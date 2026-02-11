@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model, Types } from 'mongoose';
 import { ClientPhone } from '../schemas/client-phone.schema';
@@ -111,7 +111,7 @@ export class ClientPhoneRepository {
         return existing;
       }
       // Owned by different client - reject
-      throw new Error(
+      throw new ConflictException(
         `Phone number ${phoneNumberId} is already owned by another client`,
       );
     }
