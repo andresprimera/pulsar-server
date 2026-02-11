@@ -3,14 +3,19 @@ import { getModelToken } from '@nestjs/mongoose';
 import { Types } from 'mongoose';
 import { SeederService } from './seeder.service';
 import { Agent } from './schemas/agent.schema';
+import { AgentChannel } from './schemas/agent-channel.schema';
+import { ClientPhone } from './schemas/client-phone.schema';
 import { UserRepository } from './repositories/user.repository';
 import { ChannelRepository } from './repositories/channel.repository';
 import { OnboardingService } from '../onboarding/onboarding.service';
 import { Logger } from '@nestjs/common';
+import * as SEED_DATA from './data/seed-data.json';
 
 describe('SeederService', () => {
   let service: SeederService;
   let mockAgentModel: any;
+  let mockAgentChannelModel: any;
+  let mockClientPhoneModel: any;
   let mockUserRepository: any;
   let mockOnboardingService: any;
   let mockChannelRepository: any;
@@ -21,15 +26,15 @@ describe('SeederService', () => {
   const mockOnboardingResult = {
     user: {
       _id: 'user-id',
-      email: 'john.doe@pulsar.com',
-      name: 'John Doe',
+      email: SEED_DATA.user.email,
+      name: SEED_DATA.user.name,
       clientId: 'client-id',
       status: 'active',
     },
     client: {
       _id: 'client-id',
-      type: 'individual',
-      name: 'John Doe',
+      type: SEED_DATA.client.type,
+      name: SEED_DATA.user.name,
       ownerUserId: 'user-id',
       status: 'active',
     },
@@ -37,7 +42,7 @@ describe('SeederService', () => {
       _id: 'client-agent-id',
       clientId: 'client-id',
       agentId: mockAgentId.toString(),
-      price: 100,
+      price: SEED_DATA.agentHiring.price,
       status: 'active',
     },
     agentChannels: [
@@ -55,6 +60,14 @@ describe('SeederService', () => {
     mockAgentModel = {
       findOne: jest.fn(),
       create: jest.fn(),
+    };
+
+    mockAgentChannelModel = {
+      createIndexes: jest.fn().mockResolvedValue(undefined),
+    };
+
+    mockClientPhoneModel = {
+      createIndexes: jest.fn().mockResolvedValue(undefined),
     };
 
     mockUserRepository = {
@@ -75,6 +88,14 @@ describe('SeederService', () => {
         {
           provide: getModelToken(Agent.name),
           useValue: mockAgentModel,
+        },
+        {
+          provide: getModelToken(AgentChannel.name),
+          useValue: mockAgentChannelModel,
+        },
+        {
+          provide: getModelToken(ClientPhone.name),
+          useValue: mockClientPhoneModel,
         },
         { provide: UserRepository, useValue: mockUserRepository },
         { provide: OnboardingService, useValue: mockOnboardingService },
@@ -117,7 +138,7 @@ describe('SeederService', () => {
       mockUserRepository.findByEmail.mockResolvedValue(null);
       // No existing agent
       mockAgentModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(null) });
-      mockAgentModel.create.mockResolvedValue({ _id: mockAgentId, name: 'Support Bot' });
+      mockAgentModel.create.mockResolvedValue({ _id: mockAgentId, name: SEED_DATA.agent.name });
 
       await service.onApplicationBootstrap();
 
@@ -132,59 +153,44 @@ describe('SeederService', () => {
       mockUserRepository.findByEmail.mockResolvedValue(null);
       // No existing agent
       mockAgentModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(null) });
-      mockAgentModel.create.mockResolvedValue({ _id: mockAgentId, name: 'Support Bot' });
+      mockAgentModel.create.mockResolvedValue({ _id: mockAgentId, name: SEED_DATA.agent.name });
 
       await service.onApplicationBootstrap();
 
       // Verify agent creation
       expect(mockAgentModel.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          name: 'Support Bot',
-          systemPrompt: 'You are a helpful support assistant.',
+          name: SEED_DATA.agent.name,
+          systemPrompt: SEED_DATA.agent.systemPrompt,
           status: 'active',
           createdBySeeder: true,
         }),
       );
 
+      // Verify indexes were built
+      expect(mockAgentChannelModel.createIndexes).toHaveBeenCalled();
+      expect(mockClientPhoneModel.createIndexes).toHaveBeenCalled();
+
       // Verify onboarding was called with correct DTO
       expect(mockOnboardingService.registerAndHire).toHaveBeenCalledWith({
         user: {
-          email: 'john.doe@pulsar.com',
-          name: 'John Doe',
+          email: SEED_DATA.user.email,
+          name: SEED_DATA.user.name,
         },
         client: {
-          type: 'individual',
+          type: SEED_DATA.client.type,
         },
         agentHiring: {
           agentId: mockAgentId.toString(),
-          price: 100,
+          price: SEED_DATA.agentHiring.price,
         },
-        channels: [
-          {
-            name: 'WhatsApp',
-            type: 'whatsapp',
-            provider: 'meta',
-            agentChannelConfig: {
-              status: 'active',
-              channelConfig: {
-                phoneNumberId: '1234567890',
-                accessToken: '__REPLACE_ME_ACCESS_TOKEN__',
-                webhookVerifyToken: '__REPLACE_ME_VERIFY_TOKEN__',
-              },
-              llmConfig: {
-                provider: 'openai',
-                apiKey: '__REPLACE_ME_API_KEY__',
-                model: 'gpt-4o',
-              },
-            },
-          },
-        ],
+        channels: SEED_DATA.channels,
       });
 
       // Verify channel provisioning
       expect(mockChannelRepository.findOrCreateByName).toHaveBeenCalledWith(
-        'WhatsApp',
-        expect.objectContaining({ type: 'whatsapp' }),
+        SEED_DATA.channels[0].name,
+        expect.objectContaining({ type: SEED_DATA.channels[0].type }),
       );
     });
 
@@ -206,7 +212,7 @@ describe('SeederService', () => {
       // Existing user found
       mockUserRepository.findByEmail.mockResolvedValue({
         _id: 'existing-user-id',
-        email: 'john.doe@pulsar.com',
+        email: SEED_DATA.user.email,
       });
 
       await service.onApplicationBootstrap();
@@ -224,7 +230,7 @@ describe('SeederService', () => {
       mockUserRepository.findByEmail.mockResolvedValue(null);
       // Existing agent found
       mockAgentModel.findOne.mockReturnValue({
-        exec: jest.fn().mockResolvedValue({ _id: mockAgentId, name: 'Support Bot' }),
+        exec: jest.fn().mockResolvedValue({ _id: mockAgentId, name: SEED_DATA.agent.name }),
       });
 
       await service.onApplicationBootstrap();

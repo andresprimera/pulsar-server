@@ -1,0 +1,37 @@
+{
+  "user": {
+    "email": "andresprimera@gmail.com",
+    "name": "Andrés Primera"
+  },
+  "agent": {
+    "name": "Support Bot",
+    "systemPrompt": "You are a helpful support assistant.",
+    "status": "active"
+  },
+  "client": {
+    "type": "individual"
+  },
+  "agentHiring": {
+    "price": 100
+  },
+  "channels": [
+    {
+      "name": "WhatsApp",
+      "type": "whatsapp",
+      "provider": "meta",
+      "agentChannelConfig": {
+        "status": "active",
+        "channelConfig": {
+          "phoneNumberId": "573012890029",
+          "accessToken": "__REPLACE_ME_ACCESS_TOKEN__",
+          "webhookVerifyToken": "__REPLACE_ME_VERIFY_TOKEN__"
+        },
+        "llmConfig": {
+          "provider": "openai",
+          "apiKey": "__REPLACE_ME_API_KEY__",
+          "model": "gpt-4o"
+        }
+      }
+    }
+  ]
+}

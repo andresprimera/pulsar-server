@@ -3,12 +3,11 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { UserRepository } from './repositories/user.repository';
 import { Agent } from './schemas/agent.schema';
+import { AgentChannel } from './schemas/agent-channel.schema';
+import { ClientPhone } from './schemas/client-phone.schema';
 import { OnboardingService } from '../onboarding/onboarding.service';
 import { ChannelRepository } from './repositories/channel.repository';
-
-const SEED_USER_EMAIL = 'john.doe@pulsar.com';
-const SEED_AGENT_NAME = 'Support Bot';
-const SEED_PHONE_NUMBER_ID = '1234567890';
+import * as SEED_DATA from './data/seed-data.json';
 
 @Injectable()
 export class SeederService implements OnApplicationBootstrap {
@@ -18,6 +17,10 @@ export class SeederService implements OnApplicationBootstrap {
     private readonly userRepository: UserRepository,
     @InjectModel(Agent.name)
     private readonly agentModel: Model<Agent>,
+    @InjectModel(AgentChannel.name)
+    private readonly agentChannelModel: Model<AgentChannel>,
+    @InjectModel(ClientPhone.name)
+    private readonly clientPhoneModel: Model<ClientPhone>,
     @Inject(forwardRef(() => OnboardingService))
     private readonly onboardingService: OnboardingService,
     private readonly channelRepository: ChannelRepository,
@@ -45,67 +48,57 @@ export class SeederService implements OnApplicationBootstrap {
 
     try {
       // Idempotency check: if seed user exists, skip entire seeding
-      const existingUser = await this.userRepository.findByEmail(SEED_USER_EMAIL);
+      const existingUser = await this.userRepository.findByEmail(SEED_DATA.user.email);
       if (existingUser) {
-        this.logger.log(`Seed user "${SEED_USER_EMAIL}" already exists. Skipping seeding.`);
+        this.logger.log(`Seed user "${SEED_DATA.user.email}" already exists. Skipping seeding.`);
         return;
       }
 
       // 1. Ensure Agent exists (required for onboarding)
-      let agent = await this.agentModel.findOne({ name: SEED_AGENT_NAME }).exec();
+      let agent = await this.agentModel.findOne({ name: SEED_DATA.agent.name }).exec();
       if (!agent) {
-        this.logger.log(`Creating Agent: ${SEED_AGENT_NAME}`);
+        this.logger.log(`Creating Agent: ${SEED_DATA.agent.name}`);
         agent = await this.agentModel.create({
-          name: SEED_AGENT_NAME,
-          systemPrompt: 'You are a helpful support assistant.',
-          status: 'active',
+          name: SEED_DATA.agent.name,
+          systemPrompt: SEED_DATA.agent.systemPrompt,
+          status: SEED_DATA.agent.status,
           createdBySeeder: true,
         });
       } else {
-        this.logger.log(`Agent "${SEED_AGENT_NAME}" already exists (${agent._id})`);
+        this.logger.log(`Agent "${SEED_DATA.agent.name}" already exists (${agent._id})`);
       }
 
       // 2. Ensure Channels exist (Infrastructure provisioning)
       this.logger.log('Provisioning channels...');
-      await this.channelRepository.findOrCreateByName('WhatsApp', {
-        type: 'whatsapp',
-        provider: 'meta',
-      });
+      for (const channel of SEED_DATA.channels) {
+        await this.channelRepository.findOrCreateByName(channel.name, {
+          type: channel.type as any,
+          provider: channel.provider as any,
+        });
+      }
+
+      // Ensure indexes are built before transaction starts to avoid "catalog changes" error
+      this.logger.log('Ensuring indexes are built...');
+      await Promise.all([
+        this.agentChannelModel.createIndexes(),
+        this.clientPhoneModel.createIndexes(),
+      ]);
 
       // 3. Use OnboardingService to create User, Client, ClientAgent, AgentChannel, ClientPhone
       this.logger.log('Running onboarding flow for seed user...');
       const result = await this.onboardingService.registerAndHire({
         user: {
-          email: SEED_USER_EMAIL,
-          name: 'John Doe',
+          email: SEED_DATA.user.email,
+          name: SEED_DATA.user.name,
         },
         client: {
-          type: 'individual',
+          type: SEED_DATA.client.type as any,
         },
         agentHiring: {
           agentId: agent._id.toString(),
-          price: 100,
+          price: SEED_DATA.agentHiring.price,
         },
-        channels: [
-          {
-            name: 'WhatsApp',
-            type: 'whatsapp',
-            provider: 'meta',
-            agentChannelConfig: {
-              status: 'active',
-              channelConfig: {
-                phoneNumberId: SEED_PHONE_NUMBER_ID,
-                accessToken: '__REPLACE_ME_ACCESS_TOKEN__',
-                webhookVerifyToken: '__REPLACE_ME_VERIFY_TOKEN__',
-              },
-              llmConfig: {
-                provider: 'openai',
-                apiKey: '__REPLACE_ME_API_KEY__',
-                model: 'gpt-4o',
-              },
-            },
-          },
-        ],
+        channels: SEED_DATA.channels as any,
       });
 
       this.logger.log(`Seeding complete via onboarding:`);
