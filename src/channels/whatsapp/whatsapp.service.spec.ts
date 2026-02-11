@@ -6,6 +6,7 @@ import { AgentService } from '../../agent/agent.service';
 import { AgentChannelRepository } from '../../database/repositories/agent-channel.repository';
 import { AgentRepository } from '../../database/repositories/agent.repository';
 import { ClientPhoneRepository } from '../../database/repositories/client-phone.repository';
+import { LlmProvider } from '../../agent/llm/provider.enum';
 
 describe('WhatsappService', () => {
   let service: WhatsappService;
@@ -125,7 +126,7 @@ describe('WhatsappService', () => {
         webhookVerifyToken: 'test-token',
       },
       llmConfig: {
-        provider: 'openai' as const,
+        provider: LlmProvider.OpenAI,
         apiKey: 'sk-mock-key',
         model: 'gpt-4',
       },

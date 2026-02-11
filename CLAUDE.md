@@ -66,6 +66,9 @@ The project follows a strict layered structure:
 - DTOs must use `class-validator`
 - No raw request bodies in services
 - DTOs live close to their feature module
+- Normalize external provider strings at the DTO boundary using `@Transform` to lowercase
+  - `@Transform` must appear before `@IsEnum` or other validation decorators
+  - Applies to provider fields for LLM config, channel config, credential rotation, and infra channel creation
 
 ❌ Do NOT validate inside controllers manually
 ❌ Do NOT trust raw input

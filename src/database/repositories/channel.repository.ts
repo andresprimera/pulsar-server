@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { ClientSession, Model } from 'mongoose';
+import { ClientSession, Model, Types } from 'mongoose';
 import { Channel } from '../schemas/channel.schema';
 
 @Injectable()
@@ -42,5 +42,14 @@ export class ChannelRepository {
   async create(data: Partial<Channel>): Promise<Channel> {
     const channel = new this.model(data);
     return channel.save();
+  }
+
+  async findByIdOrFail(id: string | Types.ObjectId): Promise<Channel> {
+    const objectId = typeof id === 'string' ? new Types.ObjectId(id) : id;
+    const doc = await this.model.findById(objectId).exec();
+    if (!doc) {
+      throw new NotFoundException(`Channel not found with id: ${id}`);
+    }
+    return doc;
   }
 }

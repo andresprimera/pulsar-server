@@ -1,9 +1,11 @@
+import { LlmProvider } from '../llm/provider.enum';
+
 export interface AgentContext {
   agentId: string;
   clientId: string;
   systemPrompt: string;
   llmConfig: {
-    provider: 'openai' | 'anthropic';
+    provider: LlmProvider;
     apiKey: string;
     model: string;
   };

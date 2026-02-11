@@ -70,10 +70,10 @@ export class SeederService implements OnApplicationBootstrap {
 
       // 2. Ensure Channels exist (Infrastructure provisioning)
       this.logger.log('Provisioning channels...');
-      for (const channel of SEED_DATA.channels) {
-        await this.channelRepository.findOrCreateByName(channel.name, {
-          type: channel.type as any,
-          provider: channel.provider as any,
+      for (const channelSeed of SEED_DATA.channels) {
+        await this.channelRepository.findOrCreateByName(channelSeed.name, {
+          type: channelSeed.type as any,
+          supportedProviders: channelSeed.supportedProviders.map(p => p.toLowerCase()),
         });
       }
 
@@ -84,7 +84,25 @@ export class SeederService implements OnApplicationBootstrap {
         this.clientPhoneModel.createIndexes(),
       ]);
 
-      // 3. Use OnboardingService to create User, Client, ClientAgent, AgentChannel, ClientPhone
+      // 3. Map Seed Data to HireChannelConfigDto (Resolve Channel IDs)
+      const channelsDto = [];
+      for (const channelSeed of SEED_DATA.channels) {
+          const channelDoc = await this.channelRepository.findByNameOrFail(channelSeed.name);
+          // Use provider from existing config/structure or robust default
+          // Assuming seed data might have a preferred provider logic, otherwise default to first supported
+          // Ideally seed data should specify the provider to use for the agent
+          const provider = (channelSeed as any).defaultProvider || channelSeed.supportedProviders[0];
+          
+          channelsDto.push({
+              channelId: channelDoc._id.toString(),
+              provider: provider,
+              status: 'active',
+              credentials: channelSeed.agentChannelConfig.channelConfig,
+              llmConfig: channelSeed.agentChannelConfig.llmConfig,
+          });
+      }
+
+      // 4. Use OnboardingService to create User, Client, ClientAgent, and ClientPhone
       this.logger.log('Running onboarding flow for seed user...');
       const result = await this.onboardingService.registerAndHire({
         user: {
@@ -98,14 +116,14 @@ export class SeederService implements OnApplicationBootstrap {
           agentId: agent._id.toString(),
           price: SEED_DATA.agentHiring.price,
         },
-        channels: SEED_DATA.channels as any,
+        channels: channelsDto as any,
       });
 
       this.logger.log(`Seeding complete via onboarding:`);
       this.logger.log(`  - User: ${result.user._id} (${result.user.email})`);
       this.logger.log(`  - Client: ${result.client._id} (${result.client.name})`);
       this.logger.log(`  - ClientAgent: ${result.clientAgent._id}`);
-      this.logger.log(`  - AgentChannels: ${result.agentChannels.map(ac => ac._id).join(', ')}`);
+      this.logger.log(`  - ClientAgent: ${result.clientAgent._id}`);
     } catch (error) {
       this.logger.error('Seeding failed', error);
     }

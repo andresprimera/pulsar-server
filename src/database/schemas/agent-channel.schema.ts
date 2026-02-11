@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import { LlmConfig, LlmConfigSchema } from './llm-config.schema';
 
 @Schema({ collection: 'agent_channels' })
 export class AgentChannel extends Document {
@@ -29,16 +30,14 @@ export class AgentChannel extends Document {
    */
   @Prop({ type: Object, required: true })
   channelConfig: {
-    accessToken: string;
-    webhookVerifyToken: string;
+    accessToken?: string;
+    webhookVerifyToken?: string;
+    email?: string;
+    password?: string;
   };
 
-  @Prop({ type: Object, required: true })
-  llmConfig: {
-    provider: 'openai' | 'anthropic';
-    apiKey: string;
-    model: string;
-  };
+  @Prop({ type: LlmConfigSchema, required: true })
+  llmConfig: LlmConfig;
 }
 
 export const AgentChannelSchema = SchemaFactory.createForClass(AgentChannel);

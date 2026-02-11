@@ -9,8 +9,11 @@ import {
   IsObject,
   ValidateNested,
   Min,
+  ArrayMinSize,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
+import { LlmProvider } from '../../agent/llm/provider.enum';
+import { ChannelProvider } from '../../channels/channel-provider.enum';
 
 class UserDto {
   @Transform(({ value }) => value?.toLowerCase().trim())
@@ -41,8 +44,9 @@ class AgentHiringDto {
 }
 
 class LlmConfigDto {
-  @IsEnum(['openai', 'anthropic'])
-  provider: 'openai' | 'anthropic';
+  @Transform(({ value }) => value?.toLowerCase().trim())
+  @IsEnum(LlmProvider)
+  provider: LlmProvider;
 
   @IsString()
   apiKey: string;
@@ -64,20 +68,20 @@ class AgentChannelConfigDto {
   llmConfig: LlmConfigDto;
 }
 
-class ChannelDto {
-  @IsString()
-  name: string;
+class HireChannelConfigDto {
+  @IsMongoId()
+  channelId: string;
 
-  @IsEnum(['whatsapp', 'telegram', 'web', 'api'])
-  type: 'whatsapp' | 'telegram' | 'web' | 'api';
+  @Transform(({ value }) => value?.toLowerCase().trim())
+  @IsEnum(ChannelProvider)
+  provider: ChannelProvider;
 
-  @IsOptional()
-  @IsEnum(['meta', 'twilio', 'custom'])
-  provider?: 'meta' | 'twilio' | 'custom';
+  @IsObject()
+  credentials: Record<string, any>;
 
   @ValidateNested()
-  @Type(() => AgentChannelConfigDto)
-  agentChannelConfig: AgentChannelConfigDto;
+  @Type(() => LlmConfigDto)
+  llmConfig: LlmConfigDto;
 }
 
 export class RegisterAndHireDto {
@@ -95,6 +99,7 @@ export class RegisterAndHireDto {
 
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => ChannelDto)
-  channels: ChannelDto[];
+  @ArrayMinSize(1)
+  @Type(() => HireChannelConfigDto)
+  channels: HireChannelConfigDto[];
 }

@@ -6,11 +6,11 @@ export class Channel extends Document {
   @Prop({ required: true, unique: true  })
   name: string;
 
-  @Prop({ required: true, enum: ['whatsapp', 'telegram', 'web', 'api'] })
-  type: 'whatsapp' | 'telegram' | 'web' | 'api';
+  @Prop({ required: true, enum: ['whatsapp', 'telegram', 'web', 'api', 'email'] })
+  type: 'whatsapp' | 'telegram' | 'web' | 'api' | 'email';
 
-  @Prop({ required: true, enum: ['meta', 'twilio', 'custom'] })
-  provider: 'meta' | 'twilio' | 'custom';
+  @Prop({ required: true, type: [String] })
+  supportedProviders: string[];
 }
 
 export const ChannelSchema = SchemaFactory.createForClass(Channel);

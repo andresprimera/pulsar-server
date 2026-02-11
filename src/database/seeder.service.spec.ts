@@ -80,6 +80,7 @@ describe('SeederService', () => {
 
     mockChannelRepository = {
       findOrCreateByName: jest.fn(),
+      findByNameOrFail: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -140,6 +141,10 @@ describe('SeederService', () => {
       mockAgentModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(null) });
       mockAgentModel.create.mockResolvedValue({ _id: mockAgentId, name: SEED_DATA.agent.name });
 
+      // Mock Channel resolutions
+      mockChannelRepository.findOrCreateByName.mockResolvedValue({ _id: 'channel-id', name: 'WhatsApp' });
+      mockChannelRepository.findByNameOrFail.mockResolvedValue({ _id: 'channel-id', name: 'WhatsApp' });
+
       await service.onApplicationBootstrap();
 
       expect(mockOnboardingService.registerAndHire).toHaveBeenCalled();
@@ -154,6 +159,11 @@ describe('SeederService', () => {
       // No existing agent
       mockAgentModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(null) });
       mockAgentModel.create.mockResolvedValue({ _id: mockAgentId, name: SEED_DATA.agent.name });
+
+      // Mock Channel resolutions
+      mockChannelRepository.findOrCreateByName.mockResolvedValue({ _id: 'channel-id', name: 'WhatsApp' });
+      mockChannelRepository.findByNameOrFail.mockResolvedValue({ _id: 'channel-id', name: 'WhatsApp' });
+
 
       await service.onApplicationBootstrap();
 
@@ -171,27 +181,21 @@ describe('SeederService', () => {
       expect(mockAgentChannelModel.createIndexes).toHaveBeenCalled();
       expect(mockClientPhoneModel.createIndexes).toHaveBeenCalled();
 
-      // Verify onboarding was called with correct DTO
-      expect(mockOnboardingService.registerAndHire).toHaveBeenCalledWith({
-        user: {
-          email: SEED_DATA.user.email,
-          name: SEED_DATA.user.name,
-        },
-        client: {
-          type: SEED_DATA.client.type,
-        },
-        agentHiring: {
-          agentId: mockAgentId.toString(),
-          price: SEED_DATA.agentHiring.price,
-        },
-        channels: SEED_DATA.channels,
-      });
+      // Verify onboarding was called with correct DTO structure (ClientAgent with channels)
+      expect(mockOnboardingService.registerAndHire).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user: expect.objectContaining({ email: SEED_DATA.user.email }),
+          channels: expect.arrayContaining([
+              expect.objectContaining({
+                  channelId: 'channel-id',
+                  status: 'active'
+              })
+          ])
+        })
+      );
 
       // Verify channel provisioning
-      expect(mockChannelRepository.findOrCreateByName).toHaveBeenCalledWith(
-        SEED_DATA.channels[0].name,
-        expect.objectContaining({ type: SEED_DATA.channels[0].type }),
-      );
+      expect(mockChannelRepository.findOrCreateByName).toHaveBeenCalledTimes(SEED_DATA.channels.length);
     });
 
     it('should skip seeding in DEVELOPMENT if SEED_DB is false', async () => {
@@ -232,6 +236,10 @@ describe('SeederService', () => {
       mockAgentModel.findOne.mockReturnValue({
         exec: jest.fn().mockResolvedValue({ _id: mockAgentId, name: SEED_DATA.agent.name }),
       });
+
+      // Mock Channel resolutions
+      mockChannelRepository.findOrCreateByName.mockResolvedValue({ _id: 'channel-id', name: 'WhatsApp' });
+      mockChannelRepository.findByNameOrFail.mockResolvedValue({ _id: 'channel-id', name: 'WhatsApp' });
 
       await service.onApplicationBootstrap();
 

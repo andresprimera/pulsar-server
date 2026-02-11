@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AgentService } from './agent.service';
 import { AgentInput } from './contracts/agent-input';
 import { AgentContext } from './contracts/agent-context';
+import { LlmProvider } from './llm/provider.enum';
 import * as llmFactory from './llm/llm.factory';
 import * as ai from 'ai';
 
@@ -29,7 +30,7 @@ describe('AgentService', () => {
     agentId: 'agent-1',
     clientId: 'client-1',
     systemPrompt: 'You are a helpful assistant.',
-    llmConfig: { provider: 'openai', apiKey: 'sk-mock', model: 'gpt-4' },
+    llmConfig: { provider: LlmProvider.OpenAI, apiKey: 'sk-mock', model: 'gpt-4' },
   };
 
   beforeEach(async () => {

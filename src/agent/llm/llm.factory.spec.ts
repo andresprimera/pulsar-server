@@ -1,4 +1,5 @@
 import { createLLMModel, LLMConfig } from './llm.factory';
+import { LlmProvider } from './provider.enum';
 
 jest.mock('@ai-sdk/openai', () => ({
   createOpenAI: jest.fn(() => jest.fn(() => 'openai-model')),
@@ -15,7 +16,7 @@ describe('LLM Factory', () => {
 
   it('should create OpenAI model', () => {
     const result = createLLMModel({
-      provider: 'openai',
+      provider: LlmProvider.OpenAI,
       apiKey: 'sk-test',
       model: 'gpt-4',
     });
@@ -24,7 +25,7 @@ describe('LLM Factory', () => {
 
   it('should create Anthropic model', () => {
     const result = createLLMModel({
-      provider: 'anthropic',
+      provider: LlmProvider.Anthropic,
       apiKey: 'sk-ant-test',
       model: 'claude-3-haiku',
     });

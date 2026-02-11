@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { getConnectionToken } from '@nestjs/mongoose';
-import { Types } from 'mongoose';
+import { Types, Error as MongooseError } from 'mongoose';
 import { OnboardingService } from './onboarding.service';
 import { ClientRepository } from '../database/repositories/client.repository';
 import { UserRepository } from '../database/repositories/user.repository';
@@ -10,6 +10,8 @@ import { ChannelRepository } from '../database/repositories/channel.repository';
 import { ClientAgentRepository } from '../database/repositories/client-agent.repository';
 import { AgentChannelRepository } from '../database/repositories/agent-channel.repository';
 import { ClientPhoneRepository } from '../database/repositories/client-phone.repository';
+import { LlmProvider } from '../agent/llm/provider.enum';
+import { ChannelProvider } from '../channels/channel-provider.enum';
 
 describe('OnboardingService', () => {
   let service: OnboardingService;
@@ -58,10 +60,10 @@ describe('OnboardingService', () => {
   };
 
   const mockChannel = {
-    _id: 'channel-1',
+    _id: '507f1f77bcf86cd799439011',
     name: 'whatsapp-main',
     type: 'whatsapp',
-    provider: 'meta',
+    supportedProviders: ['meta'],
   };
 
   const mockClientAgent = {
@@ -70,12 +72,14 @@ describe('OnboardingService', () => {
     agentId: 'agent-1',
     price: 100,
     status: 'active',
+    channels: [],
     toObject: () => ({
       _id: 'client-agent-1',
       clientId: 'client-1',
       agentId: 'agent-1',
       price: 100,
       status: 'active',
+      channels: [],
     }),
   };
 
@@ -84,27 +88,6 @@ describe('OnboardingService', () => {
     clientId: new Types.ObjectId('bbbbbbbbbbbbbbbbbbbbbbbb'),
     phoneNumberId: '123',
     provider: 'meta',
-  };
-
-  const mockAgentChannel = {
-    _id: 'agent-channel-1',
-    clientId: 'client-1',
-    agentId: 'agent-1',
-    channelId: 'channel-1',
-    status: 'active',
-    clientPhoneId: mockClientPhone._id,
-    channelConfig: { accessToken: 'token', webhookVerifyToken: 'verify' },
-    llmConfig: { provider: 'openai', apiKey: 'secret-key', model: 'gpt-4' },
-    toObject: () => ({
-      _id: 'agent-channel-1',
-      clientId: 'client-1',
-      agentId: 'agent-1',
-      channelId: 'channel-1',
-      status: 'active',
-      clientPhoneId: mockClientPhone._id,
-      channelConfig: { accessToken: 'token', webhookVerifyToken: 'verify' },
-      llmConfig: { provider: 'openai', apiKey: 'secret-key', model: 'gpt-4' },
-    }),
   };
 
   beforeEach(async () => {
@@ -134,7 +117,7 @@ describe('OnboardingService', () => {
     };
 
     mockChannelRepository = {
-      findByNameOrFail: jest.fn().mockResolvedValue(mockChannel),
+      findByIdOrFail: jest.fn().mockResolvedValue(mockChannel),
       create: jest.fn(),
     };
 
@@ -143,7 +126,7 @@ describe('OnboardingService', () => {
     };
 
     mockAgentChannelRepository = {
-      create: jest.fn().mockResolvedValue(mockAgentChannel),
+      create: jest.fn(), // Should not be called
       findByClientPhoneId: jest.fn().mockResolvedValue(null),
     };
 
@@ -180,16 +163,14 @@ describe('OnboardingService', () => {
       agentHiring: { agentId: 'agent-1', price: 100 },
       channels: [
         {
-          name: 'whatsapp-main',
-          type: 'whatsapp' as const,
-          provider: 'meta' as const,
-          agentChannelConfig: {
-            channelConfig: { phoneNumberId: '123' },
-            llmConfig: {
-              provider: 'openai' as const,
-              apiKey: 'key',
-              model: 'gpt-4',
-            },
+          channelId: '507f1f77bcf86cd799439011',
+          provider: ChannelProvider.Meta,
+          status: 'active' as const,
+          credentials: { phoneNumberId: '123' },
+          llmConfig: {
+            provider: LlmProvider.OpenAI,
+            apiKey: 'key',
+            model: 'gpt-4',
           },
         },
       ],
@@ -202,6 +183,7 @@ describe('OnboardingService', () => {
       expect(result).toHaveProperty('client');
       expect(result).toHaveProperty('clientAgent');
       expect(result).toHaveProperty('agentChannels');
+      expect(result.agentChannels).toEqual([]); // No longer returns agent channels directly
 
       expect(mockSession.startTransaction).toHaveBeenCalled();
       expect(mockSession.commitTransaction).toHaveBeenCalled();
@@ -241,14 +223,6 @@ describe('OnboardingService', () => {
         expect.objectContaining({ name: 'Custom Client Name' }),
         mockSession,
       );
-    });
-
-    it('should remove apiKey from response', async () => {
-      const result = await service.registerAndHire(validDto);
-
-      expect(result.agentChannels[0].llmConfig).not.toHaveProperty('apiKey');
-      expect(result.agentChannels[0].llmConfig).toHaveProperty('provider');
-      expect(result.agentChannels[0].llmConfig).toHaveProperty('model');
     });
 
     it('should throw ConflictException if user email already exists', async () => {
@@ -291,54 +265,53 @@ describe('OnboardingService', () => {
         ...validDto,
         channels: [
           {
-            name: 'channel-1',
-            type: 'whatsapp' as const,
-            provider: 'meta' as const,
-            agentChannelConfig: {
-              channelConfig: { phoneNumberId: '123' },
-              llmConfig: {
-                provider: 'openai' as const,
-                apiKey: 'key',
-                model: 'gpt-4',
-              },
+            channelId: '507f1f77bcf86cd799439011',
+            provider: ChannelProvider.Meta,
+            status: 'active' as const,
+            credentials: { phoneNumberId: '123' },
+            llmConfig: {
+              provider: LlmProvider.OpenAI,
+              apiKey: 'key',
+              model: 'gpt-4',
             },
           },
           {
-            name: 'channel-2',
-            type: 'whatsapp' as const,
-            provider: 'meta' as const,
-            agentChannelConfig: {
-              channelConfig: { phoneNumberId: '123' }, // same phone number - ALLOWED
-              llmConfig: {
-                provider: 'openai' as const,
-                apiKey: 'key',
-                model: 'gpt-4',
-              },
+            channelId: '507f1f77bcf86cd799439012', // Different channel ID
+            provider: ChannelProvider.Meta, // Assuming this channel also supports meta
+            status: 'active' as const,
+            credentials: { phoneNumberId: '123' }, // Same phone number
+            llmConfig: {
+              provider: LlmProvider.OpenAI,
+              apiKey: 'key',
+              model: 'gpt-4',
             },
           },
         ],
       };
 
-      // Should succeed - same phone can be used by multiple channels
-      const result = await service.registerAndHire(dtoWithSamePhoneMultipleChannels);
-
-      expect(result.agentChannels).toHaveLength(2);
-      // resolveOrCreate called twice but returns same ClientPhone
-      expect(mockClientPhoneRepository.resolveOrCreate).toHaveBeenCalledTimes(2);
-    });
-
-    it('should throw ConflictException when phone number is owned by another client', async () => {
-      mockClientPhoneRepository.findByPhoneNumber.mockResolvedValue({
-        _id: new Types.ObjectId(),
-        phoneNumberId: '123',
-        clientId: new Types.ObjectId(),
+      // Mock finding both channels
+      const channel1 = { ...mockChannel, _id: 'channel-1' };
+      const channel2 = { ...mockChannel, _id: 'channel-2' };
+      
+      mockChannelRepository.findByIdOrFail.mockImplementation((id) => {
+          if (id === '507f1f77bcf86cd799439011') return Promise.resolve(channel1);
+          if (id === '507f1f77bcf86cd799439012') return Promise.resolve(channel2);
+          return Promise.reject(new NotFoundException());
       });
 
-      await expect(service.registerAndHire(validDto)).rejects.toThrow(
-        ConflictException,
-      );
-      await expect(service.registerAndHire(validDto)).rejects.toThrow(
-        'Phone number 123 is already owned by another client',
+      // Should succeed - same phone can be used by multiple channels
+      await service.registerAndHire(dtoWithSamePhoneMultipleChannels);
+
+      // resolveOrCreate called twice but returns same ClientPhone (mock)
+      expect(mockClientPhoneRepository.resolveOrCreate).toHaveBeenCalledTimes(2);
+      expect(mockClientAgentRepository.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+              channels: expect.arrayContaining([
+                  expect.objectContaining({ channelId: new Types.ObjectId('507f1f77bcf86cd799439011') }),
+                  expect.objectContaining({ channelId: new Types.ObjectId('507f1f77bcf86cd799439012') }),
+              ])
+          }),
+          mockSession
       );
     });
 
@@ -346,7 +319,7 @@ describe('OnboardingService', () => {
       await service.registerAndHire(validDto);
 
       expect(mockClientPhoneRepository.resolveOrCreate).toHaveBeenCalledWith(
-        'client-1', // clientId from mock
+        'client-1', // client ID (string from mock)
         '123',
         expect.objectContaining({
           provider: 'meta',
@@ -355,32 +328,30 @@ describe('OnboardingService', () => {
       );
     });
 
-    it('should throw BadRequestException for duplicate channel names in request', async () => {
+    it('should throw BadRequestException for duplicate channel IDs in request', async () => {
       const dtoWithDuplicateChannels = {
         ...validDto,
         channels: [
           {
-            name: 'same-name',
-            type: 'whatsapp' as const,
-            agentChannelConfig: {
-              channelConfig: { phoneNumberId: '123' },
-              llmConfig: {
-                provider: 'openai' as const,
-                apiKey: 'key',
-                model: 'gpt-4',
-              },
+            channelId: '507f1f77bcf86cd799439011',
+            provider: ChannelProvider.Meta,
+            status: 'active' as const,
+            credentials: { phoneNumberId: '123' },
+            llmConfig: {
+              provider: LlmProvider.OpenAI,
+              apiKey: 'key',
+              model: 'gpt-4',
             },
           },
           {
-            name: 'same-name',
-            type: 'telegram' as const,
-            agentChannelConfig: {
-              channelConfig: { botToken: 'token' },
-              llmConfig: {
-                provider: 'anthropic' as const,
-                apiKey: 'key',
-                model: 'claude-3',
-              },
+            channelId: '507f1f77bcf86cd799439011', // Duplicate ID
+            provider: ChannelProvider.Meta,
+            status: 'active' as const,
+            credentials: { phoneNumberId: '123' },
+            llmConfig: {
+              provider: LlmProvider.OpenAI,
+              apiKey: 'key',
+              model: 'gpt-4',
             },
           },
         ],
@@ -391,7 +362,33 @@ describe('OnboardingService', () => {
       ).rejects.toThrow(BadRequestException);
       await expect(
         service.registerAndHire(dtoWithDuplicateChannels),
-      ).rejects.toThrow('Duplicate channel names in request');
+      ).rejects.toThrow(/Duplicate channelId/);
+    });
+
+    it('should throw BadRequestException if provider is not supported', async () => {
+         const dtoWithInvalidProvider = {
+        ...validDto,
+        channels: [
+          {
+            channelId: '507f1f77bcf86cd799439011',
+              provider: 'unsupported-provider' as unknown as ChannelProvider,
+            status: 'active' as const,
+            credentials: { phoneNumberId: '123' },
+            llmConfig: {
+              provider: LlmProvider.OpenAI,
+              apiKey: 'key',
+              model: 'gpt-4',
+            },
+          },
+        ],
+      };
+
+      await expect(
+        service.registerAndHire(dtoWithInvalidProvider),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.registerAndHire(dtoWithInvalidProvider),
+      ).rejects.toThrow(/not supported/);
     });
 
     it('should abort transaction on error during writes', async () => {
@@ -410,44 +407,6 @@ describe('OnboardingService', () => {
       expect(mockSession.endSession).toHaveBeenCalled();
     });
 
-    it('should create multiple agent channels when multiple channels provided', async () => {
-      const multiChannelDto = {
-        ...validDto,
-        channels: [
-          {
-            name: 'whatsapp-main',
-            type: 'whatsapp' as const,
-            provider: 'meta' as const,
-            agentChannelConfig: {
-              channelConfig: { phoneNumberId: '123' },
-              llmConfig: {
-                provider: 'openai' as const,
-                apiKey: 'key',
-                model: 'gpt-4',
-              },
-            },
-          },
-          {
-            name: 'telegram-main',
-            type: 'telegram' as const,
-            agentChannelConfig: {
-              channelConfig: { botToken: 'token' },
-              llmConfig: {
-                provider: 'anthropic' as const,
-                apiKey: 'key',
-                model: 'claude-3',
-              },
-            },
-          },
-        ],
-      };
-
-      await service.registerAndHire(multiChannelDto);
-
-      expect(mockChannelRepository.findByNameOrFail).toHaveBeenCalledTimes(2);
-      expect(mockAgentChannelRepository.create).toHaveBeenCalledTimes(2);
-    });
-
     it('should update client with ownerUserId after creating user', async () => {
       await service.registerAndHire(validDto);
 
@@ -459,7 +418,7 @@ describe('OnboardingService', () => {
     });
 
     it('should throw NotFoundException if channel does not exist', async () => {
-      mockChannelRepository.findByNameOrFail.mockRejectedValue(
+      mockChannelRepository.findByIdOrFail.mockRejectedValue(
         new NotFoundException('Channel not found'),
       );
 
@@ -468,12 +427,12 @@ describe('OnboardingService', () => {
       );
     });
 
-    it('does not create channels during onboarding (Invariant)', async () => {
-      mockChannelRepository.findByNameOrFail.mockResolvedValue(mockChannel);
+    it('does not create AgentChannels explicitly anymore (embedded in ClientAgent)', async () => {
+      mockChannelRepository.findByIdOrFail.mockResolvedValue(mockChannel);
 
       await service.registerAndHire(validDto);
 
-      expect(mockChannelRepository.create).not.toHaveBeenCalled();
+      expect(mockAgentChannelRepository.create).not.toHaveBeenCalled();
     });
   });
 });

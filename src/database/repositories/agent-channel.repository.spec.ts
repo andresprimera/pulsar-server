@@ -3,6 +3,7 @@ import { getModelToken } from '@nestjs/mongoose';
 import { Types } from 'mongoose';
 import { AgentChannelRepository } from './agent-channel.repository';
 import { AgentChannel } from '../schemas/agent-channel.schema';
+import { LlmProvider } from '../../agent/llm/provider.enum';
 
 describe('AgentChannelRepository', () => {
   let repository: AgentChannelRepository;
@@ -21,7 +22,7 @@ describe('AgentChannelRepository', () => {
       webhookVerifyToken: 'test-token',
     },
     llmConfig: {
-      provider: 'openai',
+      provider: LlmProvider.OpenAI,
       apiKey: 'sk-mock-key',
       model: 'gpt-4o-mini',
     },

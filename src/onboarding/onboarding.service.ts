@@ -83,8 +83,7 @@ export class OnboardingService {
       throw new BadRequestException('Client name is required for organization type');
     }
 
-    // 5. Pre-validate channels
-    await this.validateChannels(dto.channels);
+    // 5. Channels are validated during processing below
 
     // TRANSACTION (atomic writes)
     const session = await this.connection.startSession();
@@ -120,79 +119,71 @@ export class OnboardingService {
         session,
       );
 
-      // 9. Create ClientAgent (pricing snapshot)
+      // 10. Process Channels
+      const hireChannels = [];
+      const processedChannelIds = new Set<string>();
+
+      for (const channelConfig of dto.channels) {
+        // Validation: Unique channelId in request
+        if (processedChannelIds.has(channelConfig.channelId)) {
+            throw new BadRequestException(`Duplicate channelId in request: ${channelConfig.channelId}`);
+        }
+        processedChannelIds.add(channelConfig.channelId);
+
+        // Validation: Channel exists (Infrastructure)
+        const channel = await this.channelRepository.findByIdOrFail(channelConfig.channelId);
+
+        // Validation: Provider supported
+        const normalizedProvider = channelConfig.provider.toLowerCase().trim();
+        if (!channel.supportedProviders.includes(normalizedProvider)) {
+            throw new BadRequestException(
+                `Provider "${channelConfig.provider}" is not supported by channel "${channel.name}". Supported: ${channel.supportedProviders.join(', ')}`
+            );
+        }
+
+        // Credentials & Phone Logic
+        let phoneNumberId: string | undefined;
+        if (channelConfig.credentials && 'phoneNumberId' in channelConfig.credentials) {
+            phoneNumberId = channelConfig.credentials.phoneNumberId;
+        }
+
+        if (phoneNumberId) {
+             // Resolve or create ClientPhone for this client
+             // Note: We don't store clientPhoneId in ClientAgent (embedded), 
+             // but we still enforce ownership via ClientPhone repository
+             await this.clientPhoneRepository.resolveOrCreate(
+                client._id as Types.ObjectId,
+                phoneNumberId,
+                {
+                    provider: normalizedProvider as any,
+                    session,
+                },
+             );
+        }
+
+        hireChannels.push({
+            channelId: new Types.ObjectId(channelConfig.channelId),
+            provider: normalizedProvider,
+            status: 'active',
+            credentials: channelConfig.credentials,
+            llmConfig: channelConfig.llmConfig,
+        });
+      }
+
+      // 9. Create ClientAgent (pricing snapshot + channels)
       const clientAgent = await this.clientAgentRepository.create(
         {
           clientId: (client._id as Types.ObjectId).toString(),
           agentId: dto.agentHiring.agentId,
           price: dto.agentHiring.price,
           status: 'active',
+          channels: hireChannels,
         },
         session,
       );
 
-      // 10. Resolve Channels and create AgentChannels
-      const agentChannels = [];
-      for (const channelDto of dto.channels) {
-        // Resolve channel (must exist)
-        const channel = await this.channelRepository.findByNameOrFail(
-          channelDto.name,
-        );
-
-        // Extract phoneNumberId from channelConfig and resolve ClientPhone
-        const { phoneNumberId, ...channelConfigWithoutPhone } =
-          channelDto.agentChannelConfig.channelConfig as Record<string, any>;
-
-        let clientPhoneId: Types.ObjectId | undefined;
-        if (phoneNumberId) {
-          // Resolve or create ClientPhone for this client
-          const clientPhone = await this.clientPhoneRepository.resolveOrCreate(
-            client._id as Types.ObjectId,
-            phoneNumberId,
-            {
-              provider: channelDto.provider,
-              session,
-            },
-          );
-          clientPhoneId = clientPhone._id as Types.ObjectId;
-        }
-
-        // Create AgentChannel with clientPhoneId reference
-        const agentChannel = await this.agentChannelRepository.create(
-          {
-            clientId: (client._id as Types.ObjectId).toString(),
-            agentId: dto.agentHiring.agentId,
-            channelId: (channel._id as Types.ObjectId).toString(),
-            status: channelDto.agentChannelConfig.status || 'active',
-            clientPhoneId,
-            channelConfig: channelConfigWithoutPhone as any,
-            llmConfig: channelDto.agentChannelConfig.llmConfig,
-          },
-          session,
-        );
-
-        agentChannels.push(agentChannel);
-      }
-
       // 12. Commit transaction
       await session.commitTransaction();
-
-      // 13. Sanitize response (remove apiKey)
-      const sanitizedAgentChannels = agentChannels.map((ac) => {
-        const obj = ac.toObject();
-        return {
-          _id: obj._id.toString(),
-          clientId: obj.clientId,
-          agentId: obj.agentId,
-          channelId: obj.channelId,
-          status: obj.status,
-          channelConfig: obj.channelConfig,
-          llmConfig: {
-            provider: obj.llmConfig.provider,
-            model: obj.llmConfig.model,
-          },
-        };
-      });
 
       // 14. Return response
       return {
@@ -217,7 +208,8 @@ export class OnboardingService {
           price: clientAgent.price,
           status: clientAgent.status,
         },
-        agentChannels: sanitizedAgentChannels,
+        // We no longer return agentChannels array as they are embedded
+        agentChannels: [], 
       };
     } catch (error) {
       // Abort transaction on error
@@ -233,35 +225,6 @@ export class OnboardingService {
       throw error;
     } finally {
       session.endSession();
-    }
-  }
-
-  private async validateChannels(
-    channels: RegisterAndHireDto['channels'],
-  ): Promise<void> {
-    // 1. No duplicate channel names in same request
-    const names = channels.map((c) => c.name);
-    if (new Set(names).size !== names.length) {
-      throw new BadRequestException('Duplicate channel names in request');
-    }
-
-    // 2. Check phone numbers aren't already owned by another client
-    // NOTE: Same phone CAN be used by multiple channels of the same client
-    // Ownership is enforced ONLY via ClientPhone collection
-    const phoneNumberIds = channels
-      .filter((c) => c.agentChannelConfig.channelConfig?.phoneNumberId)
-      .map((c) => c.agentChannelConfig.channelConfig.phoneNumberId);
-
-    // Deduplicate for ownership check (no need to check same phone twice)
-    const uniquePhoneNumberIds = [...new Set(phoneNumberIds)];
-
-    for (const phoneNumberId of uniquePhoneNumberIds) {
-      const owner = await this.clientPhoneRepository.findByPhoneNumber(phoneNumberId);
-      if (owner) {
-        throw new ConflictException(
-          `Phone number ${phoneNumberId} is already owned by another client`,
-        );
-      }
     }
   }
 
