@@ -121,7 +121,6 @@ export class SeederService implements OnApplicationBootstrap {
       this.logger.log(`  - User: ${result.user._id} (${result.user.email})`);
       this.logger.log(`  - Client: ${result.client._id} (${result.client.name})`);
       this.logger.log(`  - ClientAgent: ${result.clientAgent._id}`);
-      this.logger.log(`  - ClientAgent: ${result.clientAgent._id}`);
     } catch (error) {
       this.logger.error('Seeding failed', error);
     }

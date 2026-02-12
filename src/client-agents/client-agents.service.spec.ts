@@ -97,10 +97,18 @@ describe('ClientAgentsService', () => {
 
       const dto = { clientId: 'unknown', agentId: 'agent-1', price: 100 };
       await expect(service.create(dto)).rejects.toThrow(BadRequestException);
+      await expect(service.create(dto)).rejects.toThrow('Client not found or not active');
     });
 
     it('should throw BadRequestException if client is archived', async () => {
       mockClientsService.findById.mockResolvedValue({ ...mockClient, status: 'archived' });
+
+      const dto = { clientId: 'client-1', agentId: 'agent-1', price: 100 };
+      await expect(service.create(dto)).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException if client is inactive', async () => {
+      mockClientsService.findById.mockResolvedValue({ ...mockClient, status: 'inactive' });
 
       const dto = { clientId: 'client-1', agentId: 'agent-1', price: 100 };
       await expect(service.create(dto)).rejects.toThrow(BadRequestException);
@@ -112,11 +120,20 @@ describe('ClientAgentsService', () => {
 
       const dto = { clientId: 'client-1', agentId: 'unknown', price: 100 };
       await expect(service.create(dto)).rejects.toThrow(BadRequestException);
+      await expect(service.create(dto)).rejects.toThrow('Agent not found or not active');
     });
 
     it('should throw BadRequestException if agent is archived', async () => {
       mockClientsService.findById.mockResolvedValue(mockClient);
       mockAgentsService.findOne.mockResolvedValue({ ...mockAgent, status: 'archived' });
+
+      const dto = { clientId: 'client-1', agentId: 'agent-1', price: 100 };
+      await expect(service.create(dto)).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException if agent is inactive', async () => {
+      mockClientsService.findById.mockResolvedValue(mockClient);
+      mockAgentsService.findOne.mockResolvedValue({ ...mockAgent, status: 'inactive' });
 
       const dto = { clientId: 'client-1', agentId: 'agent-1', price: 100 };
       await expect(service.create(dto)).rejects.toThrow(BadRequestException);

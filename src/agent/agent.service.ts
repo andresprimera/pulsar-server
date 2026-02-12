@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { generateText } from 'ai';
 import { AgentInput } from './contracts/agent-input';
 import { AgentOutput } from './contracts/agent-output';
@@ -7,9 +7,11 @@ import { createLLMModel } from './llm/llm.factory';
 
 @Injectable()
 export class AgentService {
+  private readonly logger = new Logger(AgentService.name);
+
   async run(input: AgentInput, context: AgentContext): Promise<AgentOutput> {
-    console.log(
-      `[Agent] ${context.agentId} for client ${context.clientId} ` +
+    this.logger.log(
+      `Processing ${context.agentId} for client ${context.clientId} ` +
         `using provider=${context.llmConfig.provider} model=${context.llmConfig.model}`,
     );
 
@@ -25,7 +27,7 @@ export class AgentService {
       const safeText =
         text?.trim() || "I'm having trouble responding right now.";
 
-      console.log(`[Agent] Response generated for ${context.agentId}`);
+      this.logger.log(`Response generated for ${context.agentId}`);
 
       return {
         reply: {
@@ -34,9 +36,9 @@ export class AgentService {
         },
       };
     } catch (error) {
-      console.error(
-        `[Agent] Error for ${context.agentId} client ${context.clientId}:`,
-        error instanceof Error ? error.message : error,
+      this.logger.error(
+        `Error for ${context.agentId} client ${context.clientId}: ` +
+          (error instanceof Error ? error.message : String(error)),
       );
 
       return {

@@ -43,15 +43,6 @@ describe('SeederService', () => {
       price: SEED_DATA.agentHiring.price,
       status: 'active',
     },
-    agentChannels: [
-      {
-        _id: 'agent-channel-id',
-        clientId: 'client-id',
-        agentId: mockAgentId.toString(),
-        channelId: 'channel-id',
-        status: 'active',
-      },
-    ],
   };
 
   beforeEach(async () => {

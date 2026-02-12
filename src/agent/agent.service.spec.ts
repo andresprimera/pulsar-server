@@ -5,6 +5,7 @@ import { AgentContext } from './contracts/agent-context';
 import { LlmProvider } from './llm/provider.enum';
 import * as llmFactory from './llm/llm.factory';
 import * as ai from 'ai';
+import { Logger } from '@nestjs/common';
 
 jest.mock('ai', () => ({
   generateText: jest.fn(),
@@ -16,8 +17,8 @@ jest.mock('./llm/llm.factory', () => ({
 
 describe('AgentService', () => {
   let service: AgentService;
-  let consoleSpy: jest.SpyInstance;
-  let consoleErrorSpy: jest.SpyInstance;
+  let logSpy: jest.SpyInstance;
+  let errorSpy: jest.SpyInstance;
 
   const mockInput: AgentInput = {
     channel: 'whatsapp',
@@ -39,14 +40,14 @@ describe('AgentService', () => {
     }).compile();
 
     service = module.get<AgentService>(AgentService);
-    consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+    errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
     jest.clearAllMocks();
   });
 
   afterEach(() => {
-    consoleSpy.mockRestore();
-    consoleErrorSpy.mockRestore();
+    logSpy.mockRestore();
+    errorSpy.mockRestore();
   });
 
   it('should be defined', () => {
@@ -102,7 +103,7 @@ describe('AgentService', () => {
           text: "I'm having trouble responding right now.",
         },
       });
-      expect(consoleErrorSpy).toHaveBeenCalled();
+      expect(errorSpy).toHaveBeenCalled();
     });
 
     it('should log agent and client info before and after call', async () => {
@@ -112,11 +113,11 @@ describe('AgentService', () => {
 
       await service.run(mockInput, mockContext);
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[Agent] agent-1 for client client-1 using provider=openai model=gpt-4',
+      expect(logSpy).toHaveBeenCalledWith(
+        'Processing agent-1 for client client-1 using provider=openai model=gpt-4',
       );
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[Agent] Response generated for agent-1',
+      expect(logSpy).toHaveBeenCalledWith(
+        'Response generated for agent-1',
       );
     });
   });

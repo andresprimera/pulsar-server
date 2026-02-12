@@ -39,7 +39,7 @@
       "agentChannelConfig": {
         "channelConfig": {
           "email": "marcelina.bauch@ethereal.email",
-          "password": "T1uPWBGMFSZ5qBCvdW",
+          "password": "__REPLACE_ME_PASSWORD__",
           "smtpHost": "smtp.ethereal.email",
           "smtpPort": 587,
           "imapHost": "imap.ethereal.email",

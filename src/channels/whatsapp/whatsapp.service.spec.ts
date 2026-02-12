@@ -36,7 +36,7 @@ describe('WhatsappService', () => {
         },
         {
           provide: AgentRepository,
-          useValue: { findById: jest.fn() },
+          useValue: { findActiveById: jest.fn() },
         },
       ],
     }).compile();
@@ -177,7 +177,7 @@ describe('WhatsappService', () => {
 
     it('should call agentService.run with correct input and context', async () => {
       clientAgentRepository.findOneByPhoneNumberId.mockResolvedValue(mockClientAgent as any);
-      agentRepository.findById.mockResolvedValue(mockAgent as any);
+      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({ reply: { type: 'text', text: 'Hello' } });
 
       const payload = createPayload();
@@ -197,7 +197,7 @@ describe('WhatsappService', () => {
           systemPrompt: 'You are a helpful assistant.',
           llmConfig: {
             ...mockClientAgent.channels[0].llmConfig,
-            apiKey: process.env.OPENAI_API_KEY, 
+            apiKey: 'sk-mock-key',
           },
           channelConfig: mockClientAgent.channels[0].credentials,
         },
@@ -206,7 +206,7 @@ describe('WhatsappService', () => {
 
     it('should log outbound message when reply exists', async () => {
       clientAgentRepository.findOneByPhoneNumberId.mockResolvedValue(mockClientAgent as any);
-      agentRepository.findById.mockResolvedValue(mockAgent as any);
+      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({ reply: { type: 'text', text: 'Echo response' } });
 
       const payload = createPayload();
@@ -219,7 +219,7 @@ describe('WhatsappService', () => {
 
     it('should not log outbound message when reply is undefined', async () => {
       clientAgentRepository.findOneByPhoneNumberId.mockResolvedValue(mockClientAgent as any);
-      agentRepository.findById.mockResolvedValue(mockAgent as any);
+      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({});
 
       const payload = createPayload();
@@ -230,18 +230,14 @@ describe('WhatsappService', () => {
       );
     });
 
-    it('should use empty systemPrompt when agent is not found', async () => {
+    it('should skip processing when agent is not active', async () => {
       clientAgentRepository.findOneByPhoneNumberId.mockResolvedValue(mockClientAgent as any);
-      agentRepository.findById.mockResolvedValue(null);
-      agentService.run.mockResolvedValue({ reply: { type: 'text', text: 'Hello' } });
+      agentRepository.findActiveById.mockResolvedValue(null);
 
       const payload = createPayload();
       await service.handleIncoming(payload);
 
-      expect(agentService.run).toHaveBeenCalledWith(
-        expect.any(Object),
-        expect.objectContaining({ systemPrompt: '' }),
-      );
+      expect(agentService.run).not.toHaveBeenCalled();
     });
   });
 });

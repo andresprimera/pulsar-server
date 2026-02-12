@@ -6,7 +6,7 @@ export class LlmConfig {
   @Prop({ required: true, enum: Object.values(LlmProvider) })
   provider: LlmProvider;
 
-  @Prop({ required: true })
+  @Prop({ required: true, select: false })
   apiKey: string;
 
   @Prop({ required: true })

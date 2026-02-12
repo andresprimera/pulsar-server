@@ -23,6 +23,12 @@ export class ClientAgentRepository {
     return doc;
   }
 
+  /**
+   * Find all ClientAgents for a given client.
+   * Note: `credentials` and `apiKey` are excluded by default (select: false).
+   * This is intentional — use `select('+channels.credentials')` only
+   * in routing queries that need to decrypt credentials.
+   */
   async findByClient(clientId: string): Promise<ClientAgent[]> {
     return this.model.find({ clientId }).exec();
   }
@@ -58,7 +64,9 @@ export class ClientAgentRepository {
           'credentials.phoneNumberId': phoneNumberId,
         },
       },
-    }).exec();
+    })
+    .select('+channels.credentials +channels.llmConfig.apiKey')
+    .exec();
   }
 
   /**
@@ -74,7 +82,9 @@ export class ClientAgentRepository {
           'credentials.email': email,
         },
       },
-    }).exec();
+    })
+    .select('+channels.credentials +channels.llmConfig.apiKey')
+    .exec();
   }
 
   /**
@@ -90,6 +100,8 @@ export class ClientAgentRepository {
           'credentials.email': { $exists: true },
         },
       },
-    }).exec();
+    })
+    .select('+channels.credentials +channels.llmConfig.apiKey')
+    .exec();
   }
 }

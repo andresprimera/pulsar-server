@@ -13,6 +13,7 @@ import { ChannelRepository } from '../database/repositories/channel.repository';
 import { ClientAgentRepository } from '../database/repositories/client-agent.repository';
 
 import { ClientPhoneRepository } from '../database/repositories/client-phone.repository';
+import { encryptRecord, encrypt } from '../database/utils/crypto.util';
 
 export interface RegisterAndHireResult {
   user: {
@@ -36,18 +37,6 @@ export interface RegisterAndHireResult {
     price: number;
     status: string;
   };
-  agentChannels: Array<{
-    _id: string;
-    clientId: string;
-    agentId: string;
-    channelId: string;
-    status: string;
-    channelConfig: Record<string, any>;
-    llmConfig: {
-      provider: string;
-      model: string;
-    };
-  }>;
 }
 
 @Injectable()
@@ -69,27 +58,28 @@ export class OnboardingService {
     // 1. Normalize email
     const normalizedEmail = dto.user.email.toLowerCase().trim();
 
-    // 2. Check user email doesn't exist
-    const existingUser = await this.userRepository.findByEmail(normalizedEmail);
-    if (existingUser) {
-      throw new ConflictException('User with this email already exists');
-    }
-
-    // 3. Validate agent is hireable
+    // 2. Validate agent is hireable
     await this.agentRepository.validateHireable(dto.agentHiring.agentId);
 
-    // 4. Validate client name for organization type
+    // 3. Validate client name for organization type
     if (dto.client.type === 'organization' && !dto.client.name) {
       throw new BadRequestException('Client name is required for organization type');
     }
 
-    // 5. Channels are validated during processing below
+    // 4. Channels are validated during processing below
 
     // TRANSACTION (atomic writes)
     const session = await this.connection.startSession();
     session.startTransaction();
 
     try {
+      // 5. Check user email doesn't exist (inside transaction for consistency
+      //    under concurrent onboarding — prevents two requests from both passing
+      //    this check and producing a less descriptive E11000 error)
+      const existingUser = await this.userRepository.findByEmail(normalizedEmail);
+      if (existingUser) {
+        throw new ConflictException('User with this email already exists');
+      }
       // 6. Create Client
       const clientName = dto.client.name || dto.user.name;
       const client = await this.clientRepository.create(
@@ -165,8 +155,11 @@ export class OnboardingService {
             channelId: new Types.ObjectId(channelConfig.channelId),
             provider: normalizedProvider,
             status: 'active',
-            credentials: channelConfig.credentials,
-            llmConfig: channelConfig.llmConfig,
+            credentials: encryptRecord(channelConfig.credentials),
+            llmConfig: {
+              ...channelConfig.llmConfig,
+              apiKey: encrypt(channelConfig.llmConfig.apiKey),
+            },
         });
       }
 
@@ -208,8 +201,6 @@ export class OnboardingService {
           price: clientAgent.price,
           status: clientAgent.status,
         },
-        // We no longer return agentChannels array as they are embedded
-        agentChannels: [], 
       };
     } catch (error) {
       // Abort transaction on error (may already be aborted by MongoDB on E11000)

@@ -20,13 +20,13 @@ export class ClientAgentsService {
 
   async create(data: CreateClientAgentDto): Promise<ClientAgent> {
     const client = await this.clientsService.findById(data.clientId);
-    if (!client || client.status === 'archived') {
-      throw new BadRequestException('Client not found or archived');
+    if (!client || client.status !== 'active') {
+      throw new BadRequestException('Client not found or not active');
     }
 
     const agent = await this.agentsService.findOne(data.agentId);
-    if (!agent || agent.status === 'archived') {
-      throw new BadRequestException('Agent not found or archived');
+    if (!agent || agent.status !== 'active') {
+      throw new BadRequestException('Agent not found or not active');
     }
 
     // Fail fast: check if agent is already hired by this client

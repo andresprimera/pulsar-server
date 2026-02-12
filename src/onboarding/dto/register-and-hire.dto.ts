@@ -55,19 +55,6 @@ class LlmConfigDto {
   model: string;
 }
 
-class AgentChannelConfigDto {
-  @IsOptional()
-  @IsEnum(['active', 'inactive'])
-  status?: 'active' | 'inactive';
-
-  @IsObject()
-  channelConfig: Record<string, any>;
-
-  @ValidateNested()
-  @Type(() => LlmConfigDto)
-  llmConfig: LlmConfigDto;
-}
-
 class HireChannelConfigDto {
   @IsMongoId()
   channelId: string;

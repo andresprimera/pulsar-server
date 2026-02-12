@@ -96,7 +96,7 @@ describe('EmailService', () => {
         },
         {
           provide: AgentRepository,
-          useValue: { findById: jest.fn() },
+          useValue: { findActiveById: jest.fn() },
         },
       ],
     }).compile();
@@ -287,7 +287,7 @@ describe('EmailService', () => {
 
       expect(pollMailboxSpy).toHaveBeenCalledTimes(2);
       expect(loggerErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to poll mailbox support@example.com'),
+        expect.stringContaining('Failed to poll mailbox for clientAgent=ca-1'),
       );
     });
 
@@ -308,7 +308,7 @@ describe('EmailService', () => {
       await service.pollAllMailboxes();
 
       expect(loggerErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to poll mailbox failing@example.com: timeout'),
+        expect.stringContaining('Failed to poll mailbox for clientAgent=ca-1: timeout'),
       );
     });
 
@@ -411,7 +411,7 @@ describe('EmailService', () => {
       );
 
       clientAgentRepository.findOneByEmail.mockResolvedValue(mockClientAgent as any);
-      agentRepository.findById.mockResolvedValue(mockAgent as any);
+      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({ reply: { type: 'text', text: 'Reply' } });
 
       await service.pollMailbox(mockChannelConfig.credentials as EmailCredentials, mockClientAgent as unknown as ClientAgent);
@@ -448,6 +448,7 @@ describe('EmailService', () => {
       };
 
       clientAgentRepository.findOneByEmail.mockResolvedValue(clientAgentMixed as any);
+      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({});
 
       await service.handleIncoming(createDto());
@@ -492,7 +493,7 @@ describe('EmailService', () => {
       );
 
       clientAgentRepository.findOneByEmail.mockResolvedValue(mockClientAgent as any);
-      agentRepository.findById.mockResolvedValue(mockAgent as any);
+      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({ reply: { type: 'text', text: 'Reply' } });
 
       await service.pollMailbox(mockChannelConfig.credentials as EmailCredentials, mockClientAgent as unknown as ClientAgent);
@@ -521,7 +522,7 @@ describe('EmailService', () => {
       );
 
       clientAgentRepository.findOneByEmail.mockResolvedValue(mockClientAgent as any);
-      agentRepository.findById.mockResolvedValue(mockAgent as any);
+      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({});
 
       await service.pollMailbox(mockChannelConfig.credentials as EmailCredentials, mockClientAgent as unknown as ClientAgent);
@@ -546,7 +547,7 @@ describe('EmailService', () => {
       );
 
       clientAgentRepository.findOneByEmail.mockResolvedValue(mockClientAgent as any);
-      agentRepository.findById.mockResolvedValue(mockAgent as any);
+      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({});
 
       await service.pollMailbox(mockChannelConfig.credentials as EmailCredentials, mockClientAgent as unknown as ClientAgent);
@@ -704,7 +705,7 @@ describe('EmailService', () => {
       clientAgentRepository.findOneByEmail
         .mockRejectedValueOnce(new Error('DB error'))
         .mockResolvedValueOnce(mockClientAgent as any);
-      agentRepository.findById.mockResolvedValue(mockAgent as any);
+      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({ reply: { type: 'text', text: 'Reply' } });
 
       await service.pollMailbox(mockChannelConfig.credentials as EmailCredentials, mockClientAgent as unknown as ClientAgent);
@@ -851,7 +852,7 @@ describe('EmailService', () => {
 
       await service.handleIncoming(createDto());
 
-      expect(agentRepository.findById).not.toHaveBeenCalled();
+      expect(agentRepository.findActiveById).not.toHaveBeenCalled();
     });
 
     it('should not send email when no agent found', async () => {
@@ -880,7 +881,7 @@ describe('EmailService', () => {
 
     it('should run agent service with correct context and input', async () => {
       clientAgentRepository.findOneByEmail.mockResolvedValue(mockClientAgent as any);
-      agentRepository.findById.mockResolvedValue(mockAgent as any);
+      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({ reply: { type: 'text', text: 'Reply' } });
 
       const dto = createDto({
@@ -893,7 +894,7 @@ describe('EmailService', () => {
 
       await service.handleIncoming(dto);
 
-      expect(agentRepository.findById).toHaveBeenCalledWith('agent-1');
+      expect(agentRepository.findActiveById).toHaveBeenCalledWith('agent-1');
       expect(agentService.run).toHaveBeenCalledWith(
         {
           channel: 'email',
@@ -914,7 +915,7 @@ describe('EmailService', () => {
           systemPrompt: 'You are a helpful assistant.',
           llmConfig: {
             provider: 'openai',
-            apiKey: process.env.OPENAI_API_KEY, // Matches service impl
+            apiKey: 'sk-mock-key',
             model: 'gpt-4',
           },
           channelConfig: mockChannelConfig.credentials,
@@ -924,7 +925,7 @@ describe('EmailService', () => {
 
     it('should use default system prompt if agent has none', async () => {
       clientAgentRepository.findOneByEmail.mockResolvedValue(mockClientAgent as any);
-      agentRepository.findById.mockResolvedValue({ ...mockAgent, systemPrompt: undefined } as any);
+      agentRepository.findActiveById.mockResolvedValue({ ...mockAgent, systemPrompt: undefined } as any);
       agentService.run.mockResolvedValue({ reply: { type: 'text', text: 'Reply' } });
 
       await service.handleIncoming(createDto());
@@ -932,14 +933,14 @@ describe('EmailService', () => {
       expect(agentService.run).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
-          systemPrompt: '',
+          systemPrompt: undefined,
         }),
       );
     });
 
     it('should send reply email if agent returns a reply', async () => {
       clientAgentRepository.findOneByEmail.mockResolvedValue(mockClientAgent as any);
-      agentRepository.findById.mockResolvedValue(mockAgent as any);
+      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({
         reply: { type: 'text', text: 'Hello there' },
       });
@@ -960,7 +961,7 @@ describe('EmailService', () => {
 
     it('should prepend "Re: " to subject in reply', async () => {
       clientAgentRepository.findOneByEmail.mockResolvedValue(mockClientAgent as any);
-      agentRepository.findById.mockResolvedValue(mockAgent as any);
+      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({ reply: { type: 'text', text: 'Reply' } });
 
       await service.handleIncoming(createDto({ subject: 'Account Issue' }));
@@ -972,7 +973,7 @@ describe('EmailService', () => {
 
     it('should send reply to original sender', async () => {
       clientAgentRepository.findOneByEmail.mockResolvedValue(mockClientAgent as any);
-      agentRepository.findById.mockResolvedValue(mockAgent as any);
+      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({ reply: { type: 'text', text: 'Reply' } });
 
       await service.handleIncoming(createDto({ from: 'customer@test.com' }));
@@ -984,7 +985,7 @@ describe('EmailService', () => {
 
     it('should send from the channel configured email', async () => {
       clientAgentRepository.findOneByEmail.mockResolvedValue(mockClientAgent as any);
-      agentRepository.findById.mockResolvedValue(mockAgent as any);
+      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({ reply: { type: 'text', text: 'Reply' } });
 
       await service.handleIncoming(createDto());
@@ -996,7 +997,7 @@ describe('EmailService', () => {
 
     it('should log when sending reply', async () => {
       clientAgentRepository.findOneByEmail.mockResolvedValue(mockClientAgent as any);
-      agentRepository.findById.mockResolvedValue(mockAgent as any);
+      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({ reply: { type: 'text', text: 'Reply' } });
 
       await service.handleIncoming(createDto({ from: 'recipient@test.com' }));
@@ -1008,7 +1009,7 @@ describe('EmailService', () => {
 
     it('should not send email when reply is undefined', async () => {
       clientAgentRepository.findOneByEmail.mockResolvedValue(mockClientAgent as any);
-      agentRepository.findById.mockResolvedValue(mockAgent as any);
+      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({});
 
       await service.handleIncoming(createDto());
@@ -1018,7 +1019,7 @@ describe('EmailService', () => {
 
     it('should not send email when reply is null', async () => {
       clientAgentRepository.findOneByEmail.mockResolvedValue(mockClientAgent as any);
-      agentRepository.findById.mockResolvedValue(mockAgent as any);
+      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({ reply: null });
 
       await service.handleIncoming(createDto());
@@ -1026,17 +1027,13 @@ describe('EmailService', () => {
       expect(mockSendMail).not.toHaveBeenCalled();
     });
 
-    it('should use empty systemPrompt when agent is not found', async () => {
+    it('should skip processing when agent is not active', async () => {
       clientAgentRepository.findOneByEmail.mockResolvedValue(mockClientAgent as any);
-      agentRepository.findById.mockResolvedValue(null);
-      agentService.run.mockResolvedValue({ reply: { type: 'text', text: 'Hello' } });
+      agentRepository.findActiveById.mockResolvedValue(null);
 
       await service.handleIncoming(createDto());
 
-      expect(agentService.run).toHaveBeenCalledWith(
-        expect.any(Object),
-        expect.objectContaining({ systemPrompt: '' }),
-      );
+      expect(agentService.run).not.toHaveBeenCalled();
     });
 
     it('should use default SMTP config when not provided in channelConfig', async () => {
@@ -1051,7 +1048,7 @@ describe('EmailService', () => {
       };
       
       clientAgentRepository.findOneByEmail.mockResolvedValue(minimalClientAgent as any);
-      agentRepository.findById.mockResolvedValue(mockAgent as any);
+      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({ reply: { type: 'text', text: 'Hello' } });
 
       await service.handleIncoming(createDto());
@@ -1066,7 +1063,7 @@ describe('EmailService', () => {
 
     it('should propagate sendMail errors', async () => {
       clientAgentRepository.findOneByEmail.mockResolvedValue(mockClientAgent as any);
-      agentRepository.findById.mockResolvedValue(mockAgent as any);
+      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({ reply: { type: 'text', text: 'Reply' } });
 
       mockSendMail.mockRejectedValue(new Error('SMTP auth failed'));
@@ -1078,7 +1075,7 @@ describe('EmailService', () => {
 
     it('should log error when sendMail fails', async () => {
       clientAgentRepository.findOneByEmail.mockResolvedValue(mockClientAgent as any);
-      agentRepository.findById.mockResolvedValue(mockAgent as any);
+      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({ reply: { type: 'text', text: 'Reply' } });
 
       mockSendMail.mockRejectedValue(new Error('Connection refused'));
@@ -1092,7 +1089,7 @@ describe('EmailService', () => {
 
     it('should log success after sending email', async () => {
       clientAgentRepository.findOneByEmail.mockResolvedValue(mockClientAgent as any);
-      agentRepository.findById.mockResolvedValue(mockAgent as any);
+      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({ reply: { type: 'text', text: 'Reply' } });
 
       await service.handleIncoming(createDto({ from: 'user@test.com' }));
@@ -1104,7 +1101,7 @@ describe('EmailService', () => {
 
     it('should use secure: false for SMTP transport', async () => {
       clientAgentRepository.findOneByEmail.mockResolvedValue(mockClientAgent as any);
-      agentRepository.findById.mockResolvedValue(mockAgent as any);
+      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({ reply: { type: 'text', text: 'Reply' } });
 
       await service.handleIncoming(createDto());

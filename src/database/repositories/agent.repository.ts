@@ -1,10 +1,12 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model } from 'mongoose';
 import { Agent } from '../schemas/agent.schema';
 
 @Injectable()
 export class AgentRepository {
+  private readonly logger = new Logger(AgentRepository.name);
+
   constructor(
     @InjectModel(Agent.name)
     private readonly model: Model<Agent>,
@@ -40,19 +42,19 @@ export class AgentRepository {
 
   /**
    * Validates that an agent exists and is active (hireable).
-   * Use this when creating new AgentChannel bindings.
+   * Use this when creating new ClientAgent channel configurations.
    * Throws BadRequestException if agent cannot be hired.
    */
   async validateHireable(agentId: string, session?: ClientSession): Promise<Agent> {
     const agent = await this.model.findById(agentId).session(session).exec();
 
     if (!agent) {
-      console.log(`[Agent] Hire rejected - agent ${agentId} not found`);
+      this.logger.warn(`Hire rejected - agent ${agentId} not found`);
       throw new BadRequestException('Agent not found');
     }
 
     if (agent.status !== 'active') {
-      console.log(`[Agent] Hire rejected - agent ${agentId} status: ${agent.status}`);
+      this.logger.warn(`Hire rejected - agent ${agentId} status: ${agent.status}`);
       throw new BadRequestException('Agent is not currently available');
     }
 

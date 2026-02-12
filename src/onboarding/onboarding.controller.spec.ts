@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { OnboardingController } from './onboarding.controller';
 import { OnboardingService } from './onboarding.service';
-import { LlmProvider } from '../agent/llm/provider.enum';
 
 describe('OnboardingController', () => {
   let controller: OnboardingController;
@@ -11,7 +10,6 @@ describe('OnboardingController', () => {
     user: { _id: 'user-1', email: 'test@example.com', name: 'Test', clientId: 'client-1', status: 'active' },
     client: { _id: 'client-1', name: 'Test', type: 'individual', ownerUserId: 'user-1', status: 'active' },
     clientAgent: { _id: 'ca-1', clientId: 'client-1', agentId: 'agent-1', price: 100, status: 'active' },
-    agentChannels: [{ _id: 'ac-1', clientId: 'client-1', agentId: 'agent-1', channelId: 'ch-1', status: 'active', channelConfig: {}, llmConfig: { provider: LlmProvider.OpenAI, model: 'gpt-4' } }],
   };
 
   beforeEach(async () => {

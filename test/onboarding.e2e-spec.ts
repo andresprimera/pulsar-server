@@ -172,6 +172,19 @@ describe('Onboarding (e2e)', () => {
       expect(savedClientAgent.channels[0].credentials).toBeDefined();
 
       expect(savedClientAgent.channels[0].llmConfig).toHaveProperty('apiKey');
+
+      // EDGE-3: Verify that GET /client-agents excludes credentials (select: false)
+      const listResponse = await request(app.getHttpServer())
+        .get(`/client-agents/client/${response.body.client._id}`)
+        .expect(200);
+
+      expect(listResponse.body).toHaveLength(1);
+      // Credentials and apiKey should NOT be present in the list response
+      const listedChannels = listResponse.body[0].channels;
+      if (listedChannels && listedChannels.length > 0) {
+        expect(listedChannels[0].credentials).toBeUndefined();
+        expect(listedChannels[0].llmConfig?.apiKey).toBeUndefined();
+      }
     });
 
     it('should use explicit client name when provided', async () => {

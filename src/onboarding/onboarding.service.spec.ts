@@ -174,8 +174,7 @@ describe('OnboardingService', () => {
       expect(result).toHaveProperty('user');
       expect(result).toHaveProperty('client');
       expect(result).toHaveProperty('clientAgent');
-      expect(result).toHaveProperty('agentChannels');
-      expect(result.agentChannels).toEqual([]); // No longer returns agent channels directly
+      expect(result).not.toHaveProperty('agentChannels');
 
       expect(mockSession.startTransaction).toHaveBeenCalled();
       expect(mockSession.commitTransaction).toHaveBeenCalled();

@@ -10,6 +10,7 @@ import { AgentContext } from '../../agent/contracts/agent-context';
 import { AgentRepository } from '../../database/repositories/agent.repository';
 import { ClientAgentRepository } from '../../database/repositories/client-agent.repository';
 import { IncomingEmailDto } from './dto/incoming-email.dto';
+import { decryptRecord, decrypt } from '../../database/utils/crypto.util';
 import * as nodemailer from 'nodemailer';
 import { ImapFlow } from 'imapflow';
 import { ClientAgent } from '../../database/schemas/client-agent.schema';
@@ -70,12 +71,15 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
 
         for (const channel of emailChannels) {
           try {
-            await this.pollMailbox(channel.credentials as EmailCredentials, clientAgent);
+            await this.pollMailbox(
+              decryptRecord(channel.credentials) as EmailCredentials,
+              clientAgent,
+            );
           } catch (error) {
             const message =
               error instanceof Error ? error.message : String(error);
             this.logger.error(
-              `[Email] Failed to poll mailbox ${channel.credentials.email}: ${message}`,
+              `[Email] Failed to poll mailbox for clientAgent=${clientAgent._id}: ${message}`,
             );
           }
         }
@@ -144,7 +148,6 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
     this.logger.log(`[Email] Incoming email from=${dto.from} to=${dto.to}`);
 
     // Route: find agent channel by recipient email
-    // Route: find agent channel by recipient email
     const clientAgent = await this.clientAgentRepository.findOneByEmail(dto.to);
 
     if (!clientAgent) {
@@ -165,17 +168,31 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    const agent = await this.agentRepository.findById(clientAgent.agentId);
+    // Guard: credentials may be undefined if select('+channels.credentials') was missed
+    if (!channelConfig.credentials) {
+      this.logger.error(
+        `[Email] Credentials missing for email=${dto.to}. Possible select('+channels.credentials') omission.`,
+      );
+      return;
+    }
+
+    const agent = await this.agentRepository.findActiveById(clientAgent.agentId);
+    if (!agent) {
+      this.logger.warn(
+        `[Email] Agent ${clientAgent.agentId} is not active. Skipping message.`,
+      );
+      return;
+    }
 
     const context: AgentContext = {
       agentId: clientAgent.agentId,
       clientId: clientAgent.clientId,
-      systemPrompt: agent?.systemPrompt ?? '',
+      systemPrompt: agent.systemPrompt,
       llmConfig: {
         ...channelConfig.llmConfig,
-        apiKey: process.env.OPENAI_API_KEY, // TODO: Remove - temporary override for testing
+        apiKey: decrypt(channelConfig.llmConfig.apiKey || process.env.OPENAI_API_KEY!),
       },
-      channelConfig: channelConfig.credentials,
+      channelConfig: decryptRecord(channelConfig.credentials),
     };
 
     const input: AgentInput = {
@@ -198,7 +215,7 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`[Email] Sending reply to ${dto.from}`);
 
       await this.sendEmail(
-        channelConfig.credentials as EmailCredentials,
+        decryptRecord(channelConfig.credentials) as EmailCredentials,
         dto.from,
         `Re: ${dto.subject}`,
         output.reply.text,

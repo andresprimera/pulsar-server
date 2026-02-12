@@ -4,6 +4,7 @@ import { AgentInput } from '../../agent/contracts/agent-input';
 import { AgentContext } from '../../agent/contracts/agent-context';
 import { AgentRepository } from '../../database/repositories/agent.repository';
 import { ClientAgentRepository } from '../../database/repositories/client-agent.repository';
+import { decryptRecord, decrypt } from '../../database/utils/crypto.util';
 
 const VERIFY_TOKEN = 'test-token';
 
@@ -73,8 +74,7 @@ export class WhatsappService {
     );
     this.logger.log(`[WhatsApp] Extracted phoneNumberId: ${phoneNumberId}`);
 
-    // Use ClientAgentRepository to find the agent and channel config
-    // This replaces the old AgentChannel lookup
+    // Route: find active ClientAgent with matching phoneNumberId in embedded channels
     const clientAgent = await this.clientAgentRepository.findOneByPhoneNumberId(phoneNumberId);
 
     if (!clientAgent) {
@@ -98,17 +98,31 @@ export class WhatsappService {
       return;
     }
 
-    const agent = await this.agentRepository.findById(clientAgent.agentId);
+    // Guard: credentials may be undefined if select('+channels.credentials') was missed
+    if (!channelConfig.credentials) {
+      this.logger.error(
+        `[WhatsApp] Credentials missing for phoneNumberId=${phoneNumberId}. Possible select('+channels.credentials') omission.`,
+      );
+      return;
+    }
+
+    const agent = await this.agentRepository.findActiveById(clientAgent.agentId);
+    if (!agent) {
+      this.logger.warn(
+        `[WhatsApp] Agent ${clientAgent.agentId} is not active. Skipping message.`,
+      );
+      return;
+    }
 
     const context: AgentContext = {
       agentId: clientAgent.agentId,
       clientId: clientAgent.clientId,
-      systemPrompt: agent?.systemPrompt ?? '',
+      systemPrompt: agent.systemPrompt,
       llmConfig: {
         ...channelConfig.llmConfig,
-        apiKey: process.env.OPENAI_API_KEY, // TODO: Remove - temporary override for testing
+        apiKey: decrypt(channelConfig.llmConfig.apiKey || process.env.OPENAI_API_KEY!),
       },
-      channelConfig: channelConfig.credentials, // credentials are the channelConfig
+      channelConfig: decryptRecord(channelConfig.credentials),
     };
 
     const input: AgentInput = {

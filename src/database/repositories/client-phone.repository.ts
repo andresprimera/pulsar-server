@@ -86,6 +86,13 @@ export class ClientPhoneRepository {
    * - If phone exists for this client, return it
    * - If phone exists for another client, throw error
    * - If phone doesn't exist, create it
+   *
+   * Uses a pre-check pattern to avoid transaction boundary leaks.
+   * The unique index on phoneNumberId still protects against races.
+   *
+   * EDGE-2 safety: Because all operations (read + create) run within
+   * the same session, if the transaction aborts, both the ClientPhone
+   * and any other writes are rolled back atomically. No orphans possible.
    */
   async resolveOrCreate(
     clientId: Types.ObjectId | string,
@@ -99,42 +106,37 @@ export class ClientPhoneRepository {
     const clientObjectId =
       typeof clientId === 'string' ? new Types.ObjectId(clientId) : clientId;
 
-    try {
-      // Optimistic create: try to create immediately
-      // If it fails with E11000, we check if it's owned by us or another client
-      return await this.create(
-        {
-          clientId: clientObjectId,
-          phoneNumberId,
-          provider: options?.provider,
-          metadata: options?.metadata,
-        },
-        options?.session,
-      );
-    } catch (error: any) {
-      // 11000 = Duplicate Key Error
-      if (error.code === 11000) {
-        // Find who owns it — do NOT use the session here because
-        // an E11000 inside a transaction aborts the transaction,
-        // making further operations on that session fail.
-        const existing = await this.model
-          .findOne({ phoneNumberId })
-          .exec();
+    // Pre-check: does this phone already exist?
+    // This runs inside the session so it respects the transaction snapshot.
+    const existing = await this.model
+      .findOne({ phoneNumberId })
+      .session(options?.session || null)
+      .exec();
 
-        if (existing) {
-          // If owned by THIS client, return it (idempotent success)
-          if (existing.clientId.toString() === clientObjectId.toString()) {
-            return existing;
-          }
-
-          // If owned by ANOTHER client, throw Conflict
-          throw new ConflictException(
-            `Phone number ${phoneNumberId} is already owned by another client`,
-          );
-        }
+    if (existing) {
+      // If owned by THIS client, return it (idempotent success)
+      if (existing.clientId.toString() === clientObjectId.toString()) {
+        return existing;
       }
-      throw error;
+
+      // If owned by ANOTHER client, throw Conflict
+      throw new ConflictException(
+        `Phone number ${phoneNumberId} is already owned by another client`,
+      );
     }
+
+    // Phone doesn't exist yet — create it within the transaction.
+    // If a race condition causes E11000, it will abort the transaction
+    // and bubble up as a ConflictException from the onboarding service.
+    return this.create(
+      {
+        clientId: clientObjectId,
+        phoneNumberId,
+        provider: options?.provider,
+        metadata: options?.metadata,
+      },
+      options?.session,
+    );
   }
 
   /**
