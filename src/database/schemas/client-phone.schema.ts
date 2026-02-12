@@ -10,8 +10,8 @@ import { Document, Types } from 'mongoose';
  * - Can be reused by multiple Channels within the same client
  * - Must NOT be reused across different Clients
  *
- * Uniqueness is enforced via compound index (clientId, phoneNumberId).
- * Cross-client uniqueness is enforced at the service layer via findByPhoneNumber.
+ * Uniqueness is enforced via global unique index on phoneNumberId.
+ * This prevents the same phone number from being registered to multiple clients.
  */
 @Schema({ collection: 'client_phones', timestamps: true })
 export class ClientPhone extends Document {
@@ -33,5 +33,8 @@ export class ClientPhone extends Document {
 
 export const ClientPhoneSchema = SchemaFactory.createForClass(ClientPhone);
 
-// Compound unique index: ensures one phone per client (no duplicates within a client)
-ClientPhoneSchema.index({ clientId: 1, phoneNumberId: 1 }, { unique: true });
+// Enforce global uniqueness
+ClientPhoneSchema.index({ phoneNumberId: 1 }, { unique: true });
+
+// Optional query optimization
+ClientPhoneSchema.index({ clientId: 1 });

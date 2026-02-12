@@ -5,16 +5,13 @@ import { Client, ClientSchema } from './schemas/client.schema';
 import { Agent, AgentSchema } from './schemas/agent.schema';
 import { Channel, ChannelSchema } from './schemas/channel.schema';
 import { ClientAgent, ClientAgentSchema } from './schemas/client-agent.schema';
-import {
-  AgentChannel,
-  AgentChannelSchema,
-} from './schemas/agent-channel.schema';
+
 import { ClientPhone, ClientPhoneSchema } from './schemas/client-phone.schema';
 import { ClientRepository } from './repositories/client.repository';
 import { AgentRepository } from './repositories/agent.repository';
 import { ChannelRepository } from './repositories/channel.repository';
 import { ClientAgentRepository } from './repositories/client-agent.repository';
-import { AgentChannelRepository } from './repositories/agent-channel.repository';
+
 import { ClientPhoneRepository } from './repositories/client-phone.repository';
 import { SeederService } from './seeder.service';
 import { User, UserSchema } from './schemas/user.schema';
@@ -26,7 +23,7 @@ const repositories = [
   AgentRepository,
   ChannelRepository,
   ClientAgentRepository,
-  AgentChannelRepository,
+
   ClientPhoneRepository,
   UserRepository,
 ];
@@ -49,7 +46,7 @@ const repositories = [
       { name: Agent.name, schema: AgentSchema },
       { name: Channel.name, schema: ChannelSchema },
       { name: ClientAgent.name, schema: ClientAgentSchema },
-      { name: AgentChannel.name, schema: AgentChannelSchema },
+
       { name: ClientPhone.name, schema: ClientPhoneSchema },
       { name: User.name, schema: UserSchema },
     ]),

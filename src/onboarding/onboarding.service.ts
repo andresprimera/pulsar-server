@@ -11,7 +11,7 @@ import { UserRepository } from '../database/repositories/user.repository';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { ChannelRepository } from '../database/repositories/channel.repository';
 import { ClientAgentRepository } from '../database/repositories/client-agent.repository';
-import { AgentChannelRepository } from '../database/repositories/agent-channel.repository';
+
 import { ClientPhoneRepository } from '../database/repositories/client-phone.repository';
 
 export interface RegisterAndHireResult {
@@ -59,7 +59,7 @@ export class OnboardingService {
     private readonly agentRepository: AgentRepository,
     private readonly channelRepository: ChannelRepository,
     private readonly clientAgentRepository: ClientAgentRepository,
-    private readonly agentChannelRepository: AgentChannelRepository,
+
     private readonly clientPhoneRepository: ClientPhoneRepository,
   ) {}
 

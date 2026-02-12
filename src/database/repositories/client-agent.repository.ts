@@ -44,4 +44,52 @@ export class ClientAgentRepository {
   async update(id: string, data: Partial<ClientAgent>): Promise<ClientAgent | null> {
     return this.model.findByIdAndUpdate(id, data, { new: true }).exec();
   }
+
+  /**
+   * Find ClientAgent by WhatsApp phoneNumberId within embedded channels.
+   * Checks for active status and matching credentials.
+   */
+  async findOneByPhoneNumberId(phoneNumberId: string): Promise<ClientAgent | null> {
+    return this.model.findOne({
+      status: 'active',
+      channels: {
+        $elemMatch: {
+          status: 'active',
+          'credentials.phoneNumberId': phoneNumberId,
+        },
+      },
+    }).exec();
+  }
+
+  /**
+   * Find ClientAgent by email address within embedded channels.
+   * Checks for active status and matching credentials.
+   */
+  async findOneByEmail(email: string): Promise<ClientAgent | null> {
+    return this.model.findOne({
+      status: 'active',
+      channels: {
+        $elemMatch: {
+          status: 'active',
+          'credentials.email': email,
+        },
+      },
+    }).exec();
+  }
+
+  /**
+   * Find all ClientAgents with active email channels.
+   * Used for IMAP polling.
+   */
+  async findAllWithActiveEmailChannels(): Promise<ClientAgent[]> {
+    return this.model.find({
+      status: 'active',
+      channels: {
+        $elemMatch: {
+          status: 'active',
+          'credentials.email': { $exists: true },
+        },
+      },
+    }).exec();
+  }
 }

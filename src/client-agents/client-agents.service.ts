@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger } from '@nestjs/common';
 import { ClientAgentRepository } from '../database/repositories/client-agent.repository';
-import { AgentChannelRepository } from '../database/repositories/agent-channel.repository';
+
 import { CreateClientAgentDto } from './dto/create-client-agent.dto';
 import { UpdateClientAgentDto } from './dto/update-client-agent.dto';
 import { UpdateClientAgentStatusDto } from './dto/update-client-agent-status.dto';
@@ -14,7 +14,6 @@ export class ClientAgentsService {
 
   constructor(
     private readonly clientAgentRepository: ClientAgentRepository,
-    private readonly agentChannelRepository: AgentChannelRepository,
     private readonly clientsService: ClientsService,
     private readonly agentsService: AgentsService,
   ) {}
@@ -83,17 +82,11 @@ export class ClientAgentsService {
 
     const updated = await this.clientAgentRepository.update(id, { status: data.status });
 
-    // Cascade archive to related AgentChannels
+    // Cascade archive happens implicitly because channels are embedded
     if (data.status === 'archived') {
-      const archivedCount = await this.agentChannelRepository.archiveByClientAndAgent(
-        clientAgent.clientId,
-        clientAgent.agentId,
-      );
-      if (archivedCount > 0) {
-        this.logger.log(
-          `[ClientAgent] Archived ${archivedCount} AgentChannel(s) for clientId=${clientAgent.clientId}, agentId=${clientAgent.agentId}`,
+       this.logger.log(
+          `[ClientAgent] Archived ClientAgent clientId=${clientAgent.clientId}, agentId=${clientAgent.agentId} (Channels embedded)`,
         );
-      }
     }
 
     return updated!;

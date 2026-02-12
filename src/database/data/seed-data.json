@@ -21,7 +21,7 @@
       "supportedProviders": ["meta", "twilio"],
       "agentChannelConfig": {
         "channelConfig": {
-          "phoneNumberId": "573012890029",
+          "phoneNumberId": "573332574065",
           "accessToken": "__REPLACE_ME_ACCESS_TOKEN__",
           "webhookVerifyToken": "__REPLACE_ME_VERIFY_TOKEN__"
         },
@@ -38,11 +38,11 @@
       "supportedProviders": ["smtp", "sendgrid"],
       "agentChannelConfig": {
         "channelConfig": {
-          "email": "support@example.com",
-          "password": "password",
-          "smtpHost": "smtp.gmail.com",
+          "email": "marcelina.bauch@ethereal.email",
+          "password": "T1uPWBGMFSZ5qBCvdW",
+          "smtpHost": "smtp.ethereal.email",
           "smtpPort": 587,
-          "imapHost": "imap.gmail.com",
+          "imapHost": "imap.ethereal.email",
           "imapPort": 993
         },
         "llmConfig": {

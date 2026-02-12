@@ -3,7 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { UserRepository } from './repositories/user.repository';
 import { Agent } from './schemas/agent.schema';
-import { AgentChannel } from './schemas/agent-channel.schema';
+
 import { ClientPhone } from './schemas/client-phone.schema';
 import { OnboardingService } from '../onboarding/onboarding.service';
 import { ChannelRepository } from './repositories/channel.repository';
@@ -17,8 +17,6 @@ export class SeederService implements OnApplicationBootstrap {
     private readonly userRepository: UserRepository,
     @InjectModel(Agent.name)
     private readonly agentModel: Model<Agent>,
-    @InjectModel(AgentChannel.name)
-    private readonly agentChannelModel: Model<AgentChannel>,
     @InjectModel(ClientPhone.name)
     private readonly clientPhoneModel: Model<ClientPhone>,
     @Inject(forwardRef(() => OnboardingService))
@@ -80,7 +78,7 @@ export class SeederService implements OnApplicationBootstrap {
       // Ensure indexes are built before transaction starts to avoid "catalog changes" error
       this.logger.log('Ensuring indexes are built...');
       await Promise.all([
-        this.agentChannelModel.createIndexes(),
+
         this.clientPhoneModel.createIndexes(),
       ]);
 

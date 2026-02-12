@@ -52,3 +52,8 @@ export const ClientAgentSchema = SchemaFactory.createForClass(ClientAgent);
 
 // Prevent hiring the same agent twice for the same client
 ClientAgentSchema.index({ clientId: 1, agentId: 1 }, { unique: true });
+
+// Critical indexes for routing and polling
+ClientAgentSchema.index({ status: 1, 'channels.credentials.phoneNumberId': 1 });
+ClientAgentSchema.index({ status: 1, 'channels.credentials.email': 1 });
+ClientAgentSchema.index({ 'channels.status': 1 });

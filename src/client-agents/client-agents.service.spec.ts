@@ -2,14 +2,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { ClientAgentsService } from './client-agents.service';
 import { ClientAgentRepository } from '../database/repositories/client-agent.repository';
-import { AgentChannelRepository } from '../database/repositories/agent-channel.repository';
 import { ClientsService } from '../clients/clients.service';
 import { AgentsService } from '../agents/agents.service';
 
 describe('ClientAgentsService', () => {
   let service: ClientAgentsService;
   let mockClientAgentRepository: any;
-  let mockAgentChannelRepository: any;
   let mockClientsService: any;
   let mockAgentsService: any;
 
@@ -41,10 +39,6 @@ describe('ClientAgentsService', () => {
       update: jest.fn(),
     };
 
-    mockAgentChannelRepository = {
-      archiveByClientAndAgent: jest.fn().mockResolvedValue(0),
-    };
-
     mockClientsService = {
       findById: jest.fn(),
     };
@@ -59,10 +53,6 @@ describe('ClientAgentsService', () => {
         {
           provide: ClientAgentRepository,
           useValue: mockClientAgentRepository,
-        },
-        {
-          provide: AgentChannelRepository,
-          useValue: mockAgentChannelRepository,
         },
         {
           provide: ClientsService,
@@ -189,26 +179,23 @@ describe('ClientAgentsService', () => {
   });
 
   describe('updateStatus', () => {
-    it('should update status to inactive without cascading', async () => {
+    it('should update status to inactive', async () => {
       mockClientAgentRepository.findById.mockResolvedValue(mockClientAgent);
       mockClientAgentRepository.update.mockResolvedValue({ ...mockClientAgent, status: 'inactive' });
 
       const result = await service.updateStatus('ca-1', { status: 'inactive' });
 
       expect(mockClientAgentRepository.update).toHaveBeenCalledWith('ca-1', { status: 'inactive' });
-      expect(mockAgentChannelRepository.archiveByClientAndAgent).not.toHaveBeenCalled();
       expect(result.status).toBe('inactive');
     });
 
-    it('should cascade archive to related AgentChannels when archiving', async () => {
+    it('should archive without cascading (channels are embedded)', async () => {
       mockClientAgentRepository.findById.mockResolvedValue(mockClientAgent);
       mockClientAgentRepository.update.mockResolvedValue({ ...mockClientAgent, status: 'archived' });
-      mockAgentChannelRepository.archiveByClientAndAgent.mockResolvedValue(2);
 
       const result = await service.updateStatus('ca-1', { status: 'archived' });
 
       expect(mockClientAgentRepository.update).toHaveBeenCalledWith('ca-1', { status: 'archived' });
-      expect(mockAgentChannelRepository.archiveByClientAndAgent).toHaveBeenCalledWith('client-1', 'agent-1');
       expect(result.status).toBe('archived');
     });
 

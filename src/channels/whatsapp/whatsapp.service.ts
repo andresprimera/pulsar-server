@@ -2,9 +2,8 @@ import { Injectable, ForbiddenException, Logger } from '@nestjs/common';
 import { AgentService } from '../../agent/agent.service';
 import { AgentInput } from '../../agent/contracts/agent-input';
 import { AgentContext } from '../../agent/contracts/agent-context';
-import { AgentChannelRepository } from '../../database/repositories/agent-channel.repository';
 import { AgentRepository } from '../../database/repositories/agent.repository';
-import { ClientPhoneRepository } from '../../database/repositories/client-phone.repository';
+import { ClientAgentRepository } from '../../database/repositories/client-agent.repository';
 
 const VERIFY_TOKEN = 'test-token';
 
@@ -14,9 +13,8 @@ export class WhatsappService {
 
   constructor(
     private readonly agentService: AgentService,
-    private readonly agentChannelRepository: AgentChannelRepository,
+    private readonly clientAgentRepository: ClientAgentRepository,
     private readonly agentRepository: AgentRepository,
-    private readonly clientPhoneRepository: ClientPhoneRepository,
   ) {}
 
   verifyWebhook(mode: string, token: string, challenge: string): string {
@@ -75,39 +73,42 @@ export class WhatsappService {
     );
     this.logger.log(`[WhatsApp] Extracted phoneNumberId: ${phoneNumberId}`);
 
-    // Find the ClientPhone by phoneNumberId
-    const clientPhone =
-      await this.clientPhoneRepository.findByPhoneNumber(phoneNumberId);
+    // Use ClientAgentRepository to find the agent and channel config
+    // This replaces the old AgentChannel lookup
+    const clientAgent = await this.clientAgentRepository.findOneByPhoneNumberId(phoneNumberId);
 
-    if (!clientPhone) {
+    if (!clientAgent) {
       this.logger.warn(
-        `[WhatsApp] No ClientPhone found for phoneNumberId=${phoneNumberId}. Phone may not be registered.`,
+        `[WhatsApp] No active ClientAgent found for phoneNumberId=${phoneNumberId}.`,
       );
       return;
     }
 
-    // Find AgentChannel by clientPhoneId
-    const agentChannel =
-      await this.agentChannelRepository.findByClientPhoneId(clientPhone._id);
+    // Extract the specific channel config
+    const channelConfig = clientAgent.channels.find(
+      (c) =>
+        c.status === 'active' &&
+        c.credentials?.phoneNumberId === phoneNumberId,
+    );
 
-    if (!agentChannel) {
-      this.logger.warn(
-        `[WhatsApp] No active agent_channel found for clientPhoneId=${clientPhone._id}. Check if channel exists and is active.`,
+    if (!channelConfig) {
+       this.logger.warn(
+        `[WhatsApp] Channel config not found in ClientAgent for phoneNumberId=${phoneNumberId} (mismatch).`,
       );
       return;
     }
 
-    const agent = await this.agentRepository.findById(agentChannel.agentId);
+    const agent = await this.agentRepository.findById(clientAgent.agentId);
 
     const context: AgentContext = {
-      agentId: agentChannel.agentId,
-      clientId: agentChannel.clientId,
+      agentId: clientAgent.agentId,
+      clientId: clientAgent.clientId,
       systemPrompt: agent?.systemPrompt ?? '',
       llmConfig: {
-        ...agentChannel.llmConfig,
+        ...channelConfig.llmConfig,
         apiKey: process.env.OPENAI_API_KEY, // TODO: Remove - temporary override for testing
       },
-      channelConfig: agentChannel.channelConfig,
+      channelConfig: channelConfig.credentials, // credentials are the channelConfig
     };
 
     const input: AgentInput = {

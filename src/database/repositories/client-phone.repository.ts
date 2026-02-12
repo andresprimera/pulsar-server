@@ -99,33 +99,41 @@ export class ClientPhoneRepository {
     const clientObjectId =
       typeof clientId === 'string' ? new Types.ObjectId(clientId) : clientId;
 
-    // Check if this phone is already owned
-    const existing = await this.model
-      .findOne({ phoneNumberId })
-      .session(options?.session || null)
-      .exec();
-
-    if (existing) {
-      // Check if owned by the same client
-      if (existing.clientId.toString() === clientObjectId.toString()) {
-        return existing;
-      }
-      // Owned by different client - reject
-      throw new ConflictException(
-        `Phone number ${phoneNumberId} is already owned by another client`,
+    try {
+      // Optimistic create: try to create immediately
+      // If it fails with E11000, we check if it's owned by us or another client
+      return await this.create(
+        {
+          clientId: clientObjectId,
+          phoneNumberId,
+          provider: options?.provider,
+          metadata: options?.metadata,
+        },
+        options?.session,
       );
-    }
+    } catch (error: any) {
+      // 11000 = Duplicate Key Error
+      if (error.code === 11000) {
+        // Find who owns it
+        const existing = await this.model
+          .findOne({ phoneNumberId })
+          .session(options?.session || null)
+          .exec();
 
-    // Not owned - create new
-    return this.create(
-      {
-        clientId: clientObjectId,
-        phoneNumberId,
-        provider: options?.provider,
-        metadata: options?.metadata,
-      },
-      options?.session,
-    );
+        if (existing) {
+          // If owned by THIS client, return it (idempotent success)
+          if (existing.clientId.toString() === clientObjectId.toString()) {
+            return existing;
+          }
+
+          // If owned by ANOTHER client, throw Conflict
+          throw new ConflictException(
+            `Phone number ${phoneNumberId} is already owned by another client`,
+          );
+        }
+      }
+      throw error;
+    }
   }
 
   /**

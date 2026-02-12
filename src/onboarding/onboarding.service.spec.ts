@@ -1,14 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { getConnectionToken } from '@nestjs/mongoose';
-import { Types, Error as MongooseError } from 'mongoose';
+import { Types } from 'mongoose';
 import { OnboardingService } from './onboarding.service';
 import { ClientRepository } from '../database/repositories/client.repository';
 import { UserRepository } from '../database/repositories/user.repository';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { ChannelRepository } from '../database/repositories/channel.repository';
 import { ClientAgentRepository } from '../database/repositories/client-agent.repository';
-import { AgentChannelRepository } from '../database/repositories/agent-channel.repository';
 import { ClientPhoneRepository } from '../database/repositories/client-phone.repository';
 import { LlmProvider } from '../agent/llm/provider.enum';
 import { ChannelProvider } from '../channels/channel-provider.enum';
@@ -22,7 +21,6 @@ describe('OnboardingService', () => {
   let mockAgentRepository: any;
   let mockChannelRepository: any;
   let mockClientAgentRepository: any;
-  let mockAgentChannelRepository: any;
   let mockClientPhoneRepository: any;
 
   const mockClient = {
@@ -125,11 +123,6 @@ describe('OnboardingService', () => {
       create: jest.fn().mockResolvedValue(mockClientAgent),
     };
 
-    mockAgentChannelRepository = {
-      create: jest.fn(), // Should not be called
-      findByClientPhoneId: jest.fn().mockResolvedValue(null),
-    };
-
     mockClientPhoneRepository = {
       findByPhoneNumber: jest.fn().mockResolvedValue(null),
       resolveOrCreate: jest.fn().mockResolvedValue(mockClientPhone),
@@ -144,7 +137,6 @@ describe('OnboardingService', () => {
         { provide: AgentRepository, useValue: mockAgentRepository },
         { provide: ChannelRepository, useValue: mockChannelRepository },
         { provide: ClientAgentRepository, useValue: mockClientAgentRepository },
-        { provide: AgentChannelRepository, useValue: mockAgentChannelRepository },
         { provide: ClientPhoneRepository, useValue: mockClientPhoneRepository },
       ],
     }).compile();
@@ -277,7 +269,7 @@ describe('OnboardingService', () => {
           },
           {
             channelId: '507f1f77bcf86cd799439012', // Different channel ID
-            provider: ChannelProvider.Meta, // Assuming this channel also supports meta
+            provider: ChannelProvider.Meta, 
             status: 'active' as const,
             credentials: { phoneNumberId: '123' }, // Same phone number
             llmConfig: {
@@ -425,14 +417,6 @@ describe('OnboardingService', () => {
       await expect(service.registerAndHire(validDto)).rejects.toThrow(
         NotFoundException,
       );
-    });
-
-    it('does not create AgentChannels explicitly anymore (embedded in ClientAgent)', async () => {
-      mockChannelRepository.findByIdOrFail.mockResolvedValue(mockChannel);
-
-      await service.registerAndHire(validDto);
-
-      expect(mockAgentChannelRepository.create).not.toHaveBeenCalled();
     });
   });
 });

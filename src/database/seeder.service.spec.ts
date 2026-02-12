@@ -3,7 +3,6 @@ import { getModelToken } from '@nestjs/mongoose';
 import { Types } from 'mongoose';
 import { SeederService } from './seeder.service';
 import { Agent } from './schemas/agent.schema';
-import { AgentChannel } from './schemas/agent-channel.schema';
 import { ClientPhone } from './schemas/client-phone.schema';
 import { UserRepository } from './repositories/user.repository';
 import { ChannelRepository } from './repositories/channel.repository';
@@ -14,7 +13,6 @@ import * as SEED_DATA from './data/seed-data.json';
 describe('SeederService', () => {
   let service: SeederService;
   let mockAgentModel: any;
-  let mockAgentChannelModel: any;
   let mockClientPhoneModel: any;
   let mockUserRepository: any;
   let mockOnboardingService: any;
@@ -62,10 +60,6 @@ describe('SeederService', () => {
       create: jest.fn(),
     };
 
-    mockAgentChannelModel = {
-      createIndexes: jest.fn().mockResolvedValue(undefined),
-    };
-
     mockClientPhoneModel = {
       createIndexes: jest.fn().mockResolvedValue(undefined),
     };
@@ -89,10 +83,6 @@ describe('SeederService', () => {
         {
           provide: getModelToken(Agent.name),
           useValue: mockAgentModel,
-        },
-        {
-          provide: getModelToken(AgentChannel.name),
-          useValue: mockAgentChannelModel,
         },
         {
           provide: getModelToken(ClientPhone.name),
@@ -178,7 +168,6 @@ describe('SeederService', () => {
       );
 
       // Verify indexes were built
-      expect(mockAgentChannelModel.createIndexes).toHaveBeenCalled();
       expect(mockClientPhoneModel.createIndexes).toHaveBeenCalled();
 
       // Verify onboarding was called with correct DTO structure (ClientAgent with channels)

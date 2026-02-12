@@ -7,13 +7,23 @@ import {
 import { AgentService } from '../../agent/agent.service';
 import { AgentInput } from '../../agent/contracts/agent-input';
 import { AgentContext } from '../../agent/contracts/agent-context';
-import { AgentChannelRepository } from '../../database/repositories/agent-channel.repository';
 import { AgentRepository } from '../../database/repositories/agent.repository';
+import { ClientAgentRepository } from '../../database/repositories/client-agent.repository';
 import { IncomingEmailDto } from './dto/incoming-email.dto';
 import * as nodemailer from 'nodemailer';
 import { ImapFlow } from 'imapflow';
+import { ClientAgent } from '../../database/schemas/client-agent.schema';
 
 const POLL_INTERVAL_MS = 30_000;
+
+export interface EmailCredentials {
+  email: string;
+  password?: string;
+  imapHost?: string;
+  imapPort?: number;
+  smtpHost?: string;
+  smtpPort?: number;
+}
 
 @Injectable()
 export class EmailService implements OnModuleInit, OnModuleDestroy {
@@ -23,7 +33,7 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly agentService: AgentService,
-    private readonly agentChannelRepository: AgentChannelRepository,
+    private readonly clientAgentRepository: ClientAgentRepository,
     private readonly agentRepository: AgentRepository,
   ) {}
 
@@ -49,18 +59,25 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
     this.isPolling = true;
 
     try {
-      const channels =
-        await this.agentChannelRepository.findAllActiveWithEmail();
+      const clientAgents =
+        await this.clientAgentRepository.findAllWithActiveEmailChannels();
 
-      for (const channel of channels) {
-        try {
-          await this.pollMailbox(channel);
-        } catch (error) {
-          const message =
-            error instanceof Error ? error.message : String(error);
-          this.logger.error(
-            `[Email] Failed to poll mailbox ${channel.channelConfig.email}: ${message}`,
-          );
+      for (const clientAgent of clientAgents) {
+        // Find all active email channels for this agent
+        const emailChannels = clientAgent.channels.filter(
+          (c) => c.status === 'active' && c.credentials?.email,
+        );
+
+        for (const channel of emailChannels) {
+          try {
+            await this.pollMailbox(channel.credentials as EmailCredentials, clientAgent);
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : String(error);
+            this.logger.error(
+              `[Email] Failed to poll mailbox ${channel.credentials.email}: ${message}`,
+            );
+          }
         }
       }
     } finally {
@@ -68,9 +85,10 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async pollMailbox(agentChannel: any): Promise<void> {
-    const { channelConfig } = agentChannel;
-
+  async pollMailbox(
+    channelConfig: EmailCredentials,
+    clientAgent: ClientAgent,
+  ): Promise<void> {
     const client = new ImapFlow({
       host: channelConfig.imapHost || 'imap.gmail.com',
       port: channelConfig.imapPort || 993,
@@ -126,26 +144,38 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
     this.logger.log(`[Email] Incoming email from=${dto.from} to=${dto.to}`);
 
     // Route: find agent channel by recipient email
-    const agentChannel = await this.agentChannelRepository.findByEmail(dto.to);
+    // Route: find agent channel by recipient email
+    const clientAgent = await this.clientAgentRepository.findOneByEmail(dto.to);
 
-    if (!agentChannel) {
+    if (!clientAgent) {
       this.logger.warn(
-        `[Email] No active agent_channel found for email=${dto.to}. Check if channel exists and is active.`,
+        `[Email] No active ClientAgent found for email=${dto.to}. Check if channel exists and is active.`,
       );
       return;
     }
 
-    const agent = await this.agentRepository.findById(agentChannel.agentId);
+    const channelConfig = clientAgent.channels.find(
+      (c) => c.status === 'active' && c.credentials?.email === dto.to,
+    );
+
+    if (!channelConfig) {
+       this.logger.warn(
+        `[Email] Channel config not found in ClientAgent for email=${dto.to} (mismatch).`,
+      );
+      return;
+    }
+
+    const agent = await this.agentRepository.findById(clientAgent.agentId);
 
     const context: AgentContext = {
-      agentId: agentChannel.agentId,
-      clientId: agentChannel.clientId,
+      agentId: clientAgent.agentId,
+      clientId: clientAgent.clientId,
       systemPrompt: agent?.systemPrompt ?? '',
       llmConfig: {
-        ...agentChannel.llmConfig,
+        ...channelConfig.llmConfig,
         apiKey: process.env.OPENAI_API_KEY, // TODO: Remove - temporary override for testing
       },
-      channelConfig: agentChannel.channelConfig,
+      channelConfig: channelConfig.credentials,
     };
 
     const input: AgentInput = {
@@ -168,7 +198,7 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`[Email] Sending reply to ${dto.from}`);
 
       await this.sendEmail(
-        agentChannel.channelConfig,
+        channelConfig.credentials as EmailCredentials,
         dto.from,
         `Re: ${dto.subject}`,
         output.reply.text,
@@ -177,12 +207,7 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async sendEmail(
-    channelConfig: {
-      email?: string;
-      password?: string;
-      smtpHost?: string;
-      smtpPort?: number;
-    },
+    channelConfig: EmailCredentials,
     to: string,
     subject: string,
     text: string,
