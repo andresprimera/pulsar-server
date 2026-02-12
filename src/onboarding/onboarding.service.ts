@@ -212,8 +212,12 @@ export class OnboardingService {
         agentChannels: [], 
       };
     } catch (error) {
-      // Abort transaction on error
-      await session.abortTransaction();
+      // Abort transaction on error (may already be aborted by MongoDB on E11000)
+      try {
+        await session.abortTransaction();
+      } catch {
+        // Transaction already aborted (e.g. after E11000 duplicate key)
+      }
 
       // Map MongoDB 11000 (duplicate key) to 409 Conflict
       if (this.isDuplicateKeyError(error)) {

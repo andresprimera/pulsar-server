@@ -114,10 +114,11 @@ export class ClientPhoneRepository {
     } catch (error: any) {
       // 11000 = Duplicate Key Error
       if (error.code === 11000) {
-        // Find who owns it
+        // Find who owns it — do NOT use the session here because
+        // an E11000 inside a transaction aborts the transaction,
+        // making further operations on that session fail.
         const existing = await this.model
           .findOne({ phoneNumberId })
-          .session(options?.session || null)
           .exec();
 
         if (existing) {

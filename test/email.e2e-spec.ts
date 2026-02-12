@@ -19,10 +19,9 @@ describe('Email Feature (e2e)', () => {
     let mockSendMail: jest.Mock;
     let mockAgentService: Partial<AgentService>;
 
-    // Test Data IDs
     const clientId = new Types.ObjectId().toString();
     const agentId = new Types.ObjectId().toString();
-    const agentChannelId = new Types.ObjectId().toString();
+    const clientAgentId = new Types.ObjectId().toString();
     const senderEmail = 'user@example.com';
     const botEmail = 'support@example.com';
 
@@ -64,7 +63,7 @@ describe('Email Feature (e2e)', () => {
         if (connection) {
             await connection.collection('clients').deleteOne({ _id: clientId as any });
             await connection.collection('agents').deleteOne({ _id: agentId as any });
-            await connection.collection('agent_channels').deleteOne({ _id: agentChannelId as any });
+            await connection.collection('client_agents').deleteOne({ _id: clientAgentId as any });
         }
 
         // Create Client
@@ -83,22 +82,31 @@ describe('Email Feature (e2e)', () => {
             status: 'active',
         });
 
-        // Create Agent Channel (Email)
-        await connection.collection('agent_channels').insertOne({
-            _id: agentChannelId as any,
+        // Create ClientAgent with embedded email channel
+        await connection.collection('client_agents').insertOne({
+            _id: clientAgentId as any,
             clientId: clientId as any,
             agentId: agentId as any,
-            channelConfig: {
-                email: botEmail,
-                password: 'password123',
-                imapHost: 'imap.test.com',
-                smtpHost: 'smtp.test.com',
-            },
-            llmConfig: {
-                 provider: 'openai',
-                 model: 'gpt-4',
-            },
+            price: 0,
             status: 'active',
+            channels: [
+                {
+                    provider: 'smtp',
+                    status: 'active',
+                    credentials: {
+                        email: botEmail,
+                        password: 'password123',
+                        imapHost: 'imap.test.com',
+                        imapPort: 993,
+                        smtpHost: 'smtp.test.com',
+                        smtpPort: 587,
+                    },
+                    llmConfig: {
+                        provider: 'openai',
+                        model: 'gpt-4',
+                    },
+                },
+            ],
         });
     });
 
@@ -106,7 +114,7 @@ describe('Email Feature (e2e)', () => {
         if (connection) {
             await connection.collection('clients').deleteOne({ _id: clientId as any });
             await connection.collection('agents').deleteOne({ _id: agentId as any });
-            await connection.collection('agent_channels').deleteOne({ _id: agentChannelId as any });
+            await connection.collection('client_agents').deleteOne({ _id: clientAgentId as any });
         }
         await app.close();
         jest.restoreAllMocks();
