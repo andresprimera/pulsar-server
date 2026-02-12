@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { getConnectionToken } from '@nestjs/mongoose';
 import { Types } from 'mongoose';
 import { OnboardingService } from './onboarding.service';
@@ -268,7 +272,7 @@ describe('OnboardingService', () => {
           },
           {
             channelId: '507f1f77bcf86cd799439012', // Different channel ID
-            provider: ChannelProvider.Meta, 
+            provider: ChannelProvider.Meta,
             status: 'active' as const,
             credentials: { phoneNumberId: '123' }, // Same phone number
             llmConfig: {
@@ -283,26 +287,32 @@ describe('OnboardingService', () => {
       // Mock finding both channels
       const channel1 = { ...mockChannel, _id: 'channel-1' };
       const channel2 = { ...mockChannel, _id: 'channel-2' };
-      
+
       mockChannelRepository.findByIdOrFail.mockImplementation((id) => {
-          if (id === '507f1f77bcf86cd799439011') return Promise.resolve(channel1);
-          if (id === '507f1f77bcf86cd799439012') return Promise.resolve(channel2);
-          return Promise.reject(new NotFoundException());
+        if (id === '507f1f77bcf86cd799439011') return Promise.resolve(channel1);
+        if (id === '507f1f77bcf86cd799439012') return Promise.resolve(channel2);
+        return Promise.reject(new NotFoundException());
       });
 
       // Should succeed - same phone can be used by multiple channels
       await service.registerAndHire(dtoWithSamePhoneMultipleChannels);
 
       // resolveOrCreate called twice but returns same ClientPhone (mock)
-      expect(mockClientPhoneRepository.resolveOrCreate).toHaveBeenCalledTimes(2);
+      expect(mockClientPhoneRepository.resolveOrCreate).toHaveBeenCalledTimes(
+        2,
+      );
       expect(mockClientAgentRepository.create).toHaveBeenCalledWith(
-          expect.objectContaining({
-              channels: expect.arrayContaining([
-                  expect.objectContaining({ channelId: new Types.ObjectId('507f1f77bcf86cd799439011') }),
-                  expect.objectContaining({ channelId: new Types.ObjectId('507f1f77bcf86cd799439012') }),
-              ])
-          }),
-          mockSession
+        expect.objectContaining({
+          channels: expect.arrayContaining([
+            expect.objectContaining({
+              channelId: new Types.ObjectId('507f1f77bcf86cd799439011'),
+            }),
+            expect.objectContaining({
+              channelId: new Types.ObjectId('507f1f77bcf86cd799439012'),
+            }),
+          ]),
+        }),
+        mockSession,
       );
     });
 
@@ -357,12 +367,12 @@ describe('OnboardingService', () => {
     });
 
     it('should throw BadRequestException if provider is not supported', async () => {
-         const dtoWithInvalidProvider = {
+      const dtoWithInvalidProvider = {
         ...validDto,
         channels: [
           {
             channelId: '507f1f77bcf86cd799439011',
-              provider: 'unsupported-provider' as unknown as ChannelProvider,
+            provider: 'unsupported-provider' as unknown as ChannelProvider,
             status: 'active' as const,
             credentials: { phoneNumberId: '123' },
             llmConfig: {

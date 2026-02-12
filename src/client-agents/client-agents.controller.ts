@@ -24,7 +24,10 @@ export class ClientAgentsController {
   }
 
   @Patch(':id/status')
-  updateStatus(@Param('id') id: string, @Body() updateDto: UpdateClientAgentStatusDto) {
+  updateStatus(
+    @Param('id') id: string,
+    @Body() updateDto: UpdateClientAgentStatusDto,
+  ) {
     return this.clientAgentsService.updateStatus(id, updateDto);
   }
 

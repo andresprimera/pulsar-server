@@ -1,4 +1,10 @@
-import { Injectable, OnApplicationBootstrap, Logger, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  OnApplicationBootstrap,
+  Logger,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { UserRepository } from './repositories/user.repository';
@@ -26,7 +32,9 @@ export class SeederService implements OnApplicationBootstrap {
 
   async onApplicationBootstrap(): Promise<void> {
     const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/pulsar';
-    this.logger.log(`Connected to Database: ${uri.replace(/:([^:@]+)@/, ':****@')}`);
+    this.logger.log(
+      `Connected to Database: ${uri.replace(/:([^:@]+)@/, ':****@')}`,
+    );
 
     const isProd = process.env.NODE_ENV === 'production';
     const startSeed = isProd
@@ -34,7 +42,9 @@ export class SeederService implements OnApplicationBootstrap {
       : process.env.SEED_DB !== 'false'; // Dev: Default on, explicit off
 
     if (!startSeed) {
-      this.logger.log(`Skipping seeding (NODE_ENV=${process.env.NODE_ENV}, SEED_DB=${process.env.SEED_DB})`);
+      this.logger.log(
+        `Skipping seeding (NODE_ENV=${process.env.NODE_ENV}, SEED_DB=${process.env.SEED_DB})`,
+      );
       return;
     }
 
@@ -46,14 +56,20 @@ export class SeederService implements OnApplicationBootstrap {
 
     try {
       // Idempotency check: if seed user exists, skip entire seeding
-      const existingUser = await this.userRepository.findByEmail(SEED_DATA.user.email);
+      const existingUser = await this.userRepository.findByEmail(
+        SEED_DATA.user.email,
+      );
       if (existingUser) {
-        this.logger.log(`Seed user "${SEED_DATA.user.email}" already exists. Skipping seeding.`);
+        this.logger.log(
+          `Seed user "${SEED_DATA.user.email}" already exists. Skipping seeding.`,
+        );
         return;
       }
 
       // 1. Ensure Agent exists (required for onboarding)
-      let agent = await this.agentModel.findOne({ name: SEED_DATA.agent.name }).exec();
+      let agent = await this.agentModel
+        .findOne({ name: SEED_DATA.agent.name })
+        .exec();
       if (!agent) {
         this.logger.log(`Creating Agent: ${SEED_DATA.agent.name}`);
         agent = await this.agentModel.create({
@@ -63,7 +79,9 @@ export class SeederService implements OnApplicationBootstrap {
           createdBySeeder: true,
         });
       } else {
-        this.logger.log(`Agent "${SEED_DATA.agent.name}" already exists (${agent._id})`);
+        this.logger.log(
+          `Agent "${SEED_DATA.agent.name}" already exists (${agent._id})`,
+        );
       }
 
       // 2. Ensure Channels exist (Infrastructure provisioning)
@@ -71,33 +89,36 @@ export class SeederService implements OnApplicationBootstrap {
       for (const channelSeed of SEED_DATA.channels) {
         await this.channelRepository.findOrCreateByName(channelSeed.name, {
           type: channelSeed.type as any,
-          supportedProviders: channelSeed.supportedProviders.map(p => p.toLowerCase()),
+          supportedProviders: channelSeed.supportedProviders.map((p) =>
+            p.toLowerCase(),
+          ),
         });
       }
 
       // Ensure indexes are built before transaction starts to avoid "catalog changes" error
       this.logger.log('Ensuring indexes are built...');
-      await Promise.all([
-
-        this.clientPhoneModel.createIndexes(),
-      ]);
+      await Promise.all([this.clientPhoneModel.createIndexes()]);
 
       // 3. Map Seed Data to HireChannelConfigDto (Resolve Channel IDs)
       const channelsDto = [];
       for (const channelSeed of SEED_DATA.channels) {
-          const channelDoc = await this.channelRepository.findByNameOrFail(channelSeed.name);
-          // Use provider from existing config/structure or robust default
-          // Assuming seed data might have a preferred provider logic, otherwise default to first supported
-          // Ideally seed data should specify the provider to use for the agent
-          const provider = (channelSeed as any).defaultProvider || channelSeed.supportedProviders[0];
-          
-          channelsDto.push({
-              channelId: channelDoc._id.toString(),
-              provider: provider,
-              status: 'active',
-              credentials: channelSeed.agentChannelConfig.channelConfig,
-              llmConfig: channelSeed.agentChannelConfig.llmConfig,
-          });
+        const channelDoc = await this.channelRepository.findByNameOrFail(
+          channelSeed.name,
+        );
+        // Use provider from existing config/structure or robust default
+        // Assuming seed data might have a preferred provider logic, otherwise default to first supported
+        // Ideally seed data should specify the provider to use for the agent
+        const provider =
+          (channelSeed as any).defaultProvider ||
+          channelSeed.supportedProviders[0];
+
+        channelsDto.push({
+          channelId: channelDoc._id.toString(),
+          provider: provider,
+          status: 'active',
+          credentials: channelSeed.agentChannelConfig.channelConfig,
+          llmConfig: channelSeed.agentChannelConfig.llmConfig,
+        });
       }
 
       // 4. Use OnboardingService to create User, Client, ClientAgent, and ClientPhone
@@ -119,7 +140,9 @@ export class SeederService implements OnApplicationBootstrap {
 
       this.logger.log(`Seeding complete via onboarding:`);
       this.logger.log(`  - User: ${result.user._id} (${result.user.email})`);
-      this.logger.log(`  - Client: ${result.client._id} (${result.client.name})`);
+      this.logger.log(
+        `  - Client: ${result.client._id} (${result.client.name})`,
+      );
       this.logger.log(`  - ClientAgent: ${result.clientAgent._id}`);
     } catch (error) {
       this.logger.error('Seeding failed', error);

@@ -31,7 +31,11 @@ describe('AgentService', () => {
     agentId: 'agent-1',
     clientId: 'client-1',
     systemPrompt: 'You are a helpful assistant.',
-    llmConfig: { provider: LlmProvider.OpenAI, apiKey: 'sk-mock', model: 'gpt-4' },
+    llmConfig: {
+      provider: LlmProvider.OpenAI,
+      apiKey: 'sk-mock',
+      model: 'gpt-4',
+    },
   };
 
   beforeEach(async () => {
@@ -116,9 +120,7 @@ describe('AgentService', () => {
       expect(logSpy).toHaveBeenCalledWith(
         'Processing agent-1 for client client-1 using provider=openai model=gpt-4',
       );
-      expect(logSpy).toHaveBeenCalledWith(
-        'Response generated for agent-1',
-      );
+      expect(logSpy).toHaveBeenCalledWith('Response generated for agent-1');
     });
   });
 });

@@ -23,7 +23,10 @@ export class UserRepository {
     return this.model.findById(id).exec();
   }
 
-  async findByEmail(email: string, session?: ClientSession): Promise<User | null> {
+  async findByEmail(
+    email: string,
+    session?: ClientSession,
+  ): Promise<User | null> {
     return this.model.findOne({ email }).session(session).exec();
   }
 
@@ -33,10 +36,7 @@ export class UserRepository {
     return this.model.find({ status }).exec();
   }
 
-  async update(
-    id: string,
-    data: Partial<User>,
-  ): Promise<User | null> {
+  async update(id: string, data: Partial<User>): Promise<User | null> {
     return this.model.findByIdAndUpdate(id, data, { new: true }).exec();
   }
 

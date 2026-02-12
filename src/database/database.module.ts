@@ -28,7 +28,6 @@ const repositories = [
   UserRepository,
 ];
 
-
 @Global()
 @Module({
   imports: [

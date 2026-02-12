@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+  Logger,
+} from '@nestjs/common';
 import { ClientAgentRepository } from '../database/repositories/client-agent.repository';
 
 import { CreateClientAgentDto } from './dto/create-client-agent.dto';
@@ -67,10 +73,15 @@ export class ClientAgentsService {
     }
 
     const updated = await this.clientAgentRepository.update(id, data);
-    return updated!; // non-null assertion because we checked existence
+    if (!updated)
+      throw new NotFoundException('ClientAgent not found after update');
+    return updated;
   }
 
-  async updateStatus(id: string, data: UpdateClientAgentStatusDto): Promise<ClientAgent> {
+  async updateStatus(
+    id: string,
+    data: UpdateClientAgentStatusDto,
+  ): Promise<ClientAgent> {
     const clientAgent = await this.clientAgentRepository.findById(id);
     if (!clientAgent) {
       throw new NotFoundException('ClientAgent not found');
@@ -80,20 +91,28 @@ export class ClientAgentsService {
       throw new BadRequestException('Cannot modify archived ClientAgent');
     }
 
-    const updated = await this.clientAgentRepository.update(id, { status: data.status });
+    const updated = await this.clientAgentRepository.update(id, {
+      status: data.status,
+    });
+    if (!updated)
+      throw new NotFoundException('ClientAgent not found after update');
 
     // Cascade archive happens implicitly because channels are embedded
     if (data.status === 'archived') {
-       this.logger.log(
-          `[ClientAgent] Archived ClientAgent clientId=${clientAgent.clientId}, agentId=${clientAgent.agentId} (Channels embedded)`,
-        );
+      this.logger.log(
+        `[ClientAgent] Archived ClientAgent clientId=${clientAgent.clientId}, agentId=${clientAgent.agentId} (Channels embedded)`,
+      );
     }
 
-    return updated!;
+    return updated;
   }
 
   async calculateClientTotal(clientId: string): Promise<number> {
-    const activeClientAgents = await this.clientAgentRepository.findByClientAndStatus(clientId, 'active');
+    const activeClientAgents =
+      await this.clientAgentRepository.findByClientAndStatus(
+        clientId,
+        'active',
+      );
     return activeClientAgents.reduce((total, ca) => total + ca.price, 0);
   }
 }

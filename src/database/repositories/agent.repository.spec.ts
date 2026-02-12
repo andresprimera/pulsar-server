@@ -166,7 +166,9 @@ describe('AgentRepository', () => {
         exec: jest.fn().mockResolvedValue(updatedAgent),
       });
 
-      const result = await repository.update('agent-1', { name: 'Updated Name' });
+      const result = await repository.update('agent-1', {
+        name: 'Updated Name',
+      });
 
       expect(mockModel.findByIdAndUpdate).toHaveBeenCalledWith(
         'agent-1',

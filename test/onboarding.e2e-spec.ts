@@ -49,7 +49,9 @@ describe('Onboarding (e2e)', () => {
 
     try {
       // Remove potential zombie index from previous schema versions
-      await connection.collection('agent_channels').dropIndex('channelConfig.phoneNumberId_1');
+      await connection
+        .collection('agent_channels')
+        .dropIndex('channelConfig.phoneNumberId_1');
     } catch (e) {
       // Ignore if index doesn't exist
     }
@@ -73,11 +75,11 @@ describe('Onboarding (e2e)', () => {
   });
 
   async function provisionChannel(name: string, type: string) {
-    // For WhatsApp, we use 'meta'. For others (web/api), we use 'smtp' as a valid fallback 
+    // For WhatsApp, we use 'meta'. For others (web/api), we use 'smtp' as a valid fallback
     // since 'custom' is not in ChannelProvider enum.
     const provider = type === 'whatsapp' ? 'meta' : 'smtp';
     const supportedProviders = [provider];
-    
+
     const result = await connection.collection('channels').findOneAndUpdate(
       { name },
       {
@@ -91,7 +93,9 @@ describe('Onboarding (e2e)', () => {
       },
       { upsert: true, returnDocument: 'after' },
     );
-    return result.value ? result.value._id.toString() : result.lastErrorObject.upserted.toString();
+    return result.value
+      ? result.value._id.toString()
+      : result.lastErrorObject.upserted.toString();
   }
 
   describe('POST /onboarding/register-and-hire', () => {
@@ -161,7 +165,10 @@ describe('Onboarding (e2e)', () => {
         .findOne({ _id: new Types.ObjectId(response.body.clientAgent._id) });
 
       if (!savedClientAgent) {
-        const allAgents = await connection.collection('client_agents').find().toArray();
+        const allAgents = await connection
+          .collection('client_agents')
+          .find()
+          .toArray();
         console.error('All ClientAgents:', JSON.stringify(allAgents, null, 2));
         console.error('Looking for ID:', response.body.clientAgent._id);
       }
@@ -229,7 +236,9 @@ describe('Onboarding (e2e)', () => {
         })
         .expect(201);
 
-      expect(response.body.client.name).toBe(`E2E Onboarding Custom Org Name ${suffix}`);
+      expect(response.body.client.name).toBe(
+        `E2E Onboarding Custom Org Name ${suffix}`,
+      );
       expect(response.body.client.type).toBe('organization');
     });
 
@@ -397,7 +406,9 @@ describe('Onboarding (e2e)', () => {
         })
         .expect(409);
 
-      expect(response.body.message).toContain('already owned by another client');
+      expect(response.body.message).toContain(
+        'already owned by another client',
+      );
     });
 
     it('should return 400 when agent is not hireable (inactive)', async () => {
@@ -487,11 +498,11 @@ describe('Onboarding (e2e)', () => {
           agentHiring: { agentId: testAgentId, price: 100 },
           channels: [
             {
-               channelId,
-               provider: 'smtp',
-               credentials: {},
-               llmConfig: { provider: 'openai', apiKey: 'key', model: 'gpt-4' }
-            }
+              channelId,
+              provider: 'smtp',
+              credentials: {},
+              llmConfig: { provider: 'openai', apiKey: 'key', model: 'gpt-4' },
+            },
           ],
         })
         .expect(400);
@@ -513,12 +524,16 @@ describe('Onboarding (e2e)', () => {
             client: { type: 'individual' },
             agentHiring: { agentId: testAgentId, price: 100 },
             channels: [
-                {
-                   channelId,
-                   provider: 'smtp',
-                   credentials: {},
-                   llmConfig: { provider: 'openai', apiKey: 'key', model: 'gpt-4' }
-                }
+              {
+                channelId,
+                provider: 'smtp',
+                credentials: {},
+                llmConfig: {
+                  provider: 'openai',
+                  apiKey: 'key',
+                  model: 'gpt-4',
+                },
+              },
             ],
           })
           .expect(400);
@@ -539,12 +554,16 @@ describe('Onboarding (e2e)', () => {
             client: { type: 'invalid-type' },
             agentHiring: { agentId: testAgentId, price: 100 },
             channels: [
-                {
-                   channelId,
-                   provider: 'smtp',
-                   credentials: {},
-                   llmConfig: { provider: 'openai', apiKey: 'key', model: 'gpt-4' }
-                }
+              {
+                channelId,
+                provider: 'smtp',
+                credentials: {},
+                llmConfig: {
+                  provider: 'openai',
+                  apiKey: 'key',
+                  model: 'gpt-4',
+                },
+              },
             ],
           })
           .expect(400);
@@ -565,12 +584,16 @@ describe('Onboarding (e2e)', () => {
             client: { type: 'individual' },
             agentHiring: { agentId: 'not-a-mongo-id', price: 100 },
             channels: [
-                {
-                   channelId,
-                   provider: 'smtp',
-                   credentials: {},
-                   llmConfig: { provider: 'openai', apiKey: 'key', model: 'gpt-4' }
-                }
+              {
+                channelId,
+                provider: 'smtp',
+                credentials: {},
+                llmConfig: {
+                  provider: 'openai',
+                  apiKey: 'key',
+                  model: 'gpt-4',
+                },
+              },
             ],
           })
           .expect(400);
@@ -591,12 +614,16 @@ describe('Onboarding (e2e)', () => {
             client: { type: 'individual' },
             agentHiring: { agentId: testAgentId, price: -1 },
             channels: [
-                {
-                   channelId,
-                   provider: 'smtp',
-                   credentials: {},
-                   llmConfig: { provider: 'openai', apiKey: 'key', model: 'gpt-4' }
-                }
+              {
+                channelId,
+                provider: 'smtp',
+                credentials: {},
+                llmConfig: {
+                  provider: 'openai',
+                  apiKey: 'key',
+                  model: 'gpt-4',
+                },
+              },
             ],
           })
           .expect(400);
@@ -652,9 +679,9 @@ describe('Onboarding (e2e)', () => {
                 provider: 'smtp',
                 credentials: {},
                 llmConfig: {
-                    provider: 'invalid-provider',
-                    apiKey: 'key',
-                    model: 'gpt-4',
+                  provider: 'invalid-provider',
+                  apiKey: 'key',
+                  model: 'gpt-4',
                 },
               },
             ],

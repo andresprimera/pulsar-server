@@ -32,9 +32,17 @@ describe('WhatsappController', () => {
     it('should delegate to service.verifyWebhook()', () => {
       service.verifyWebhook.mockReturnValue('challenge123');
 
-      const result = controller.verify('subscribe', 'test-token', 'challenge123');
+      const result = controller.verify(
+        'subscribe',
+        'test-token',
+        'challenge123',
+      );
 
-      expect(service.verifyWebhook).toHaveBeenCalledWith('subscribe', 'test-token', 'challenge123');
+      expect(service.verifyWebhook).toHaveBeenCalledWith(
+        'subscribe',
+        'test-token',
+        'challenge123',
+      );
       expect(result).toBe('challenge123');
     });
   });

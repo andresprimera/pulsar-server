@@ -45,7 +45,10 @@ export class AgentRepository {
    * Use this when creating new ClientAgent channel configurations.
    * Throws BadRequestException if agent cannot be hired.
    */
-  async validateHireable(agentId: string, session?: ClientSession): Promise<Agent> {
+  async validateHireable(
+    agentId: string,
+    session?: ClientSession,
+  ): Promise<Agent> {
     const agent = await this.model.findById(agentId).session(session).exec();
 
     if (!agent) {
@@ -54,7 +57,9 @@ export class AgentRepository {
     }
 
     if (agent.status !== 'active') {
-      this.logger.warn(`Hire rejected - agent ${agentId} status: ${agent.status}`);
+      this.logger.warn(
+        `Hire rejected - agent ${agentId} status: ${agent.status}`,
+      );
       throw new BadRequestException('Agent is not currently available');
     }
 

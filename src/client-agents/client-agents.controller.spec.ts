@@ -58,7 +58,9 @@ describe('ClientAgentsController', () => {
 
       const result = await controller.findByClient('client-1');
 
-      expect(mockClientAgentsService.findByClient).toHaveBeenCalledWith('client-1');
+      expect(mockClientAgentsService.findByClient).toHaveBeenCalledWith(
+        'client-1',
+      );
       expect(result).toEqual([mockClientAgent]);
     });
   });
@@ -66,7 +68,10 @@ describe('ClientAgentsController', () => {
   describe('update', () => {
     it('should call service.update', async () => {
       const dto = { price: 200 };
-      mockClientAgentsService.update.mockResolvedValue({ ...mockClientAgent, price: 200 });
+      mockClientAgentsService.update.mockResolvedValue({
+        ...mockClientAgent,
+        price: 200,
+      });
 
       const result = await controller.update('ca-1', dto);
 
@@ -78,11 +83,17 @@ describe('ClientAgentsController', () => {
   describe('updateStatus', () => {
     it('should call service.updateStatus', async () => {
       const dto = { status: 'inactive' as const };
-      mockClientAgentsService.updateStatus.mockResolvedValue({ ...mockClientAgent, status: 'inactive' });
+      mockClientAgentsService.updateStatus.mockResolvedValue({
+        ...mockClientAgent,
+        status: 'inactive',
+      });
 
       const result = await controller.updateStatus('ca-1', dto);
 
-      expect(mockClientAgentsService.updateStatus).toHaveBeenCalledWith('ca-1', dto);
+      expect(mockClientAgentsService.updateStatus).toHaveBeenCalledWith(
+        'ca-1',
+        dto,
+      );
       expect(result.status).toBe('inactive');
     });
   });
@@ -93,7 +104,9 @@ describe('ClientAgentsController', () => {
 
       const result = await controller.calculateClientTotal('client-1');
 
-      expect(mockClientAgentsService.calculateClientTotal).toHaveBeenCalledWith('client-1');
+      expect(mockClientAgentsService.calculateClientTotal).toHaveBeenCalledWith(
+        'client-1',
+      );
       expect(result).toBe(100);
     });
   });

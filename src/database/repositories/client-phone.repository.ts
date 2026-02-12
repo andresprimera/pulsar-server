@@ -78,7 +78,10 @@ export class ClientPhoneRepository {
     id: Types.ObjectId | string,
     session?: ClientSession,
   ): Promise<ClientPhone | null> {
-    return this.model.findById(id).session(session || null).exec();
+    return this.model
+      .findById(id)
+      .session(session || null)
+      .exec();
   }
 
   /**

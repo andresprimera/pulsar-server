@@ -18,7 +18,10 @@ export class ClientAgentRepository {
     return this.model.find().exec();
   }
 
-  async create(data: Partial<ClientAgent>, session?: ClientSession): Promise<ClientAgent> {
+  async create(
+    data: Partial<ClientAgent>,
+    session?: ClientSession,
+  ): Promise<ClientAgent> {
     const [doc] = await this.model.create([data], { session });
     return doc;
   }
@@ -47,7 +50,10 @@ export class ClientAgentRepository {
     return this.model.find({ clientId, status }).exec();
   }
 
-  async update(id: string, data: Partial<ClientAgent>): Promise<ClientAgent | null> {
+  async update(
+    id: string,
+    data: Partial<ClientAgent>,
+  ): Promise<ClientAgent | null> {
     return this.model.findByIdAndUpdate(id, data, { new: true }).exec();
   }
 
@@ -55,18 +61,21 @@ export class ClientAgentRepository {
    * Find ClientAgent by WhatsApp phoneNumberId within embedded channels.
    * Checks for active status and matching credentials.
    */
-  async findOneByPhoneNumberId(phoneNumberId: string): Promise<ClientAgent | null> {
-    return this.model.findOne({
-      status: 'active',
-      channels: {
-        $elemMatch: {
-          status: 'active',
-          'credentials.phoneNumberId': phoneNumberId,
+  async findOneByPhoneNumberId(
+    phoneNumberId: string,
+  ): Promise<ClientAgent | null> {
+    return this.model
+      .findOne({
+        status: 'active',
+        channels: {
+          $elemMatch: {
+            status: 'active',
+            'credentials.phoneNumberId': phoneNumberId,
+          },
         },
-      },
-    })
-    .select('+channels.credentials +channels.llmConfig.apiKey')
-    .exec();
+      })
+      .select('+channels.credentials +channels.llmConfig.apiKey')
+      .exec();
   }
 
   /**
@@ -74,17 +83,18 @@ export class ClientAgentRepository {
    * Checks for active status and matching credentials.
    */
   async findOneByEmail(email: string): Promise<ClientAgent | null> {
-    return this.model.findOne({
-      status: 'active',
-      channels: {
-        $elemMatch: {
-          status: 'active',
-          'credentials.email': email,
+    return this.model
+      .findOne({
+        status: 'active',
+        channels: {
+          $elemMatch: {
+            status: 'active',
+            'credentials.email': email,
+          },
         },
-      },
-    })
-    .select('+channels.credentials +channels.llmConfig.apiKey')
-    .exec();
+      })
+      .select('+channels.credentials +channels.llmConfig.apiKey')
+      .exec();
   }
 
   /**
@@ -92,16 +102,17 @@ export class ClientAgentRepository {
    * Used for IMAP polling.
    */
   async findAllWithActiveEmailChannels(): Promise<ClientAgent[]> {
-    return this.model.find({
-      status: 'active',
-      channels: {
-        $elemMatch: {
-          status: 'active',
-          'credentials.email': { $exists: true },
+    return this.model
+      .find({
+        status: 'active',
+        channels: {
+          $elemMatch: {
+            status: 'active',
+            'credentials.email': { $exists: true },
+          },
         },
-      },
-    })
-    .select('+channels.credentials +channels.llmConfig.apiKey')
-    .exec();
+      })
+      .select('+channels.credentials +channels.llmConfig.apiKey')
+      .exec();
   }
 }

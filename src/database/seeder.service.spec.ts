@@ -119,12 +119,23 @@ describe('SeederService', () => {
       // No existing user
       mockUserRepository.findByEmail.mockResolvedValue(null);
       // No existing agent
-      mockAgentModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(null) });
-      mockAgentModel.create.mockResolvedValue({ _id: mockAgentId, name: SEED_DATA.agent.name });
+      mockAgentModel.findOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
+      });
+      mockAgentModel.create.mockResolvedValue({
+        _id: mockAgentId,
+        name: SEED_DATA.agent.name,
+      });
 
       // Mock Channel resolutions
-      mockChannelRepository.findOrCreateByName.mockResolvedValue({ _id: 'channel-id', name: 'WhatsApp' });
-      mockChannelRepository.findByNameOrFail.mockResolvedValue({ _id: 'channel-id', name: 'WhatsApp' });
+      mockChannelRepository.findOrCreateByName.mockResolvedValue({
+        _id: 'channel-id',
+        name: 'WhatsApp',
+      });
+      mockChannelRepository.findByNameOrFail.mockResolvedValue({
+        _id: 'channel-id',
+        name: 'WhatsApp',
+      });
 
       await service.onApplicationBootstrap();
 
@@ -138,13 +149,23 @@ describe('SeederService', () => {
       // No existing user
       mockUserRepository.findByEmail.mockResolvedValue(null);
       // No existing agent
-      mockAgentModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(null) });
-      mockAgentModel.create.mockResolvedValue({ _id: mockAgentId, name: SEED_DATA.agent.name });
+      mockAgentModel.findOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
+      });
+      mockAgentModel.create.mockResolvedValue({
+        _id: mockAgentId,
+        name: SEED_DATA.agent.name,
+      });
 
       // Mock Channel resolutions
-      mockChannelRepository.findOrCreateByName.mockResolvedValue({ _id: 'channel-id', name: 'WhatsApp' });
-      mockChannelRepository.findByNameOrFail.mockResolvedValue({ _id: 'channel-id', name: 'WhatsApp' });
-
+      mockChannelRepository.findOrCreateByName.mockResolvedValue({
+        _id: 'channel-id',
+        name: 'WhatsApp',
+      });
+      mockChannelRepository.findByNameOrFail.mockResolvedValue({
+        _id: 'channel-id',
+        name: 'WhatsApp',
+      });
 
       await service.onApplicationBootstrap();
 
@@ -166,16 +187,18 @@ describe('SeederService', () => {
         expect.objectContaining({
           user: expect.objectContaining({ email: SEED_DATA.user.email }),
           channels: expect.arrayContaining([
-              expect.objectContaining({
-                  channelId: 'channel-id',
-                  status: 'active'
-              })
-          ])
-        })
+            expect.objectContaining({
+              channelId: 'channel-id',
+              status: 'active',
+            }),
+          ]),
+        }),
       );
 
       // Verify channel provisioning
-      expect(mockChannelRepository.findOrCreateByName).toHaveBeenCalledTimes(SEED_DATA.channels.length);
+      expect(mockChannelRepository.findOrCreateByName).toHaveBeenCalledTimes(
+        SEED_DATA.channels.length,
+      );
     });
 
     it('should skip seeding in DEVELOPMENT if SEED_DB is false', async () => {
@@ -214,12 +237,20 @@ describe('SeederService', () => {
       mockUserRepository.findByEmail.mockResolvedValue(null);
       // Existing agent found
       mockAgentModel.findOne.mockReturnValue({
-        exec: jest.fn().mockResolvedValue({ _id: mockAgentId, name: SEED_DATA.agent.name }),
+        exec: jest
+          .fn()
+          .mockResolvedValue({ _id: mockAgentId, name: SEED_DATA.agent.name }),
       });
 
       // Mock Channel resolutions
-      mockChannelRepository.findOrCreateByName.mockResolvedValue({ _id: 'channel-id', name: 'WhatsApp' });
-      mockChannelRepository.findByNameOrFail.mockResolvedValue({ _id: 'channel-id', name: 'WhatsApp' });
+      mockChannelRepository.findOrCreateByName.mockResolvedValue({
+        _id: 'channel-id',
+        name: 'WhatsApp',
+      });
+      mockChannelRepository.findByNameOrFail.mockResolvedValue({
+        _id: 'channel-id',
+        name: 'WhatsApp',
+      });
 
       await service.onApplicationBootstrap();
 

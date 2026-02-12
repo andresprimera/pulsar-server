@@ -75,7 +75,9 @@ export class WhatsappService {
     this.logger.log(`[WhatsApp] Extracted phoneNumberId: ${phoneNumberId}`);
 
     // Route: find active ClientAgent with matching phoneNumberId in embedded channels
-    const clientAgent = await this.clientAgentRepository.findOneByPhoneNumberId(phoneNumberId);
+    const clientAgent = await this.clientAgentRepository.findOneByPhoneNumberId(
+      phoneNumberId,
+    );
 
     if (!clientAgent) {
       this.logger.warn(
@@ -87,12 +89,11 @@ export class WhatsappService {
     // Extract the specific channel config
     const channelConfig = clientAgent.channels.find(
       (c) =>
-        c.status === 'active' &&
-        c.credentials?.phoneNumberId === phoneNumberId,
+        c.status === 'active' && c.credentials?.phoneNumberId === phoneNumberId,
     );
 
     if (!channelConfig) {
-       this.logger.warn(
+      this.logger.warn(
         `[WhatsApp] Channel config not found in ClientAgent for phoneNumberId=${phoneNumberId} (mismatch).`,
       );
       return;
@@ -106,7 +107,9 @@ export class WhatsappService {
       return;
     }
 
-    const agent = await this.agentRepository.findActiveById(clientAgent.agentId);
+    const agent = await this.agentRepository.findActiveById(
+      clientAgent.agentId,
+    );
     if (!agent) {
       this.logger.warn(
         `[WhatsApp] Agent ${clientAgent.agentId} is not active. Skipping message.`,
@@ -120,7 +123,9 @@ export class WhatsappService {
       systemPrompt: agent.systemPrompt,
       llmConfig: {
         ...channelConfig.llmConfig,
-        apiKey: decrypt(channelConfig.llmConfig.apiKey || process.env.OPENAI_API_KEY!),
+        apiKey: decrypt(
+          channelConfig.llmConfig.apiKey || (process.env.OPENAI_API_KEY ?? ''),
+        ),
       },
       channelConfig: decryptRecord(channelConfig.credentials),
     };

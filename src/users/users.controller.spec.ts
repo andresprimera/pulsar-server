@@ -41,10 +41,10 @@ describe('UsersController', () => {
 
   describe('POST /users', () => {
     it('should call service.create', async () => {
-      const dto = { 
-        email: 'test@example.com', 
+      const dto = {
+        email: 'test@example.com',
         name: 'New User',
-        clientId: '507f1f77bcf86cd799439011'
+        clientId: '507f1f77bcf86cd799439011',
       };
       mockUsersService.create.mockResolvedValue({ ...dto, _id: 'new-id' });
 
@@ -119,10 +119,7 @@ describe('UsersController', () => {
 
       const result = await controller.updateStatus('user-1', dto);
 
-      expect(mockUsersService.updateStatus).toHaveBeenCalledWith(
-        'user-1',
-        dto,
-      );
+      expect(mockUsersService.updateStatus).toHaveBeenCalledWith('user-1', dto);
       expect(result.status).toBe('inactive');
     });
   });

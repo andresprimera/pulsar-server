@@ -3,10 +3,13 @@ import { Document } from 'mongoose';
 
 @Schema({ collection: 'channels' })
 export class Channel extends Document {
-  @Prop({ required: true, unique: true  })
+  @Prop({ required: true, unique: true })
   name: string;
 
-  @Prop({ required: true, enum: ['whatsapp', 'telegram', 'web', 'api', 'email'] })
+  @Prop({
+    required: true,
+    enum: ['whatsapp', 'telegram', 'web', 'api', 'email'],
+  })
   type: 'whatsapp' | 'telegram' | 'web' | 'api' | 'email';
 
   @Prop({ required: true, type: [String] })

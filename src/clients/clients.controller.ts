@@ -40,10 +40,7 @@ export class ClientsController {
   }
 
   @Patch(':id/status')
-  updateStatus(
-    @Param('id') id: string,
-    @Body() dto: UpdateClientStatusDto,
-  ) {
+  updateStatus(@Param('id') id: string, @Body() dto: UpdateClientStatusDto) {
     return this.clientsService.updateStatus(id, dto);
   }
 }

@@ -7,9 +7,27 @@ describe('OnboardingController', () => {
   let mockOnboardingService: any;
 
   const mockResult = {
-    user: { _id: 'user-1', email: 'test@example.com', name: 'Test', clientId: 'client-1', status: 'active' },
-    client: { _id: 'client-1', name: 'Test', type: 'individual', ownerUserId: 'user-1', status: 'active' },
-    clientAgent: { _id: 'ca-1', clientId: 'client-1', agentId: 'agent-1', price: 100, status: 'active' },
+    user: {
+      _id: 'user-1',
+      email: 'test@example.com',
+      name: 'Test',
+      clientId: 'client-1',
+      status: 'active',
+    },
+    client: {
+      _id: 'client-1',
+      name: 'Test',
+      type: 'individual',
+      ownerUserId: 'user-1',
+      status: 'active',
+    },
+    clientAgent: {
+      _id: 'ca-1',
+      clientId: 'client-1',
+      agentId: 'agent-1',
+      price: 100,
+      status: 'active',
+    },
   };
 
   beforeEach(async () => {

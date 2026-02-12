@@ -62,10 +62,10 @@ export class UsersService {
     if (dto.name) {
       updates.name = dto.name;
     }
-    
+
     if (dto.email) {
       const email = dto.email.toLowerCase().trim();
-      
+
       // Check if email is taken by another user
       if (email !== existing.email) {
         const emailExists = await this.userRepository.findByEmail(email);

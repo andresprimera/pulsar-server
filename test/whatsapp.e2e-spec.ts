@@ -60,19 +60,25 @@ describe('WhatsApp Webhook (e2e)', () => {
       return request(app.getHttpServer())
         .post('/whatsapp/webhook')
         .send({
-          entry: [{
-            changes: [{
-              value: {
-                messages: [{
-                  from: '1234567890',
-                  id: 'msg123',
-                  type: 'text',
-                  text: { body: 'Hello' },
-                }],
-                metadata: { phone_number_id: 'phone123' },
-              },
-            }],
-          }],
+          entry: [
+            {
+              changes: [
+                {
+                  value: {
+                    messages: [
+                      {
+                        from: '1234567890',
+                        id: 'msg123',
+                        type: 'text',
+                        text: { body: 'Hello' },
+                      },
+                    ],
+                    metadata: { phone_number_id: 'phone123' },
+                  },
+                },
+              ],
+            },
+          ],
         })
         .expect(200)
         .expect('ok');
@@ -82,19 +88,25 @@ describe('WhatsApp Webhook (e2e)', () => {
       return request(app.getHttpServer())
         .post('/whatsapp/webhook')
         .send({
-          entry: [{
-            changes: [{
-              value: {
-                messages: [{
-                  from: '1234567890',
-                  id: 'msg123',
-                  type: 'text',
-                  text: { body: 'Hello' },
-                }],
-                metadata: { phone_number_id: 'unknown-phone' },
-              },
-            }],
-          }],
+          entry: [
+            {
+              changes: [
+                {
+                  value: {
+                    messages: [
+                      {
+                        from: '1234567890',
+                        id: 'msg123',
+                        type: 'text',
+                        text: { body: 'Hello' },
+                      },
+                    ],
+                    metadata: { phone_number_id: 'unknown-phone' },
+                  },
+                },
+              ],
+            },
+          ],
         })
         .expect(200)
         .expect('ok');
@@ -104,13 +116,17 @@ describe('WhatsApp Webhook (e2e)', () => {
       return request(app.getHttpServer())
         .post('/whatsapp/webhook')
         .send({
-          entry: [{
-            changes: [{
-              value: {
-                statuses: [{ id: 'status123', status: 'delivered' }],
-              },
-            }],
-          }],
+          entry: [
+            {
+              changes: [
+                {
+                  value: {
+                    statuses: [{ id: 'status123', status: 'delivered' }],
+                  },
+                },
+              ],
+            },
+          ],
         })
         .expect(200)
         .expect('ok');

@@ -21,7 +21,8 @@ export class HireChannelConfig {
   llmConfig: LlmConfig;
 }
 
-export const HireChannelConfigSchema = SchemaFactory.createForClass(HireChannelConfig);
+export const HireChannelConfigSchema =
+  SchemaFactory.createForClass(HireChannelConfig);
 
 @Schema({ collection: 'client_agents', timestamps: true })
 export class ClientAgent extends Document {

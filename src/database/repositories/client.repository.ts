@@ -10,7 +10,10 @@ export class ClientRepository {
     private readonly model: Model<Client>,
   ) {}
 
-  async create(data: Partial<Client>, session?: ClientSession): Promise<Client> {
+  async create(
+    data: Partial<Client>,
+    session?: ClientSession,
+  ): Promise<Client> {
     const [doc] = await this.model.create([data], { session });
     return doc;
   }

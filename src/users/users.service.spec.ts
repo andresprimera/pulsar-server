@@ -47,10 +47,10 @@ describe('UsersService', () => {
 
   describe('create', () => {
     it('should create user with normalized email', async () => {
-      const dto = { 
-        email: '  TEST@example.com  ', 
+      const dto = {
+        email: '  TEST@example.com  ',
         name: 'Test User',
-        clientId: '507f1f77bcf86cd799439011' 
+        clientId: '507f1f77bcf86cd799439011',
       };
       mockUserRepository.findByEmail.mockResolvedValue(null);
       mockUserRepository.create.mockResolvedValue({
@@ -75,10 +75,10 @@ describe('UsersService', () => {
     });
 
     it('should throw ConflictException if email exists', async () => {
-      const dto = { 
-        email: 'test@example.com', 
+      const dto = {
+        email: 'test@example.com',
         name: 'Test User',
-        clientId: '507f1f77bcf86cd799439011' 
+        clientId: '507f1f77bcf86cd799439011',
       };
       mockUserRepository.findByEmail.mockResolvedValue(mockUser);
 
@@ -130,7 +130,7 @@ describe('UsersService', () => {
       mockUserRepository.findById.mockResolvedValue(mockUser);
       // Mock findByEmail to return null (email not taken)
       mockUserRepository.findByEmail.mockResolvedValue(null);
-      
+
       mockUserRepository.update.mockResolvedValue({
         ...mockUser,
         name: 'Updated',
@@ -165,14 +165,14 @@ describe('UsersService', () => {
     });
 
     it('should allow updating to same email (no conflict)', async () => {
-       mockUserRepository.findById.mockResolvedValue(mockUser);
-       // Should not call findByEmail if email is same
-       mockUserRepository.update.mockResolvedValue(mockUser);
+      mockUserRepository.findById.mockResolvedValue(mockUser);
+      // Should not call findByEmail if email is same
+      mockUserRepository.update.mockResolvedValue(mockUser);
 
-       await service.update('user-1', { email: 'test@example.com' });
-       
-       expect(mockUserRepository.findByEmail).not.toHaveBeenCalled();
-       expect(mockUserRepository.update).toHaveBeenCalled();
+      await service.update('user-1', { email: 'test@example.com' });
+
+      expect(mockUserRepository.findByEmail).not.toHaveBeenCalled();
+      expect(mockUserRepository.update).toHaveBeenCalled();
     });
 
     it('should throw BadRequestException for archived user', async () => {

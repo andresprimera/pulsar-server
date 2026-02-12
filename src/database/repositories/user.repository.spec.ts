@@ -48,7 +48,9 @@ describe('UserRepository', () => {
 
       const result = await repository.create(mockUser);
 
-      expect(mockModel.create).toHaveBeenCalledWith([mockUser], { session: undefined });
+      expect(mockModel.create).toHaveBeenCalledWith([mockUser], {
+        session: undefined,
+      });
       expect(result).toEqual(mockUser);
     });
   });
@@ -99,7 +101,9 @@ describe('UserRepository', () => {
 
       const result = await repository.findByEmail('test@example.com');
 
-      expect(mockModel.findOne).toHaveBeenCalledWith({ email: 'test@example.com' });
+      expect(mockModel.findOne).toHaveBeenCalledWith({
+        email: 'test@example.com',
+      });
       expect(result).toEqual(mockUser);
     });
 
@@ -136,7 +140,9 @@ describe('UserRepository', () => {
         exec: jest.fn().mockResolvedValue(updatedUser),
       });
 
-      const result = await repository.update(mockUser._id.toString(), { name: 'Updated' });
+      const result = await repository.update(mockUser._id.toString(), {
+        name: 'Updated',
+      });
 
       expect(mockModel.findByIdAndUpdate).toHaveBeenCalledWith(
         mockUser._id.toString(),

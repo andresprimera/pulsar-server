@@ -52,7 +52,9 @@ export class OnboardingService {
     private readonly clientPhoneRepository: ClientPhoneRepository,
   ) {}
 
-  async registerAndHire(dto: RegisterAndHireDto): Promise<RegisterAndHireResult> {
+  async registerAndHire(
+    dto: RegisterAndHireDto,
+  ): Promise<RegisterAndHireResult> {
     // PRE-TRANSACTION VALIDATIONS (fail fast, no rollback needed)
 
     // 1. Normalize email
@@ -63,7 +65,9 @@ export class OnboardingService {
 
     // 3. Validate client name for organization type
     if (dto.client.type === 'organization' && !dto.client.name) {
-      throw new BadRequestException('Client name is required for organization type');
+      throw new BadRequestException(
+        'Client name is required for organization type',
+      );
     }
 
     // 4. Channels are validated during processing below
@@ -76,7 +80,9 @@ export class OnboardingService {
       // 5. Check user email doesn't exist (inside transaction for consistency
       //    under concurrent onboarding — prevents two requests from both passing
       //    this check and producing a less descriptive E11000 error)
-      const existingUser = await this.userRepository.findByEmail(normalizedEmail);
+      const existingUser = await this.userRepository.findByEmail(
+        normalizedEmail,
+      );
       if (existingUser) {
         throw new ConflictException('User with this email already exists');
       }
@@ -116,50 +122,61 @@ export class OnboardingService {
       for (const channelConfig of dto.channels) {
         // Validation: Unique channelId in request
         if (processedChannelIds.has(channelConfig.channelId)) {
-            throw new BadRequestException(`Duplicate channelId in request: ${channelConfig.channelId}`);
+          throw new BadRequestException(
+            `Duplicate channelId in request: ${channelConfig.channelId}`,
+          );
         }
         processedChannelIds.add(channelConfig.channelId);
 
         // Validation: Channel exists (Infrastructure)
-        const channel = await this.channelRepository.findByIdOrFail(channelConfig.channelId);
+        const channel = await this.channelRepository.findByIdOrFail(
+          channelConfig.channelId,
+        );
 
         // Validation: Provider supported
         const normalizedProvider = channelConfig.provider.toLowerCase().trim();
         if (!channel.supportedProviders.includes(normalizedProvider)) {
-            throw new BadRequestException(
-                `Provider "${channelConfig.provider}" is not supported by channel "${channel.name}". Supported: ${channel.supportedProviders.join(', ')}`
-            );
+          throw new BadRequestException(
+            `Provider "${
+              channelConfig.provider
+            }" is not supported by channel "${
+              channel.name
+            }". Supported: ${channel.supportedProviders.join(', ')}`,
+          );
         }
 
         // Credentials & Phone Logic
         let phoneNumberId: string | undefined;
-        if (channelConfig.credentials && 'phoneNumberId' in channelConfig.credentials) {
-            phoneNumberId = channelConfig.credentials.phoneNumberId;
+        if (
+          channelConfig.credentials &&
+          'phoneNumberId' in channelConfig.credentials
+        ) {
+          phoneNumberId = channelConfig.credentials.phoneNumberId;
         }
 
         if (phoneNumberId) {
-             // Resolve or create ClientPhone for this client
-             // Note: We don't store clientPhoneId in ClientAgent (embedded), 
-             // but we still enforce ownership via ClientPhone repository
-             await this.clientPhoneRepository.resolveOrCreate(
-                client._id as Types.ObjectId,
-                phoneNumberId,
-                {
-                    provider: normalizedProvider as any,
-                    session,
-                },
-             );
+          // Resolve or create ClientPhone for this client
+          // Note: We don't store clientPhoneId in ClientAgent (embedded),
+          // but we still enforce ownership via ClientPhone repository
+          await this.clientPhoneRepository.resolveOrCreate(
+            client._id as Types.ObjectId,
+            phoneNumberId,
+            {
+              provider: normalizedProvider as any,
+              session,
+            },
+          );
         }
 
         hireChannels.push({
-            channelId: new Types.ObjectId(channelConfig.channelId),
-            provider: normalizedProvider,
-            status: 'active',
-            credentials: encryptRecord(channelConfig.credentials),
-            llmConfig: {
-              ...channelConfig.llmConfig,
-              apiKey: encrypt(channelConfig.llmConfig.apiKey),
-            },
+          channelId: new Types.ObjectId(channelConfig.channelId),
+          provider: normalizedProvider,
+          status: 'active',
+          credentials: encryptRecord(channelConfig.credentials),
+          llmConfig: {
+            ...channelConfig.llmConfig,
+            apiKey: encrypt(channelConfig.llmConfig.apiKey),
+          },
         });
       }
 

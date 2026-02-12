@@ -20,9 +20,6 @@ describe('AppController (e2e)', () => {
   });
 
   it('/ (GET) should return 200 for health check', () => {
-    return request(app.getHttpServer())
-      .get('/')
-      .expect(200)
-      .expect('');
+    return request(app.getHttpServer()).get('/').expect(200).expect('');
   });
 });

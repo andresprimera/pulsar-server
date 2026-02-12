@@ -42,7 +42,10 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
     this.logger.log(
       `[Email] Starting IMAP polling (every ${POLL_INTERVAL_MS / 1000}s)`,
     );
-    this.pollTimer = setInterval(() => this.pollAllMailboxes(), POLL_INTERVAL_MS);
+    this.pollTimer = setInterval(
+      () => this.pollAllMailboxes(),
+      POLL_INTERVAL_MS,
+    );
   }
 
   onModuleDestroy() {
@@ -91,7 +94,7 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
 
   async pollMailbox(
     channelConfig: EmailCredentials,
-    clientAgent: ClientAgent,
+    _clientAgent: ClientAgent,
   ): Promise<void> {
     const client = new ImapFlow({
       host: channelConfig.imapHost || 'imap.gmail.com',
@@ -162,7 +165,7 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
     );
 
     if (!channelConfig) {
-       this.logger.warn(
+      this.logger.warn(
         `[Email] Channel config not found in ClientAgent for email=${dto.to} (mismatch).`,
       );
       return;
@@ -176,7 +179,9 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    const agent = await this.agentRepository.findActiveById(clientAgent.agentId);
+    const agent = await this.agentRepository.findActiveById(
+      clientAgent.agentId,
+    );
     if (!agent) {
       this.logger.warn(
         `[Email] Agent ${clientAgent.agentId} is not active. Skipping message.`,
@@ -190,7 +195,9 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
       systemPrompt: agent.systemPrompt,
       llmConfig: {
         ...channelConfig.llmConfig,
-        apiKey: decrypt(channelConfig.llmConfig.apiKey || process.env.OPENAI_API_KEY!),
+        apiKey: decrypt(
+          channelConfig.llmConfig.apiKey || (process.env.OPENAI_API_KEY ?? ''),
+        ),
       },
       channelConfig: decryptRecord(channelConfig.credentials),
     };

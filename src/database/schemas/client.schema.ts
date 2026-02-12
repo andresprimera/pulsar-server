@@ -2,7 +2,6 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
 @Schema({ collection: 'clients', timestamps: true })
-
 export class Client extends Document {
   @Prop({ required: true })
   name: string;
@@ -29,7 +28,6 @@ export class Client extends Document {
     index: true,
   })
   status: 'active' | 'inactive' | 'archived';
-
 
   @Prop({ type: Object })
   llmPreferences?: {

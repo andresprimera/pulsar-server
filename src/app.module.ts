@@ -24,7 +24,6 @@ import { OnboardingModule } from './onboarding/onboarding.module';
     OnboardingModule,
   ],
 
-
   controllers: [AppController],
 })
 export class AppModule {}
