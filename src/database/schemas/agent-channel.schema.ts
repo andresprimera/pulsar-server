@@ -34,6 +34,10 @@ export class AgentChannel extends Document {
     webhookVerifyToken?: string;
     email?: string;
     password?: string;
+    smtpHost?: string;
+    smtpPort?: number;
+    imapHost?: string;
+    imapPort?: number;
   };
 
   @Prop({ type: LlmConfigSchema, required: true })
@@ -47,3 +51,6 @@ AgentChannelSchema.index({ clientId: 1, agentId: 1, channelId: 1 }, { unique: tr
 
 // Index for efficient phone lookups (routing webhooks)
 AgentChannelSchema.index({ clientPhoneId: 1 });
+
+// Index for efficient email lookups (routing email webhooks)
+AgentChannelSchema.index({ 'channelConfig.email': 1 });

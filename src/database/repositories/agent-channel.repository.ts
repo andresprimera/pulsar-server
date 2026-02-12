@@ -61,6 +61,32 @@ export class AgentChannelRepository {
     }
     return this.model.find(query).session(options?.session || null).exec();
   }
+  /**
+   * Find AgentChannel by email address in channelConfig.
+   * Used for routing incoming emails to the correct agent channel.
+   */
+  async findByEmail(email: string): Promise<AgentChannel | null> {
+    return this.model
+      .findOne({
+        'channelConfig.email': email,
+        status: 'active',
+      })
+      .exec();
+  }
+
+  /**
+   * Find all active AgentChannels that have an email configured.
+   * Used by the IMAP polling loop to discover which mailboxes to check.
+   */
+  async findAllActiveWithEmail(): Promise<AgentChannel[]> {
+    return this.model
+      .find({
+        'channelConfig.email': { $exists: true, $ne: null },
+        status: 'active',
+      })
+      .exec();
+  }
+
   async findByKeys(clientId: string, agentId: string, channelId: string): Promise<AgentChannel | null> {
     return this.model.findOne({ clientId, agentId, channelId }).exec();
   }

@@ -39,7 +39,11 @@
       "agentChannelConfig": {
         "channelConfig": {
           "email": "support@example.com",
-          "password": "password"
+          "password": "password",
+          "smtpHost": "smtp.gmail.com",
+          "smtpPort": 587,
+          "imapHost": "imap.gmail.com",
+          "imapPort": 993
         },
         "llmConfig": {
           "provider": "openai",
