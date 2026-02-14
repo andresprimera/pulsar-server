@@ -4,7 +4,6 @@ import { AgentInput } from '../../agent/contracts/agent-input';
 import { AgentContext } from '../../agent/contracts/agent-context';
 import { AgentRepository } from '../../database/repositories/agent.repository';
 import { ClientAgentRepository } from '../../database/repositories/client-agent.repository';
-import { MessagePersistenceService } from '../shared/message-persistence.service';
 import { decryptRecord, decrypt } from '../../database/utils/crypto.util';
 
 const VERIFY_TOKEN = 'test-token';
@@ -17,7 +16,6 @@ export class WhatsappService {
     private readonly agentService: AgentService,
     private readonly clientAgentRepository: ClientAgentRepository,
     private readonly agentRepository: AgentRepository,
-    private readonly messagePersistenceService: MessagePersistenceService,
   ) {}
 
   verifyWebhook(mode: string, token: string, challenge: string): string {
@@ -119,22 +117,10 @@ export class WhatsappService {
       return;
     }
 
-    // Use shared message persistence service
-    const { user, conversationHistory } =
-      await this.messagePersistenceService.handleIncomingMessage(
-        message.text.body,
-        {
-          channelId: channelConfig.channelId,
-          agentId: clientAgent.agentId,
-          clientId: clientAgent.clientId,
-          externalUserId: message.from,
-          userName: message.from, // Use phone number as name initially
-        },
-      );
-
     const context: AgentContext = {
       agentId: clientAgent.agentId,
       clientId: clientAgent.clientId,
+      channelId: channelConfig.channelId.toString(),
       systemPrompt: agent.systemPrompt,
       llmConfig: {
         ...channelConfig.llmConfig,
@@ -159,11 +145,7 @@ export class WhatsappService {
       },
     };
 
-    const output = await this.agentService.run(
-      input,
-      context,
-      conversationHistory,
-    );
+    const output = await this.agentService.run(input, context);
 
     if (output.reply) {
       this.logger.log(
@@ -171,20 +153,6 @@ export class WhatsappService {
       );
 
       await this.sendMessage(message.from, output.reply.text);
-
-      // Use shared message persistence service for outgoing message
-      await this.messagePersistenceService.handleOutgoingMessage(
-        output.reply.text,
-        {
-          channelId: channelConfig.channelId,
-          agentId: clientAgent.agentId,
-          clientId: clientAgent.clientId,
-          externalUserId: message.from,
-          userName: message.from,
-        },
-        user._id,
-        context,
-      );
     }
   }
 }

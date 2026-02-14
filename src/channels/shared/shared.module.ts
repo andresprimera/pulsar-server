@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
 import { MessagePersistenceService } from './message-persistence.service';
-import { AgentModule } from '../../agent/agent.module';
+import { ConversationSummaryService } from '../../agent/conversation-summary.service';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
-  imports: [AgentModule],
-  providers: [MessagePersistenceService],
-  exports: [MessagePersistenceService],
+  imports: [ConfigModule],
+  providers: [MessagePersistenceService, ConversationSummaryService],
+  exports: [MessagePersistenceService, ConversationSummaryService],
 })
 export class SharedChannelModule {}

@@ -9,7 +9,6 @@ import { AgentInput } from '../../agent/contracts/agent-input';
 import { AgentContext } from '../../agent/contracts/agent-context';
 import { AgentRepository } from '../../database/repositories/agent.repository';
 import { ClientAgentRepository } from '../../database/repositories/client-agent.repository';
-import { MessagePersistenceService } from '../shared/message-persistence.service';
 import { IncomingEmailDto } from './dto/incoming-email.dto';
 import { decryptRecord, decrypt } from '../../database/utils/crypto.util';
 import * as nodemailer from 'nodemailer';
@@ -37,7 +36,6 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
     private readonly agentService: AgentService,
     private readonly clientAgentRepository: ClientAgentRepository,
     private readonly agentRepository: AgentRepository,
-    private readonly messagePersistenceService: MessagePersistenceService,
   ) {}
 
   onModuleInit() {
@@ -191,22 +189,10 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    // Use shared message persistence service
-    const { user, conversationHistory } =
-      await this.messagePersistenceService.handleIncomingMessage(
-        dto.text,
-        {
-          channelId: channelConfig.channelId,
-          agentId: clientAgent.agentId,
-          clientId: clientAgent.clientId,
-          externalUserId: dto.from,
-          userName: dto.from, // Use email as name initially
-        },
-      );
-
     const context: AgentContext = {
       agentId: clientAgent.agentId,
       clientId: clientAgent.clientId,
+      channelId: channelConfig.channelId.toString(),
       systemPrompt: agent.systemPrompt,
       llmConfig: {
         ...channelConfig.llmConfig,
@@ -231,11 +217,7 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
       },
     };
 
-    const output = await this.agentService.run(
-      input,
-      context,
-      conversationHistory,
-    );
+    const output = await this.agentService.run(input, context);
 
     if (output.reply) {
       this.logger.log(`[Email] Sending reply to ${dto.from}`);
@@ -245,20 +227,6 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
         dto.from,
         `Re: ${dto.subject}`,
         output.reply.text,
-      );
-
-      // Use shared message persistence service for outgoing message
-      await this.messagePersistenceService.handleOutgoingMessage(
-        output.reply.text,
-        {
-          channelId: channelConfig.channelId,
-          agentId: clientAgent.agentId,
-          clientId: clientAgent.clientId,
-          externalUserId: dto.from,
-          userName: dto.from,
-        },
-        user._id,
-        context,
       );
     }
   }
