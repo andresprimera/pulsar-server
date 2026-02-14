@@ -9,7 +9,11 @@ import { createLLMModel } from './llm/llm.factory';
 export class AgentService {
   private readonly logger = new Logger(AgentService.name);
 
-  async run(input: AgentInput, context: AgentContext): Promise<AgentOutput> {
+  async run(
+    input: AgentInput,
+    context: AgentContext,
+    conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>,
+  ): Promise<AgentOutput> {
     this.logger.log(
       `Processing ${context.agentId} for client ${context.clientId} ` +
         `using provider=${context.llmConfig.provider} model=${context.llmConfig.model}`,
@@ -18,10 +22,20 @@ export class AgentService {
     try {
       const model = createLLMModel(context.llmConfig);
 
+      // Build messages array with conversation history
+      const messages: Array<{ role: 'user' | 'assistant'; content: string }> =
+        conversationHistory || [];
+
+      // Add current message
+      messages.push({
+        role: 'user',
+        content: input.message.text,
+      });
+
       const { text } = await generateText({
         model,
         system: context.systemPrompt,
-        prompt: input.message.text,
+        messages,
       });
 
       const safeText =

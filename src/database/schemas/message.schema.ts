@@ -42,6 +42,9 @@ export class Message extends Document {
     index: true,
   })
   status: 'active' | 'inactive' | 'archived';
+
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export const MessageSchema = SchemaFactory.createForClass(Message);
