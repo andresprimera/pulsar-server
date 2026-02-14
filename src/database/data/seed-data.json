@@ -1,8 +1,4 @@
 {
-  "user": {
-    "email": "andresprimera@gmail.com",
-    "name": "Andrés Primera"
-  },
   "agents": [
     {
       "name": "Customer Service Agent",
@@ -15,12 +11,6 @@
       "status": "active"
     }
   ],
-  "client": {
-    "type": "individual"
-  },
-  "agentHiring": {
-    "price": 100
-  },
   "channels": [
     {
       "name": "WhatsApp",
@@ -58,6 +48,63 @@
           "model": "gpt-4o"
         }
       }
+    }
+  ],
+  "users": [
+    {
+      "email": "andresprimera@gmail.com",
+      "name": "Andrés Primera",
+      "client": {
+        "type": "individual"
+      },
+      "agentHirings": [
+        {
+          "agentName": "Customer Service Agent",
+          "price": 100
+        }
+      ],
+      "channelNames": ["WhatsApp", "Email"]
+    },
+    {
+      "email": "user2@example.com",
+      "name": "Demo User 2",
+      "client": {
+        "type": "individual"
+      },
+      "agentHirings": [
+        {
+          "agentName": "Lead Qualifier & Sales Agent",
+          "price": 100
+        }
+      ],
+      "channelNames": ["WhatsApp"]
+    },
+    {
+      "email": "user3@example.com",
+      "name": "Demo User 3",
+      "client": {
+        "type": "individual"
+      },
+      "agentHirings": [
+        {
+          "agentName": "Customer Service Agent",
+          "price": 100
+        },
+        {
+          "agentName": "Lead Qualifier & Sales Agent",
+          "price": 100
+        }
+      ],
+      "channelNames": ["WhatsApp"]
+    },
+    {
+      "email": "user4@example.com",
+      "name": "Demo User 4",
+      "client": {
+        "type": "individual"
+      },
+      "agentHirings": [],
+      "channelNames": ["WhatsApp"]
     }
   ]
 }
