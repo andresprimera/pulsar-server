@@ -31,6 +31,30 @@ describe('WhatsApp Message Routing (e2e)', () => {
     await app.close();
   });
 
+  const getClientAgentPhoneNumberId = async (clientId: string): Promise<string | null> => {
+    const clientAgent = await connection
+      .collection('client_agents')
+      .aggregate([
+        { $match: { clientId: clientId } },
+        {
+          $project: {
+            channels: 1,
+          },
+        },
+      ])
+      .next();
+
+    if (clientAgent) {
+      const whatsappChannel = clientAgent.channels.find(
+        (c: any) => c.credentials?.phoneNumberId,
+      );
+      if (whatsappChannel) {
+        return whatsappChannel.credentials.phoneNumberId;
+      }
+    }
+    return null;
+  };
+
   const extractPhoneNumberIds = async () => {
     // User 1 (andresprimera@gmail.com) - Customer Service Agent
     const user1 = await connection
@@ -38,35 +62,7 @@ describe('WhatsApp Message Routing (e2e)', () => {
       .findOne({ email: 'andresprimera@gmail.com' });
 
     if (user1) {
-      const user1ClientAgent = await connection
-        .collection('client_agents')
-        .findOne({ clientId: user1.clientId.toString() })
-        .then((doc) => {
-          if (doc) {
-            // Need to use select to get credentials
-            return connection
-              .collection('client_agents')
-              .aggregate([
-                { $match: { _id: doc._id } },
-                {
-                  $project: {
-                    channels: 1,
-                  },
-                },
-              ])
-              .next();
-          }
-          return null;
-        });
-
-      if (user1ClientAgent) {
-        const whatsappChannel = user1ClientAgent.channels.find(
-          (c: any) => c.credentials?.phoneNumberId,
-        );
-        if (whatsappChannel) {
-          user1PhoneNumberId = whatsappChannel.credentials.phoneNumberId;
-        }
-      }
+      user1PhoneNumberId = await getClientAgentPhoneNumberId(user1.clientId.toString());
     }
 
     // User 2 (user2@example.com) - Sales Agent
@@ -75,34 +71,7 @@ describe('WhatsApp Message Routing (e2e)', () => {
       .findOne({ email: 'user2@example.com' });
 
     if (user2) {
-      const user2ClientAgent = await connection
-        .collection('client_agents')
-        .findOne({ clientId: user2.clientId.toString() })
-        .then((doc) => {
-          if (doc) {
-            return connection
-              .collection('client_agents')
-              .aggregate([
-                { $match: { _id: doc._id } },
-                {
-                  $project: {
-                    channels: 1,
-                  },
-                },
-              ])
-              .next();
-          }
-          return null;
-        });
-
-      if (user2ClientAgent) {
-        const whatsappChannel = user2ClientAgent.channels.find(
-          (c: any) => c.credentials?.phoneNumberId,
-        );
-        if (whatsappChannel) {
-          user2PhoneNumberId = whatsappChannel.credentials.phoneNumberId;
-        }
-      }
+      user2PhoneNumberId = await getClientAgentPhoneNumberId(user2.clientId.toString());
     }
 
     // User 3 (user3@example.com) - Both agents
