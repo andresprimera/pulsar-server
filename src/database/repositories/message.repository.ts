@@ -61,4 +61,60 @@ export class MessageRepository {
   async update(id: string, data: Partial<Message>): Promise<Message | null> {
     return this.model.findByIdAndUpdate(id, data, { new: true }).exec();
   }
+
+  async findConversationContext(
+    channelId: Types.ObjectId,
+    userId: Types.ObjectId,
+    agentId: Types.ObjectId,
+  ): Promise<Message[]> {
+    // Find the most recent summary for this conversation
+    const lastSummary = await this.model
+      .findOne({
+        channelId,
+        userId,
+        agentId,
+        type: 'summary',
+        status: 'active',
+      })
+      .sort({ createdAt: -1 })
+      .exec();
+
+    // Build query for messages after the last summary
+    const query: any = {
+      channelId,
+      userId,
+      agentId,
+      status: 'active',
+      type: { $in: ['user', 'agent'] },
+    };
+
+    if (lastSummary) {
+      query.createdAt = { $gt: lastSummary.createdAt };
+    }
+
+    // Return messages in chronological order
+    return this.model.find(query).sort({ createdAt: 1 }).exec();
+  }
+
+  async countTokensInConversation(
+    channelId: Types.ObjectId,
+    userId: Types.ObjectId,
+    agentId: Types.ObjectId,
+  ): Promise<number> {
+    const messages = await this.findConversationContext(
+      channelId,
+      userId,
+      agentId,
+    );
+
+    // Simple token estimation: ~1.3 tokens per word
+    // TODO: Replace with proper token counting using tiktoken library for accurate counts
+    // This approximation works for most cases but may underestimate for technical content
+    const totalWords = messages.reduce((sum, msg) => {
+      const words = msg.content.split(/\s+/).length;
+      return sum + words;
+    }, 0);
+
+    return Math.ceil(totalWords * 1.3);
+  }
 }

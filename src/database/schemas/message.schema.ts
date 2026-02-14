@@ -29,6 +29,14 @@ export class Message extends Document {
 
   @Prop({
     type: Types.ObjectId,
+    ref: 'Client',
+    required: true,
+    index: true,
+  })
+  clientId: Types.ObjectId;
+
+  @Prop({
+    type: Types.ObjectId,
     ref: 'Channel',
     required: true,
     index: true,
@@ -42,6 +50,9 @@ export class Message extends Document {
     index: true,
   })
   status: 'active' | 'inactive' | 'archived';
+
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export const MessageSchema = SchemaFactory.createForClass(Message);
