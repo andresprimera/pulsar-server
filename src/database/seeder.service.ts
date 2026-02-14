@@ -66,23 +66,30 @@ export class SeederService implements OnApplicationBootstrap {
         return;
       }
 
-      // 1. Ensure Agent exists (required for onboarding)
-      let agent = await this.agentModel
-        .findOne({ name: SEED_DATA.agent.name })
-        .exec();
-      if (!agent) {
-        this.logger.log(`Creating Agent: ${SEED_DATA.agent.name}`);
-        agent = await this.agentModel.create({
-          name: SEED_DATA.agent.name,
-          systemPrompt: SEED_DATA.agent.systemPrompt,
-          status: SEED_DATA.agent.status,
-          createdBySeeder: true,
-        });
-      } else {
-        this.logger.log(
-          `Agent "${SEED_DATA.agent.name}" already exists (${agent._id})`,
-        );
+      // 1. Ensure Agents exist (required for onboarding)
+      const agents = [];
+      for (const agentSeed of SEED_DATA.agents) {
+        let agent = await this.agentModel
+          .findOne({ name: agentSeed.name })
+          .exec();
+        if (!agent) {
+          this.logger.log(`Creating Agent: ${agentSeed.name}`);
+          agent = await this.agentModel.create({
+            name: agentSeed.name,
+            systemPrompt: agentSeed.systemPrompt,
+            status: agentSeed.status,
+            createdBySeeder: true,
+          });
+        } else {
+          this.logger.log(
+            `Agent "${agentSeed.name}" already exists (${agent._id})`,
+          );
+        }
+        agents.push(agent);
       }
+
+      // Use the first agent for onboarding (customer service agent)
+      const agent = agents[0];
 
       // 2. Ensure Channels exist (Infrastructure provisioning)
       this.logger.log('Provisioning channels...');

@@ -118,13 +118,13 @@ describe('SeederService', () => {
 
       // No existing user
       mockUserRepository.findByEmail.mockResolvedValue(null);
-      // No existing agent
+      // No existing agents
       mockAgentModel.findOne.mockReturnValue({
         exec: jest.fn().mockResolvedValue(null),
       });
       mockAgentModel.create.mockResolvedValue({
         _id: mockAgentId,
-        name: SEED_DATA.agent.name,
+        name: SEED_DATA.agents[0].name,
       });
 
       // Mock Channel resolutions
@@ -148,13 +148,13 @@ describe('SeederService', () => {
 
       // No existing user
       mockUserRepository.findByEmail.mockResolvedValue(null);
-      // No existing agent
+      // No existing agents
       mockAgentModel.findOne.mockReturnValue({
         exec: jest.fn().mockResolvedValue(null),
       });
       mockAgentModel.create.mockResolvedValue({
         _id: mockAgentId,
-        name: SEED_DATA.agent.name,
+        name: SEED_DATA.agents[0].name,
       });
 
       // Mock Channel resolutions
@@ -169,11 +169,11 @@ describe('SeederService', () => {
 
       await service.onApplicationBootstrap();
 
-      // Verify agent creation
+      // Verify agents creation (both agents should be created)
       expect(mockAgentModel.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          name: SEED_DATA.agent.name,
-          systemPrompt: SEED_DATA.agent.systemPrompt,
+          name: SEED_DATA.agents[0].name,
+          systemPrompt: SEED_DATA.agents[0].systemPrompt,
           status: 'active',
           createdBySeeder: true,
         }),
@@ -235,11 +235,11 @@ describe('SeederService', () => {
 
       // No existing user
       mockUserRepository.findByEmail.mockResolvedValue(null);
-      // Existing agent found
+      // Existing agents found
       mockAgentModel.findOne.mockReturnValue({
         exec: jest
           .fn()
-          .mockResolvedValue({ _id: mockAgentId, name: SEED_DATA.agent.name }),
+          .mockResolvedValue({ _id: mockAgentId, name: SEED_DATA.agents[0].name }),
       });
 
       // Mock Channel resolutions
