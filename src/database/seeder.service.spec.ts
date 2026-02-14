@@ -4,8 +4,11 @@ import { Types } from 'mongoose';
 import { SeederService } from './seeder.service';
 import { Agent } from './schemas/agent.schema';
 import { ClientPhone } from './schemas/client-phone.schema';
+import { ClientAgent } from './schemas/client-agent.schema';
 import { UserRepository } from './repositories/user.repository';
 import { ChannelRepository } from './repositories/channel.repository';
+import { ClientRepository } from './repositories/client.repository';
+import { ClientAgentRepository } from './repositories/client-agent.repository';
 import { OnboardingService } from '../onboarding/onboarding.service';
 import { Logger } from '@nestjs/common';
 import * as SEED_DATA from './data/seed-data.json';
@@ -14,9 +17,12 @@ describe('SeederService', () => {
   let service: SeederService;
   let mockAgentModel: any;
   let mockClientPhoneModel: any;
+  let mockClientAgentModel: any;
   let mockUserRepository: any;
   let mockOnboardingService: any;
   let mockChannelRepository: any;
+  let mockClientRepository: any;
+  let mockClientAgentRepository: any;
   let loggerSpy: jest.SpyInstance;
 
   const mockAgentId = new Types.ObjectId('aaaaaaaaaaaaaaaaaaaaaaaa');
@@ -68,6 +74,18 @@ describe('SeederService', () => {
       findByNameOrFail: jest.fn(),
     };
 
+    mockClientRepository = {
+      findById: jest.fn(),
+    };
+
+    mockClientAgentRepository = {
+      findByClient: jest.fn(),
+    };
+
+    mockClientAgentModel = {
+      createIndexes: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SeederService,
@@ -79,9 +97,15 @@ describe('SeederService', () => {
           provide: getModelToken(ClientPhone.name),
           useValue: mockClientPhoneModel,
         },
+        {
+          provide: getModelToken(ClientAgent.name),
+          useValue: mockClientAgentModel,
+        },
         { provide: UserRepository, useValue: mockUserRepository },
         { provide: OnboardingService, useValue: mockOnboardingService },
         { provide: ChannelRepository, useValue: mockChannelRepository },
+        { provide: ClientRepository, useValue: mockClientRepository },
+        { provide: ClientAgentRepository, useValue: mockClientAgentRepository },
       ],
     }).compile();
 
@@ -220,7 +244,17 @@ describe('SeederService', () => {
       mockUserRepository.findByEmail.mockResolvedValue({
         _id: 'existing-user-id',
         email: SEED_DATA.user.email,
+        clientId: 'existing-client-id',
       });
+
+      // Mock consistency check - client and clientAgents exist
+      mockClientRepository.findById.mockResolvedValue({
+        _id: 'existing-client-id',
+        name: 'Test Client',
+      });
+      mockClientAgentRepository.findByClient.mockResolvedValue([
+        { _id: 'existing-client-agent-id' },
+      ]);
 
       await service.onApplicationBootstrap();
 

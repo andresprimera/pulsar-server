@@ -194,10 +194,15 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
       clientId: clientAgent.clientId,
       systemPrompt: agent.systemPrompt,
       llmConfig: {
-        ...channelConfig.llmConfig,
+        // TODO: [HACK] REMOVE THIS IN PRODUCTION.
+        provider: (channelConfig.llmConfig.provider || 'openai') as any,
         apiKey: decrypt(
-          channelConfig.llmConfig.apiKey || (process.env.OPENAI_API_KEY ?? ''),
+          channelConfig.llmConfig.apiKey &&
+            !channelConfig.llmConfig.apiKey.includes('REPLACE_ME')
+            ? channelConfig.llmConfig.apiKey
+            : process.env.OPENAI_API_KEY ?? '',
         ),
+        model: channelConfig.llmConfig.model || 'gpt-4o',
       },
       channelConfig: decryptRecord(channelConfig.credentials),
     };

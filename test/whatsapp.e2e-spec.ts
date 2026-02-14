@@ -7,6 +7,9 @@ describe('WhatsApp Webhook (e2e)', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
+    // Point WhatsApp config at a mock server for e2e tests
+    process.env.WHATSAPP_API_HOST = 'http://localhost:3005';
+    process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN = 'test-token';
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -17,6 +20,8 @@ describe('WhatsApp Webhook (e2e)', () => {
 
   afterAll(async () => {
     await app.close();
+    delete process.env.WHATSAPP_API_HOST;
+    delete process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
   });
 
   describe('GET /whatsapp/webhook (verification)', () => {

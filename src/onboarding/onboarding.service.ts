@@ -168,11 +168,23 @@ export class OnboardingService {
           );
         }
 
+        // Extract email for unencrypted storage/lookup
+        let email: string | undefined;
+        if (
+          channelConfig.credentials &&
+          'email' in channelConfig.credentials
+        ) {
+          email = channelConfig.credentials.email;
+        }
+
         hireChannels.push({
           channelId: new Types.ObjectId(channelConfig.channelId),
           provider: normalizedProvider,
           status: 'active',
           credentials: encryptRecord(channelConfig.credentials),
+          // Store unencrypted keys for fast lookup
+          phoneNumberId,
+          email,
           llmConfig: {
             ...channelConfig.llmConfig,
             apiKey: encrypt(channelConfig.llmConfig.apiKey),

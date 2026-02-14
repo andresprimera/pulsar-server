@@ -38,11 +38,11 @@
       "supportedProviders": ["smtp", "sendgrid"],
       "agentChannelConfig": {
         "channelConfig": {
-          "email": "marcelina.bauch@ethereal.email",
-          "password": "__REPLACE_ME_PASSWORD__",
-          "smtpHost": "smtp.ethereal.email",
+          "email": "codingboxapp@gmail.com",
+          "password": "Coding.2022",
+          "smtpHost": "smtp.gmail.com",
           "smtpPort": 587,
-          "imapHost": "imap.ethereal.email",
+          "imapHost": "imap.gmail.com",
           "imapPort": 993
         },
         "llmConfig": {

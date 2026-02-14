@@ -11,9 +11,12 @@ import { UserRepository } from './repositories/user.repository';
 import { Agent } from './schemas/agent.schema';
 
 import { ClientPhone } from './schemas/client-phone.schema';
+import { ClientAgent } from './schemas/client-agent.schema';
 import { OnboardingService } from '../onboarding/onboarding.service';
 import { ChannelRepository } from './repositories/channel.repository';
 import * as SEED_DATA from './data/seed-data.json';
+import { ClientRepository } from './repositories/client.repository';
+import { ClientAgentRepository } from './repositories/client-agent.repository';
 
 @Injectable()
 export class SeederService implements OnApplicationBootstrap {
@@ -28,6 +31,10 @@ export class SeederService implements OnApplicationBootstrap {
     @Inject(forwardRef(() => OnboardingService))
     private readonly onboardingService: OnboardingService,
     private readonly channelRepository: ChannelRepository,
+    private readonly clientRepository: ClientRepository,
+    private readonly clientAgentRepository: ClientAgentRepository,
+    @InjectModel(ClientAgent.name)
+    private readonly clientAgentModel: Model<ClientAgent>,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -60,6 +67,23 @@ export class SeederService implements OnApplicationBootstrap {
         SEED_DATA.user.email,
       );
       if (existingUser) {
+        // Check for consistency: if user exists, Client and ClientAgent MUST exist
+        const client = await this.clientRepository.findById(
+          (existingUser.clientId as any).toString(),
+        );
+        const clientAgents = await this.clientAgentRepository.findByClient(
+          (existingUser.clientId as any).toString(),
+        );
+
+        if (!client || clientAgents.length === 0) {
+          this.logger.error(
+            `[Seeder] Inconsistent state detected: Seed user "${SEED_DATA.user.email}" exists, but Client or ClientAgent is missing.`,
+          );
+          throw new Error(
+            `Database is in an inconsistent state. Seed user exists but Client/Agent data is missing. Please drop the database or remove the seed user manually to fix this.`,
+          );
+        }
+
         this.logger.log(
           `Seed user "${SEED_DATA.user.email}" already exists. Skipping seeding.`,
         );
@@ -97,7 +121,10 @@ export class SeederService implements OnApplicationBootstrap {
 
       // Ensure indexes are built before transaction starts to avoid "catalog changes" error
       this.logger.log('Ensuring indexes are built...');
-      await Promise.all([this.clientPhoneModel.createIndexes()]);
+      await Promise.all([
+        this.clientPhoneModel.createIndexes(),
+        this.clientAgentModel.createIndexes(),
+      ]);
 
       // 3. Map Seed Data to HireChannelConfigDto (Resolve Channel IDs)
       const channelsDto = [];
@@ -117,6 +144,8 @@ export class SeederService implements OnApplicationBootstrap {
           provider: provider,
           status: 'active',
           credentials: channelSeed.agentChannelConfig.channelConfig,
+          // Note: OnboardingService automatically extracts phoneNumberId/email
+          // from credentials and populates the unencrypted fields.
           llmConfig: channelSeed.agentChannelConfig.llmConfig,
         });
       }
@@ -146,6 +175,10 @@ export class SeederService implements OnApplicationBootstrap {
       this.logger.log(`  - ClientAgent: ${result.clientAgent._id}`);
     } catch (error) {
       this.logger.error('Seeding failed', error);
+      // Re-throw if it's our specific consistency error, otherwise log and continue
+      if (error.message.includes('Database is in an inconsistent state')) {
+          throw error;
+      }
     }
   }
 }

@@ -17,6 +17,10 @@ describe('WhatsappService', () => {
   let fetchSpy: jest.SpyInstance;
 
   beforeEach(async () => {
+    // Set env vars for server-level WhatsApp config
+    process.env.WHATSAPP_API_HOST = 'http://localhost:3005';
+    process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN = 'test-token';
+
     // Mock global fetch to prevent real HTTP calls
     fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
@@ -55,6 +59,8 @@ describe('WhatsappService', () => {
     loggerLogSpy.mockRestore();
     loggerWarnSpy.mockRestore();
     fetchSpy.mockRestore();
+    delete process.env.WHATSAPP_API_HOST;
+    delete process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
   });
 
   it('should be defined', () => {
@@ -125,7 +131,7 @@ describe('WhatsappService', () => {
           channelId: 'whatsapp-1',
           status: 'active',
           provider: 'meta',
-          credentials: { phoneNumberId: 'phone123' },
+          credentials: { phoneNumberId: 'phone123', accessToken: 'sk-wa-token' },
           llmConfig: {
             provider: LlmProvider.OpenAI,
             apiKey: 'sk-mock-key',
@@ -181,7 +187,7 @@ describe('WhatsappService', () => {
         channels: [
           {
             ...mockClientAgent.channels[0],
-            credentials: { phoneNumberId: 'other-phone' },
+            credentials: { phoneNumberId: 'other-phone', accessToken: 'sk-wa-token' },
           },
         ],
       };

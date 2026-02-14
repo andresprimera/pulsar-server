@@ -70,7 +70,7 @@ export class ClientAgentRepository {
         channels: {
           $elemMatch: {
             status: 'active',
-            'credentials.phoneNumberId': phoneNumberId,
+            phoneNumberId: phoneNumberId,
           },
         },
       })
@@ -89,7 +89,7 @@ export class ClientAgentRepository {
         channels: {
           $elemMatch: {
             status: 'active',
-            'credentials.email': email,
+            email: email,
           },
         },
       })
@@ -108,7 +108,7 @@ export class ClientAgentRepository {
         channels: {
           $elemMatch: {
             status: 'active',
-            'credentials.email': { $exists: true },
+            email: { $exists: true, $ne: null },
           },
         },
       })

@@ -5,33 +5,44 @@ import { AgentContext } from '../../agent/contracts/agent-context';
 import { AgentRepository } from '../../database/repositories/agent.repository';
 import { ClientAgentRepository } from '../../database/repositories/client-agent.repository';
 import { decryptRecord, decrypt } from '../../database/utils/crypto.util';
-
-const VERIFY_TOKEN = 'test-token';
+import {
+  WhatsAppServerConfig,
+  loadWhatsAppConfig,
+  buildMessagesUrl,
+} from './whatsapp.config';
 
 @Injectable()
 export class WhatsappService {
   private readonly logger = new Logger(WhatsappService.name);
+  private readonly config: WhatsAppServerConfig;
 
   constructor(
     private readonly agentService: AgentService,
     private readonly clientAgentRepository: ClientAgentRepository,
     private readonly agentRepository: AgentRepository,
-  ) {}
+  ) {
+    this.config = loadWhatsAppConfig();
+  }
 
   verifyWebhook(mode: string, token: string, challenge: string): string {
-    if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+    if (mode === 'subscribe' && token === this.config.webhookVerifyToken) {
       return challenge;
     }
     throw new ForbiddenException('Verification failed');
   }
 
-  private async sendMessage(to: string, text: string): Promise<void> {
-    const url = 'http://localhost:3005/whatsapp/send';
+  private async sendMessage(
+    to: string,
+    text: string,
+    channelCredentials: { phoneNumberId: string; accessToken: string },
+  ): Promise<void> {
+    const url = buildMessagesUrl(this.config, channelCredentials.phoneNumberId);
 
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        Authorization: `Bearer ${channelCredentials.accessToken}`,
       },
       body: JSON.stringify({
         messaging_product: 'whatsapp',
@@ -123,9 +134,17 @@ export class WhatsappService {
       systemPrompt: agent.systemPrompt,
       llmConfig: {
         ...channelConfig.llmConfig,
+        // TODO: [HACK] REMOVE THIS IN PRODUCTION.
+        // Forcing 'openai' provider and system key for dev/testing ease.
+        // This bypasses client billing!
+        provider: (channelConfig.llmConfig.provider || 'openai') as any,
         apiKey: decrypt(
-          channelConfig.llmConfig.apiKey || (process.env.OPENAI_API_KEY ?? ''),
+          channelConfig.llmConfig.apiKey &&
+            !channelConfig.llmConfig.apiKey.includes('REPLACE_ME')
+            ? channelConfig.llmConfig.apiKey
+            : process.env.OPENAI_API_KEY ?? '',
         ),
+        model: channelConfig.llmConfig.model || 'gpt-4o',
       },
       channelConfig: decryptRecord(channelConfig.credentials),
     };
@@ -151,7 +170,11 @@ export class WhatsappService {
         `[WhatsApp] Sending to ${message.from}: ${output.reply.text}`,
       );
 
-      await this.sendMessage(message.from, output.reply.text);
+      const decryptedCredentials = decryptRecord(channelConfig.credentials);
+      await this.sendMessage(message.from, output.reply.text, {
+        phoneNumberId: decryptedCredentials.phoneNumberId,
+        accessToken: decryptedCredentials.accessToken,
+      });
     }
   }
 }

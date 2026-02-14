@@ -17,6 +17,13 @@ export class HireChannelConfig {
   @Prop({ type: Object, required: true, select: false })
   credentials: Record<string, any>;
 
+  // Unencrypted routing keys for fast lookup
+  @Prop({ type: String, required: false, index: true })
+  phoneNumberId?: string;
+
+  @Prop({ type: String, required: false, index: true })
+  email?: string;
+
   @Prop({ type: LlmConfigSchema, required: true })
   llmConfig: LlmConfig;
 }
@@ -55,6 +62,6 @@ export const ClientAgentSchema = SchemaFactory.createForClass(ClientAgent);
 ClientAgentSchema.index({ clientId: 1, agentId: 1 }, { unique: true });
 
 // Critical indexes for routing and polling
-ClientAgentSchema.index({ status: 1, 'channels.credentials.phoneNumberId': 1 });
-ClientAgentSchema.index({ status: 1, 'channels.credentials.email': 1 });
+ClientAgentSchema.index({ status: 1, 'channels.phoneNumberId': 1 });
+ClientAgentSchema.index({ status: 1, 'channels.email': 1 });
 ClientAgentSchema.index({ 'channels.status': 1 });
