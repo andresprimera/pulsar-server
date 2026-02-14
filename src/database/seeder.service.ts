@@ -253,7 +253,7 @@ export class SeederService implements OnApplicationBootstrap {
               }
 
               additionalChannels.push({
-                channelId: new Types.ObjectId(channelInfo.channel._id.toString()),
+                channelId: channelInfo.channel._id as Types.ObjectId,
                 provider: provider.toLowerCase(),
                 status: 'active',
                 credentials: encryptRecord(channelInfo.config.channelConfig),
