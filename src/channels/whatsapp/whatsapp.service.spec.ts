@@ -5,9 +5,7 @@ import { WhatsappService } from './whatsapp.service';
 import { AgentService } from '../../agent/agent.service';
 import { ClientAgentRepository } from '../../database/repositories/client-agent.repository';
 import { AgentRepository } from '../../database/repositories/agent.repository';
-import { MessageRepository } from '../../database/repositories/message.repository';
-import { UserRepository } from '../../database/repositories/user.repository';
-import { ConversationSummaryService } from '../../agent/conversation-summary.service';
+import { MessagePersistenceService } from '../shared/message-persistence.service';
 import { LlmProvider } from '../../agent/llm/provider.enum';
 import { Types } from 'mongoose';
 
@@ -16,9 +14,7 @@ describe('WhatsappService', () => {
   let agentService: jest.Mocked<AgentService>;
   let clientAgentRepository: jest.Mocked<ClientAgentRepository>;
   let agentRepository: jest.Mocked<AgentRepository>;
-  let messageRepository: jest.Mocked<MessageRepository>;
-  let userRepository: jest.Mocked<UserRepository>;
-  let conversationSummaryService: jest.Mocked<ConversationSummaryService>;
+  let messagePersistenceService: jest.Mocked<MessagePersistenceService>;
   let loggerLogSpy: jest.SpyInstance;
   let loggerWarnSpy: jest.SpyInstance;
   let fetchSpy: jest.SpyInstance;
@@ -46,22 +42,10 @@ describe('WhatsappService', () => {
           useValue: { findActiveById: jest.fn() },
         },
         {
-          provide: MessageRepository,
+          provide: MessagePersistenceService,
           useValue: {
-            create: jest.fn(),
-            findConversationContext: jest.fn(),
-          },
-        },
-        {
-          provide: UserRepository,
-          useValue: {
-            findOrCreateByExternalUserId: jest.fn(),
-          },
-        },
-        {
-          provide: ConversationSummaryService,
-          useValue: {
-            checkAndSummarizeIfNeeded: jest.fn(),
+            handleIncomingMessage: jest.fn(),
+            handleOutgoingMessage: jest.fn(),
           },
         },
       ],
@@ -71,9 +55,7 @@ describe('WhatsappService', () => {
     agentService = module.get(AgentService);
     clientAgentRepository = module.get(ClientAgentRepository);
     agentRepository = module.get(AgentRepository);
-    messageRepository = module.get(MessageRepository);
-    userRepository = module.get(UserRepository);
-    conversationSummaryService = module.get(ConversationSummaryService);
+    messagePersistenceService = module.get(MessagePersistenceService);
 
     // Spy on Logger.prototype since a new Logger() is instantiated in the service
     loggerLogSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
@@ -237,21 +219,35 @@ describe('WhatsappService', () => {
         status: 'active',
       };
 
+      const mockConversationHistory = [
+        { role: 'user' as const, content: 'Previous message' },
+      ];
+
       clientAgentRepository.findOneByPhoneNumberId.mockResolvedValue(
         mockClientAgent as any,
       );
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
-      userRepository.findOrCreateByExternalUserId.mockResolvedValue(
-        mockUser as any,
-      );
-      messageRepository.create.mockResolvedValue({} as any);
-      messageRepository.findConversationContext.mockResolvedValue([]);
+      messagePersistenceService.handleIncomingMessage.mockResolvedValue({
+        user: mockUser,
+        conversationHistory: mockConversationHistory,
+      });
       agentService.run.mockResolvedValue({
         reply: { type: 'text', text: 'Hello' },
       });
 
       const payload = createPayload();
       await service.handleIncoming(payload);
+
+      expect(messagePersistenceService.handleIncomingMessage).toHaveBeenCalledWith(
+        'Hello',
+        {
+          channelId: 'whatsapp-1',
+          agentId: 'agent-1',
+          clientId: 'client-1',
+          externalUserId: '1234567890',
+          userName: '1234567890',
+        },
+      );
 
       expect(agentService.run).toHaveBeenCalledWith(
         {
@@ -271,26 +267,22 @@ describe('WhatsappService', () => {
           },
           channelConfig: mockClientAgent.channels[0].credentials,
         },
-        [], // conversation history
+        mockConversationHistory,
       );
 
-      // Verify user message was saved
-      expect(messageRepository.create).toHaveBeenCalledWith(
+      expect(messagePersistenceService.handleOutgoingMessage).toHaveBeenCalledWith(
+        'Hello',
+        {
+          channelId: 'whatsapp-1',
+          agentId: 'agent-1',
+          clientId: 'client-1',
+          externalUserId: '1234567890',
+          userName: '1234567890',
+        },
+        mockUser._id,
         expect.objectContaining({
-          content: 'Hello',
-          type: 'user',
-          userId: mockUser._id,
-          status: 'active',
-        }),
-      );
-
-      // Verify agent response was saved
-      expect(messageRepository.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          content: 'Hello',
-          type: 'agent',
-          userId: mockUser._id,
-          status: 'active',
+          agentId: 'agent-1',
+          clientId: 'client-1',
         }),
       );
     });
@@ -304,11 +296,10 @@ describe('WhatsappService', () => {
         mockClientAgent as any,
       );
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
-      userRepository.findOrCreateByExternalUserId.mockResolvedValue(
-        mockUser as any,
-      );
-      messageRepository.create.mockResolvedValue({} as any);
-      messageRepository.findConversationContext.mockResolvedValue([]);
+      messagePersistenceService.handleIncomingMessage.mockResolvedValue({
+        user: mockUser,
+        conversationHistory: [],
+      });
       agentService.run.mockResolvedValue({
         reply: { type: 'text', text: 'Echo response' },
       });
@@ -330,11 +321,10 @@ describe('WhatsappService', () => {
         mockClientAgent as any,
       );
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
-      userRepository.findOrCreateByExternalUserId.mockResolvedValue(
-        mockUser as any,
-      );
-      messageRepository.create.mockResolvedValue({} as any);
-      messageRepository.findConversationContext.mockResolvedValue([]);
+      messagePersistenceService.handleIncomingMessage.mockResolvedValue({
+        user: mockUser,
+        conversationHistory: [],
+      });
       agentService.run.mockResolvedValue({});
 
       const payload = createPayload();

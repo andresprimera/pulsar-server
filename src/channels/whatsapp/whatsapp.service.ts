@@ -4,11 +4,8 @@ import { AgentInput } from '../../agent/contracts/agent-input';
 import { AgentContext } from '../../agent/contracts/agent-context';
 import { AgentRepository } from '../../database/repositories/agent.repository';
 import { ClientAgentRepository } from '../../database/repositories/client-agent.repository';
-import { MessageRepository } from '../../database/repositories/message.repository';
-import { UserRepository } from '../../database/repositories/user.repository';
-import { ConversationSummaryService } from '../../agent/conversation-summary.service';
+import { MessagePersistenceService } from '../shared/message-persistence.service';
 import { decryptRecord, decrypt } from '../../database/utils/crypto.util';
-import { Types } from 'mongoose';
 
 const VERIFY_TOKEN = 'test-token';
 
@@ -20,9 +17,7 @@ export class WhatsappService {
     private readonly agentService: AgentService,
     private readonly clientAgentRepository: ClientAgentRepository,
     private readonly agentRepository: AgentRepository,
-    private readonly messageRepository: MessageRepository,
-    private readonly userRepository: UserRepository,
-    private readonly conversationSummaryService: ConversationSummaryService,
+    private readonly messagePersistenceService: MessagePersistenceService,
   ) {}
 
   verifyWebhook(mode: string, token: string, challenge: string): string {
@@ -124,36 +119,18 @@ export class WhatsappService {
       return;
     }
 
-    // Find or create user based on external user ID (WhatsApp phone number)
-    const user = await this.userRepository.findOrCreateByExternalUserId(
-      message.from,
-      new Types.ObjectId(clientAgent.clientId),
-      message.from, // Use phone number as name initially
-    );
-
-    // Save incoming user message
-    await this.messageRepository.create({
-      content: message.text.body,
-      type: 'user',
-      userId: user._id as Types.ObjectId,
-      agentId: new Types.ObjectId(clientAgent.agentId),
-      channelId: new Types.ObjectId(channelConfig.channelId),
-      status: 'active',
-    });
-
-    // Fetch conversation context (messages since last summary)
-    const conversationMessages =
-      await this.messageRepository.findConversationContext(
-        new Types.ObjectId(channelConfig.channelId),
-        user._id as Types.ObjectId,
-        new Types.ObjectId(clientAgent.agentId),
+    // Use shared message persistence service
+    const { user, conversationHistory } =
+      await this.messagePersistenceService.handleIncomingMessage(
+        message.text.body,
+        {
+          channelId: channelConfig.channelId,
+          agentId: clientAgent.agentId,
+          clientId: clientAgent.clientId,
+          externalUserId: message.from,
+          userName: message.from, // Use phone number as name initially
+        },
       );
-
-    // Convert to conversation history format for agent
-    const conversationHistory = conversationMessages.map((msg) => ({
-      role: (msg.type === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
-      content: msg.content,
-    }));
 
     const context: AgentContext = {
       agentId: clientAgent.agentId,
@@ -195,30 +172,19 @@ export class WhatsappService {
 
       await this.sendMessage(message.from, output.reply.text);
 
-      // Save agent response message
-      await this.messageRepository.create({
-        content: output.reply.text,
-        type: 'agent',
-        userId: user._id as Types.ObjectId,
-        agentId: new Types.ObjectId(clientAgent.agentId),
-        channelId: new Types.ObjectId(channelConfig.channelId),
-        status: 'active',
-      });
-
-      // Asynchronously check token count and generate summary if needed
-      // This is fire-and-forget - errors are logged but don't affect the response
-      this.conversationSummaryService
-        .checkAndSummarizeIfNeeded(
-          new Types.ObjectId(channelConfig.channelId),
-          user._id as Types.ObjectId,
-          new Types.ObjectId(clientAgent.agentId),
-          context,
-        )
-        .catch((err) => {
-          this.logger.error(
-            `[WhatsApp] Background summary check failed: ${err.message}`,
-          );
-        });
+      // Use shared message persistence service for outgoing message
+      await this.messagePersistenceService.handleOutgoingMessage(
+        output.reply.text,
+        {
+          channelId: channelConfig.channelId,
+          agentId: clientAgent.agentId,
+          clientId: clientAgent.clientId,
+          externalUserId: message.from,
+          userName: message.from,
+        },
+        user._id,
+        context,
+      );
     }
   }
 }
