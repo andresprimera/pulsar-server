@@ -26,6 +26,17 @@ export class AgentService {
       const messages: Array<{ role: 'user' | 'assistant'; content: string }> =
         conversationHistory || [];
 
+      // Validate conversation history if provided
+      if (conversationHistory) {
+        for (const msg of conversationHistory) {
+          if (!msg.content || typeof msg.content !== 'string' || !msg.content.trim()) {
+            this.logger.warn(
+              `Invalid conversation history message detected: empty or non-string content`,
+            );
+          }
+        }
+      }
+
       // Add current message
       messages.push({
         role: 'user',

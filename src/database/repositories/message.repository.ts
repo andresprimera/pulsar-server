@@ -108,7 +108,8 @@ export class MessageRepository {
     );
 
     // Simple token estimation: ~1.3 tokens per word
-    // This is a rough approximation; real implementation should use tiktoken
+    // TODO: Replace with proper token counting using tiktoken library for accurate counts
+    // This approximation works for most cases but may underestimate for technical content
     const totalWords = messages.reduce((sum, msg) => {
       const words = msg.content.split(/\s+/).length;
       return sum + words;

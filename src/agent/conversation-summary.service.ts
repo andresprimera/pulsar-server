@@ -27,6 +27,10 @@ export class ConversationSummaryService {
   ): Promise<void> {
     try {
       // Get token threshold from environment (default to 2000)
+      // 2000 tokens is chosen as a conservative default that:
+      // - Leaves room for system prompts and responses within typical 4k context windows
+      // - Balances between maintaining context and avoiding truncation
+      // - Can be overridden via environment variable for specific use cases
       const threshold = this.configService.get<number>(
         'CONVERSATION_TOKEN_THRESHOLD',
         2000,
@@ -89,6 +93,12 @@ export class ConversationSummaryService {
       });
 
       const summary = text?.trim() || 'Unable to generate summary';
+
+      if (!text?.trim()) {
+        this.logger.warn(
+          `LLM returned empty summary for user ${userId} agent ${agentId}`,
+        );
+      }
 
       // Save summary as a message
       await this.messageRepository.create({
