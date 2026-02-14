@@ -7,12 +7,25 @@ export class Message extends Document {
   content: string;
 
   @Prop({
-    type: Types.ObjectId,
-    ref: 'User',
     required: true,
+    enum: ['user', 'agent'],
     index: true,
   })
-  userId: Types.ObjectId;
+  type: 'user' | 'agent';
+
+  @Prop({
+    type: Types.ObjectId,
+    ref: 'User',
+    index: true,
+  })
+  userId?: Types.ObjectId;
+
+  @Prop({
+    type: Types.ObjectId,
+    ref: 'Agent',
+    index: true,
+  })
+  agentId?: Types.ObjectId;
 
   @Prop({
     type: Types.ObjectId,

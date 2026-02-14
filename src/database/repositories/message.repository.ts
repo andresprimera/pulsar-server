@@ -34,11 +34,22 @@ export class MessageRepository {
     return this.model.find({ userId }).sort({ createdAt: 1 }).exec();
   }
 
+  async findByAgent(agentId: Types.ObjectId): Promise<Message[]> {
+    return this.model.find({ agentId }).sort({ createdAt: 1 }).exec();
+  }
+
   async findByChannelAndUser(
     channelId: Types.ObjectId,
     userId: Types.ObjectId,
   ): Promise<Message[]> {
-    return this.model.find({ channelId, userId }).sort({ createdAt: 1 }).exec();
+    return this.model
+      .find({ channelId, userId })
+      .sort({ createdAt: 1 })
+      .exec();
+  }
+
+  async findByType(type: 'user' | 'agent'): Promise<Message[]> {
+    return this.model.find({ type }).sort({ createdAt: 1 }).exec();
   }
 
   async findByStatus(

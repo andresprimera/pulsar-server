@@ -10,11 +10,24 @@ describe('MessageRepository', () => {
 
   const mockChannelId = new Types.ObjectId('507f1f77bcf86cd799439011');
   const mockUserId = new Types.ObjectId('507f1f77bcf86cd799439012');
+  const mockAgentId = new Types.ObjectId('507f1f77bcf86cd799439013');
 
-  const mockMessage = {
+  const mockUserMessage = {
     _id: new Types.ObjectId(),
     content: 'Hello, this is a test message',
+    type: 'user' as const,
     userId: mockUserId,
+    channelId: mockChannelId,
+    status: 'active' as const,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  const mockAgentMessage = {
+    _id: new Types.ObjectId(),
+    content: 'Hello, this is an agent response',
+    type: 'agent' as const,
+    agentId: mockAgentId,
     channelId: mockChannelId,
     status: 'active' as const,
     createdAt: new Date(),
@@ -47,15 +60,26 @@ describe('MessageRepository', () => {
   });
 
   describe('create', () => {
-    it('should create and return new message', async () => {
-      mockModel.create.mockResolvedValue([mockMessage]);
+    it('should create and return new user message', async () => {
+      mockModel.create.mockResolvedValue([mockUserMessage]);
 
-      const result = await repository.create(mockMessage);
+      const result = await repository.create(mockUserMessage);
 
-      expect(mockModel.create).toHaveBeenCalledWith([mockMessage], {
+      expect(mockModel.create).toHaveBeenCalledWith([mockUserMessage], {
         session: undefined,
       });
-      expect(result).toEqual(mockMessage);
+      expect(result).toEqual(mockUserMessage);
+    });
+
+    it('should create and return new agent message', async () => {
+      mockModel.create.mockResolvedValue([mockAgentMessage]);
+
+      const result = await repository.create(mockAgentMessage);
+
+      expect(mockModel.create).toHaveBeenCalledWith([mockAgentMessage], {
+        session: undefined,
+      });
+      expect(result).toEqual(mockAgentMessage);
     });
   });
 
@@ -63,29 +87,29 @@ describe('MessageRepository', () => {
     it('should return all messages sorted by creation date', async () => {
       mockModel.find.mockReturnValue({
         sort: jest.fn().mockReturnValue({
-          exec: jest.fn().mockResolvedValue([mockMessage]),
+          exec: jest.fn().mockResolvedValue([mockUserMessage, mockAgentMessage]),
         }),
       });
 
       const result = await repository.findAll();
 
       expect(mockModel.find).toHaveBeenCalled();
-      expect(result).toEqual([mockMessage]);
+      expect(result).toEqual([mockUserMessage, mockAgentMessage]);
     });
   });
 
   describe('findById', () => {
     it('should return message when exists', async () => {
       mockModel.findById.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(mockMessage),
+        exec: jest.fn().mockResolvedValue(mockUserMessage),
       });
 
-      const result = await repository.findById(mockMessage._id.toString());
+      const result = await repository.findById(mockUserMessage._id.toString());
 
       expect(mockModel.findById).toHaveBeenCalledWith(
-        mockMessage._id.toString(),
+        mockUserMessage._id.toString(),
       );
-      expect(result).toEqual(mockMessage);
+      expect(result).toEqual(mockUserMessage);
     });
 
     it('should return null when not exists', async () => {
@@ -103,7 +127,9 @@ describe('MessageRepository', () => {
     it('should return messages for a channel sorted by creation date', async () => {
       mockModel.find.mockReturnValue({
         sort: jest.fn().mockReturnValue({
-          exec: jest.fn().mockResolvedValue([mockMessage]),
+          exec: jest
+            .fn()
+            .mockResolvedValue([mockUserMessage, mockAgentMessage]),
         }),
       });
 
@@ -112,7 +138,7 @@ describe('MessageRepository', () => {
       expect(mockModel.find).toHaveBeenCalledWith({
         channelId: mockChannelId,
       });
-      expect(result).toEqual([mockMessage]);
+      expect(result).toEqual([mockUserMessage, mockAgentMessage]);
     });
   });
 
@@ -120,14 +146,29 @@ describe('MessageRepository', () => {
     it('should return messages for a user sorted by creation date', async () => {
       mockModel.find.mockReturnValue({
         sort: jest.fn().mockReturnValue({
-          exec: jest.fn().mockResolvedValue([mockMessage]),
+          exec: jest.fn().mockResolvedValue([mockUserMessage]),
         }),
       });
 
       const result = await repository.findByUser(mockUserId);
 
       expect(mockModel.find).toHaveBeenCalledWith({ userId: mockUserId });
-      expect(result).toEqual([mockMessage]);
+      expect(result).toEqual([mockUserMessage]);
+    });
+  });
+
+  describe('findByAgent', () => {
+    it('should return messages for an agent sorted by creation date', async () => {
+      mockModel.find.mockReturnValue({
+        sort: jest.fn().mockReturnValue({
+          exec: jest.fn().mockResolvedValue([mockAgentMessage]),
+        }),
+      });
+
+      const result = await repository.findByAgent(mockAgentId);
+
+      expect(mockModel.find).toHaveBeenCalledWith({ agentId: mockAgentId });
+      expect(result).toEqual([mockAgentMessage]);
     });
   });
 
@@ -135,7 +176,7 @@ describe('MessageRepository', () => {
     it('should return conversation history for a channel and user', async () => {
       mockModel.find.mockReturnValue({
         sort: jest.fn().mockReturnValue({
-          exec: jest.fn().mockResolvedValue([mockMessage]),
+          exec: jest.fn().mockResolvedValue([mockUserMessage]),
         }),
       });
 
@@ -148,7 +189,35 @@ describe('MessageRepository', () => {
         channelId: mockChannelId,
         userId: mockUserId,
       });
-      expect(result).toEqual([mockMessage]);
+      expect(result).toEqual([mockUserMessage]);
+    });
+  });
+
+  describe('findByType', () => {
+    it('should return user messages when type is user', async () => {
+      mockModel.find.mockReturnValue({
+        sort: jest.fn().mockReturnValue({
+          exec: jest.fn().mockResolvedValue([mockUserMessage]),
+        }),
+      });
+
+      const result = await repository.findByType('user');
+
+      expect(mockModel.find).toHaveBeenCalledWith({ type: 'user' });
+      expect(result).toEqual([mockUserMessage]);
+    });
+
+    it('should return agent messages when type is agent', async () => {
+      mockModel.find.mockReturnValue({
+        sort: jest.fn().mockReturnValue({
+          exec: jest.fn().mockResolvedValue([mockAgentMessage]),
+        }),
+      });
+
+      const result = await repository.findByType('agent');
+
+      expect(mockModel.find).toHaveBeenCalledWith({ type: 'agent' });
+      expect(result).toEqual([mockAgentMessage]);
     });
   });
 
@@ -156,30 +225,38 @@ describe('MessageRepository', () => {
     it('should return messages filtered by status sorted by creation date', async () => {
       mockModel.find.mockReturnValue({
         sort: jest.fn().mockReturnValue({
-          exec: jest.fn().mockResolvedValue([mockMessage]),
+          exec: jest
+            .fn()
+            .mockResolvedValue([mockUserMessage, mockAgentMessage]),
         }),
       });
 
       const result = await repository.findByStatus('active');
 
       expect(mockModel.find).toHaveBeenCalledWith({ status: 'active' });
-      expect(result).toEqual([mockMessage]);
+      expect(result).toEqual([mockUserMessage, mockAgentMessage]);
     });
   });
 
   describe('update', () => {
     it('should update and return message', async () => {
-      const updatedMessage = { ...mockMessage, content: 'Updated content' };
+      const updatedMessage = {
+        ...mockUserMessage,
+        content: 'Updated content',
+      };
       mockModel.findByIdAndUpdate.mockReturnValue({
         exec: jest.fn().mockResolvedValue(updatedMessage),
       });
 
-      const result = await repository.update(mockMessage._id.toString(), {
-        content: 'Updated content',
-      });
+      const result = await repository.update(
+        mockUserMessage._id.toString(),
+        {
+          content: 'Updated content',
+        },
+      );
 
       expect(mockModel.findByIdAndUpdate).toHaveBeenCalledWith(
-        mockMessage._id.toString(),
+        mockUserMessage._id.toString(),
         { content: 'Updated content' },
         { new: true },
       );
