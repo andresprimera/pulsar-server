@@ -170,10 +170,19 @@ describe('SeederService', () => {
       await service.onApplicationBootstrap();
 
       // Verify agents creation (both agents should be created)
+      expect(mockAgentModel.create).toHaveBeenCalledTimes(SEED_DATA.agents.length);
       expect(mockAgentModel.create).toHaveBeenCalledWith(
         expect.objectContaining({
           name: SEED_DATA.agents[0].name,
           systemPrompt: SEED_DATA.agents[0].systemPrompt,
+          status: 'active',
+          createdBySeeder: true,
+        }),
+      );
+      expect(mockAgentModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: SEED_DATA.agents[1].name,
+          systemPrompt: SEED_DATA.agents[1].systemPrompt,
           status: 'active',
           createdBySeeder: true,
         }),
