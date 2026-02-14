@@ -8,10 +8,10 @@ export class Message extends Document {
 
   @Prop({
     required: true,
-    enum: ['user', 'agent'],
+    enum: ['user', 'agent', 'summary'],
     index: true,
   })
-  type: 'user' | 'agent';
+  type: 'user' | 'agent' | 'summary';
 
   @Prop({
     type: Types.ObjectId,
@@ -46,12 +46,12 @@ export class Message extends Document {
 
 export const MessageSchema = SchemaFactory.createForClass(Message);
 
-// Validation: user messages must have userId, agent messages must have agentId
+// Validation: user messages must have userId, agent/summary messages must have agentId
 MessageSchema.pre('save', function (next) {
   if (this.type === 'user' && !this.userId) {
     next(new Error('userId is required for user messages'));
-  } else if (this.type === 'agent' && !this.agentId) {
-    next(new Error('agentId is required for agent messages'));
+  } else if ((this.type === 'agent' || this.type === 'summary') && !this.agentId) {
+    next(new Error('agentId is required for agent and summary messages'));
   } else {
     next();
   }
@@ -62,8 +62,8 @@ MessageSchema.pre('findOneAndUpdate', function (next) {
   const update = this.getUpdate() as any;
   if (update.type === 'user' && !update.userId) {
     next(new Error('userId is required for user messages'));
-  } else if (update.type === 'agent' && !update.agentId) {
-    next(new Error('agentId is required for agent messages'));
+  } else if ((update.type === 'agent' || update.type === 'summary') && !update.agentId) {
+    next(new Error('agentId is required for agent and summary messages'));
   } else {
     next();
   }

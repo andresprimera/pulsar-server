@@ -48,7 +48,7 @@ export class MessageRepository {
       .exec();
   }
 
-  async findByType(type: 'user' | 'agent'): Promise<Message[]> {
+  async findByType(type: 'user' | 'agent' | 'summary'): Promise<Message[]> {
     return this.model.find({ type }).sort({ createdAt: 1 }).exec();
   }
 

@@ -34,6 +34,17 @@ describe('MessageRepository', () => {
     updatedAt: new Date(),
   };
 
+  const mockSummaryMessage = {
+    _id: new Types.ObjectId(),
+    content: 'This is a summary of the previous conversation',
+    type: 'summary' as const,
+    agentId: mockAgentId,
+    channelId: mockChannelId,
+    status: 'active' as const,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
   beforeEach(async () => {
     mockModel = {
       create: jest.fn(),
@@ -80,6 +91,17 @@ describe('MessageRepository', () => {
         session: undefined,
       });
       expect(result).toEqual(mockAgentMessage);
+    });
+
+    it('should create and return new summary message', async () => {
+      mockModel.create.mockResolvedValue([mockSummaryMessage]);
+
+      const result = await repository.create(mockSummaryMessage);
+
+      expect(mockModel.create).toHaveBeenCalledWith([mockSummaryMessage], {
+        session: undefined,
+      });
+      expect(result).toEqual(mockSummaryMessage);
     });
   });
 
@@ -218,6 +240,19 @@ describe('MessageRepository', () => {
 
       expect(mockModel.find).toHaveBeenCalledWith({ type: 'agent' });
       expect(result).toEqual([mockAgentMessage]);
+    });
+
+    it('should return summary messages when type is summary', async () => {
+      mockModel.find.mockReturnValue({
+        sort: jest.fn().mockReturnValue({
+          exec: jest.fn().mockResolvedValue([mockSummaryMessage]),
+        }),
+      });
+
+      const result = await repository.findByType('summary');
+
+      expect(mockModel.find).toHaveBeenCalledWith({ type: 'summary' });
+      expect(result).toEqual([mockSummaryMessage]);
     });
   });
 
