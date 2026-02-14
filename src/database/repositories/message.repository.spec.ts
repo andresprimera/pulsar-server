@@ -60,9 +60,11 @@ describe('MessageRepository', () => {
   });
 
   describe('findAll', () => {
-    it('should return all messages', async () => {
+    it('should return all messages sorted by creation date', async () => {
       mockModel.find.mockReturnValue({
-        exec: jest.fn().mockResolvedValue([mockMessage]),
+        sort: jest.fn().mockReturnValue({
+          exec: jest.fn().mockResolvedValue([mockMessage]),
+        }),
       });
 
       const result = await repository.findAll();
@@ -151,9 +153,11 @@ describe('MessageRepository', () => {
   });
 
   describe('findByStatus', () => {
-    it('should return messages filtered by status', async () => {
+    it('should return messages filtered by status sorted by creation date', async () => {
       mockModel.find.mockReturnValue({
-        exec: jest.fn().mockResolvedValue([mockMessage]),
+        sort: jest.fn().mockReturnValue({
+          exec: jest.fn().mockResolvedValue([mockMessage]),
+        }),
       });
 
       const result = await repository.findByStatus('active');

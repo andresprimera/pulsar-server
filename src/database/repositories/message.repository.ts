@@ -19,7 +19,7 @@ export class MessageRepository {
   }
 
   async findAll(): Promise<Message[]> {
-    return this.model.find().exec();
+    return this.model.find().sort({ createdAt: 1 }).exec();
   }
 
   async findById(id: string): Promise<Message | null> {
@@ -44,7 +44,7 @@ export class MessageRepository {
   async findByStatus(
     status: 'active' | 'inactive' | 'archived',
   ): Promise<Message[]> {
-    return this.model.find({ status }).exec();
+    return this.model.find({ status }).sort({ createdAt: 1 }).exec();
   }
 
   async update(id: string, data: Partial<Message>): Promise<Message | null> {
