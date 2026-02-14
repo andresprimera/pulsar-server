@@ -51,12 +51,13 @@ export class MessagePersistenceService {
       type: 'user',
       userId,
       agentId: new Types.ObjectId(context.agentId),
+      clientId: new Types.ObjectId(context.clientId),
       channelId: new Types.ObjectId(context.channelId),
       status: 'active',
     });
 
     this.logger.log(
-      `Saved user message: user=${userId} agent=${context.agentId} channel=${context.channelId}`,
+      `Saved user message: user=${userId} agent=${context.agentId} client=${context.clientId} channel=${context.channelId}`,
     );
   }
 
@@ -73,12 +74,13 @@ export class MessagePersistenceService {
       type: 'agent',
       userId,
       agentId: new Types.ObjectId(context.agentId),
+      clientId: new Types.ObjectId(context.clientId),
       channelId: new Types.ObjectId(context.channelId),
       status: 'active',
     });
 
     this.logger.log(
-      `Saved agent message: user=${userId} agent=${context.agentId} channel=${context.channelId}`,
+      `Saved agent message: user=${userId} agent=${context.agentId} client=${context.clientId} channel=${context.channelId}`,
     );
   }
 

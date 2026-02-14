@@ -22,10 +22,11 @@ describe('ConversationSummaryService', () => {
   const mockChannelId = new Types.ObjectId('507f1f77bcf86cd799439011');
   const mockUserId = new Types.ObjectId('507f1f77bcf86cd799439012');
   const mockAgentId = new Types.ObjectId('507f1f77bcf86cd799439013');
+  const mockClientId = new Types.ObjectId('507f1f77bcf86cd799439014');
 
   const mockContext = {
     agentId: mockAgentId.toString(),
-    clientId: 'client-1',
+    clientId: mockClientId.toString(),
     channelId: mockChannelId.toString(),
     systemPrompt: 'You are a helpful assistant',
     llmConfig: {
@@ -42,6 +43,7 @@ describe('ConversationSummaryService', () => {
       type: 'user' as const,
       userId: mockUserId,
       agentId: mockAgentId,
+      clientId: mockClientId,
       channelId: mockChannelId,
       status: 'active' as const,
       createdAt: new Date(),
@@ -53,6 +55,7 @@ describe('ConversationSummaryService', () => {
       type: 'agent' as const,
       userId: mockUserId,
       agentId: mockAgentId,
+      clientId: mockClientId,
       channelId: mockChannelId,
       status: 'active' as const,
       createdAt: new Date(),
@@ -139,6 +142,7 @@ describe('ConversationSummaryService', () => {
           content: 'This is a summary of the conversation',
           userId: mockUserId,
           agentId: mockAgentId,
+          clientId: expect.any(Types.ObjectId),
           channelId: mockChannelId,
           status: 'active',
         }),

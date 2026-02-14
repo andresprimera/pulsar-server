@@ -106,12 +106,13 @@ export class ConversationSummaryService {
         type: 'summary',
         userId,
         agentId,
+        clientId: new Types.ObjectId(context.clientId),
         channelId,
         status: 'active',
       });
 
       this.logger.log(
-        `Summary generated and saved for user ${userId} agent ${agentId}`,
+        `Summary generated and saved for user ${userId} agent ${agentId} client ${context.clientId}`,
       );
     } catch (error) {
       this.logger.error(

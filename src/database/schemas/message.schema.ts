@@ -29,6 +29,14 @@ export class Message extends Document {
 
   @Prop({
     type: Types.ObjectId,
+    ref: 'Client',
+    required: true,
+    index: true,
+  })
+  clientId: Types.ObjectId;
+
+  @Prop({
+    type: Types.ObjectId,
     ref: 'Channel',
     required: true,
     index: true,

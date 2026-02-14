@@ -11,12 +11,14 @@ describe('MessageRepository', () => {
   const mockChannelId = new Types.ObjectId('507f1f77bcf86cd799439011');
   const mockUserId = new Types.ObjectId('507f1f77bcf86cd799439012');
   const mockAgentId = new Types.ObjectId('507f1f77bcf86cd799439013');
+  const mockClientId = new Types.ObjectId('507f1f77bcf86cd799439014');
 
   const mockUserMessage = {
     _id: new Types.ObjectId(),
     content: 'Hello, this is a test message',
     type: 'user' as const,
     userId: mockUserId,
+    clientId: mockClientId,
     channelId: mockChannelId,
     status: 'active' as const,
     createdAt: new Date(),
@@ -28,6 +30,7 @@ describe('MessageRepository', () => {
     content: 'Hello, this is an agent response',
     type: 'agent' as const,
     agentId: mockAgentId,
+    clientId: mockClientId,
     channelId: mockChannelId,
     status: 'active' as const,
     createdAt: new Date(),
@@ -39,6 +42,7 @@ describe('MessageRepository', () => {
     content: 'This is a summary of the previous conversation',
     type: 'summary' as const,
     agentId: mockAgentId,
+    clientId: mockClientId,
     channelId: mockChannelId,
     status: 'active' as const,
     createdAt: new Date(),

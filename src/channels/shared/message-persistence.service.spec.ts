@@ -35,6 +35,7 @@ describe('MessagePersistenceService', () => {
       type: 'user' as const,
       userId: mockUser._id,
       agentId: new Types.ObjectId('507f1f77bcf86cd799439013'),
+      clientId: new Types.ObjectId('507f1f77bcf86cd799439011'),
       channelId: new Types.ObjectId('507f1f77bcf86cd799439014'),
       status: 'active' as const,
       createdAt: new Date(),
@@ -46,6 +47,7 @@ describe('MessagePersistenceService', () => {
       type: 'agent' as const,
       userId: mockUser._id,
       agentId: new Types.ObjectId('507f1f77bcf86cd799439013'),
+      clientId: new Types.ObjectId('507f1f77bcf86cd799439011'),
       channelId: new Types.ObjectId('507f1f77bcf86cd799439014'),
       status: 'active' as const,
       createdAt: new Date(),
@@ -119,6 +121,7 @@ describe('MessagePersistenceService', () => {
         type: 'user',
         userId: mockUser._id,
         agentId: expect.any(Types.ObjectId),
+        clientId: expect.any(Types.ObjectId),
         channelId: expect.any(Types.ObjectId),
         status: 'active',
       });
@@ -136,6 +139,7 @@ describe('MessagePersistenceService', () => {
         type: 'agent',
         userId: mockUser._id,
         agentId: expect.any(Types.ObjectId),
+        clientId: expect.any(Types.ObjectId),
         channelId: expect.any(Types.ObjectId),
         status: 'active',
       });
