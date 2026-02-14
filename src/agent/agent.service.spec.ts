@@ -72,7 +72,12 @@ describe('AgentService', () => {
       expect(ai.generateText).toHaveBeenCalledWith({
         model: mockModel,
         system: mockContext.systemPrompt,
-        prompt: mockInput.message.text,
+        messages: [
+          {
+            role: 'user',
+            content: mockInput.message.text,
+          },
+        ],
       });
       expect(result).toEqual({
         reply: { type: 'text', text: 'AI response' },
@@ -121,6 +126,29 @@ describe('AgentService', () => {
         'Processing agent-1 for client client-1 using provider=openai model=gpt-4',
       );
       expect(logSpy).toHaveBeenCalledWith('Response generated for agent-1');
+    });
+
+    it('should include conversation history when provided', async () => {
+      const mockModel = {};
+      (llmFactory.createLLMModel as jest.Mock).mockReturnValue(mockModel);
+      (ai.generateText as jest.Mock).mockResolvedValue({ text: 'response' });
+
+      const conversationHistory = [
+        { role: 'user' as const, content: 'Previous user message' },
+        { role: 'assistant' as const, content: 'Previous agent response' },
+      ];
+
+      await service.run(mockInput, mockContext, conversationHistory);
+
+      expect(ai.generateText).toHaveBeenCalledWith({
+        model: mockModel,
+        system: mockContext.systemPrompt,
+        messages: [
+          { role: 'user', content: 'Previous user message' },
+          { role: 'assistant', content: 'Previous agent response' },
+          { role: 'user', content: 'Hello, world!' },
+        ],
+      });
     });
   });
 });

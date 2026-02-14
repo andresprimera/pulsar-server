@@ -50,6 +50,7 @@ describe('MessageRepository', () => {
       create: jest.fn(),
       find: jest.fn(),
       findById: jest.fn(),
+      findOne: jest.fn(),
       findByIdAndUpdate: jest.fn(),
     };
 
@@ -296,6 +297,97 @@ describe('MessageRepository', () => {
         { new: true },
       );
       expect(result).toEqual(updatedMessage);
+    });
+  });
+
+  describe('findConversationContext', () => {
+    it('should return messages after last summary', async () => {
+      const lastSummary = {
+        ...mockSummaryMessage,
+        createdAt: new Date('2024-01-01'),
+      };
+
+      // First call: findOne for last summary
+      mockModel.findOne.mockReturnValueOnce({
+        sort: jest.fn().mockReturnValue({
+          exec: jest.fn().mockResolvedValue(lastSummary),
+        }),
+      });
+
+      // Second call: find for messages after summary
+      mockModel.find.mockReturnValueOnce({
+        sort: jest.fn().mockReturnValue({
+          exec: jest
+            .fn()
+            .mockResolvedValue([mockUserMessage, mockAgentMessage]),
+        }),
+      });
+
+      const result = await repository.findConversationContext(
+        mockChannelId,
+        mockUserId,
+        mockAgentId,
+      );
+
+      expect(result).toEqual([mockUserMessage, mockAgentMessage]);
+    });
+
+    it('should return all messages when no summary exists', async () => {
+      // First call: findOne for last summary - returns null
+      mockModel.findOne.mockReturnValueOnce({
+        sort: jest.fn().mockReturnValue({
+          exec: jest.fn().mockResolvedValue(null),
+        }),
+      });
+
+      // Second call: find for all messages
+      mockModel.find.mockReturnValueOnce({
+        sort: jest.fn().mockReturnValue({
+          exec: jest
+            .fn()
+            .mockResolvedValue([mockUserMessage, mockAgentMessage]),
+        }),
+      });
+
+      const result = await repository.findConversationContext(
+        mockChannelId,
+        mockUserId,
+        mockAgentId,
+      );
+
+      expect(result).toEqual([mockUserMessage, mockAgentMessage]);
+    });
+  });
+
+  describe('countTokensInConversation', () => {
+    it('should estimate token count from messages', async () => {
+      const messages = [
+        { ...mockUserMessage, content: 'Hello world' }, // 2 words
+        { ...mockAgentMessage, content: 'Hi there how are you' }, // 5 words
+      ];
+
+      jest.spyOn(repository, 'findConversationContext').mockResolvedValue(messages as any);
+
+      const result = await repository.countTokensInConversation(
+        mockChannelId,
+        mockUserId,
+        mockAgentId,
+      );
+
+      // Total words: 7, estimated tokens: 7 * 1.3 = 9.1, ceil = 10
+      expect(result).toBe(10);
+    });
+
+    it('should return 0 for empty conversation', async () => {
+      jest.spyOn(repository, 'findConversationContext').mockResolvedValue([]);
+
+      const result = await repository.countTokensInConversation(
+        mockChannelId,
+        mockUserId,
+        mockAgentId,
+      );
+
+      expect(result).toBe(0);
     });
   });
 });
