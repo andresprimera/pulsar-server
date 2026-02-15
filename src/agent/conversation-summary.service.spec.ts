@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { Logger } from '@nestjs/common';
 import { ConversationSummaryService } from './conversation-summary.service';
 import { MessageRepository } from '../database/repositories/message.repository';
 import { Types } from 'mongoose';
@@ -18,6 +19,7 @@ describe('ConversationSummaryService', () => {
   let service: ConversationSummaryService;
   let messageRepository: jest.Mocked<MessageRepository>;
   let configService: jest.Mocked<ConfigService>;
+  let loggerErrorSpy: jest.SpyInstance;
 
   const mockChannelId = new Types.ObjectId('507f1f77bcf86cd799439011');
   const mockUserId = new Types.ObjectId('507f1f77bcf86cd799439012');
@@ -87,8 +89,13 @@ describe('ConversationSummaryService', () => {
     service = module.get<ConversationSummaryService>(ConversationSummaryService);
     messageRepository = module.get(MessageRepository);
     configService = module.get(ConfigService);
+    loggerErrorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
 
     jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    loggerErrorSpy?.mockRestore();
   });
 
   it('should be defined', () => {

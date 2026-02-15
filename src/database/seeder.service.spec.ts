@@ -26,6 +26,8 @@ describe('SeederService', () => {
   let mockClientAgentRepository: any;
   let mockClientPhoneRepository: any;
   let loggerSpy: jest.SpyInstance;
+  let loggerWarnSpy: jest.SpyInstance;
+  let loggerErrorSpy: jest.SpyInstance;
 
   const mockAgentId = new Types.ObjectId('aaaaaaaaaaaaaaaaaaaaaaaa');
 
@@ -132,10 +134,15 @@ describe('SeederService', () => {
 
     service = module.get<SeederService>(SeederService);
     loggerSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+    loggerWarnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    loggerErrorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
   });
 
   afterEach(() => {
     jest.clearAllMocks();
+    loggerSpy?.mockRestore();
+    loggerWarnSpy?.mockRestore();
+    loggerErrorSpy?.mockRestore();
     delete process.env.NODE_ENV;
     delete process.env.SEED_DB;
   });
