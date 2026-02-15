@@ -64,13 +64,21 @@ export class ClientAgentRepository {
   async findOneByPhoneNumberId(
     phoneNumberId: string,
   ): Promise<ClientAgent | null> {
+    const matches = await this.findActiveByPhoneNumberId(phoneNumberId);
+    return matches[0] ?? null;
+  }
+
+  /**
+   * Find all active ClientAgents by WhatsApp phoneNumberId within embedded channels.
+   */
+  async findActiveByPhoneNumberId(phoneNumberId: string): Promise<ClientAgent[]> {
     return this.model
-      .findOne({
+      .find({
         status: 'active',
         channels: {
           $elemMatch: {
             status: 'active',
-            phoneNumberId: phoneNumberId,
+            phoneNumberId,
           },
         },
       })
@@ -83,13 +91,21 @@ export class ClientAgentRepository {
    * Checks for active status and matching credentials.
    */
   async findOneByEmail(email: string): Promise<ClientAgent | null> {
+    const matches = await this.findActiveByEmail(email);
+    return matches[0] ?? null;
+  }
+
+  /**
+   * Find all active ClientAgents by email within embedded channels.
+   */
+  async findActiveByEmail(email: string): Promise<ClientAgent[]> {
     return this.model
-      .findOne({
+      .find({
         status: 'active',
         channels: {
           $elemMatch: {
             status: 'active',
-            email: email,
+            email,
           },
         },
       })
@@ -104,13 +120,21 @@ export class ClientAgentRepository {
   async findOneByTiktokUserId(
     tiktokUserId: string,
   ): Promise<ClientAgent | null> {
+    const matches = await this.findActiveByTiktokUserId(tiktokUserId);
+    return matches[0] ?? null;
+  }
+
+  /**
+   * Find all active ClientAgents by TikTok user ID within embedded channels.
+   */
+  async findActiveByTiktokUserId(tiktokUserId: string): Promise<ClientAgent[]> {
     return this.model
-      .findOne({
+      .find({
         status: 'active',
         channels: {
           $elemMatch: {
             status: 'active',
-            tiktokUserId: tiktokUserId,
+            tiktokUserId,
           },
         },
       })

@@ -3,13 +3,13 @@ import { AgentService } from '../../agent/agent.service';
 import { AgentInput } from '../../agent/contracts/agent-input';
 import { AgentContext } from '../../agent/contracts/agent-context';
 import { AgentRepository } from '../../database/repositories/agent.repository';
-import { ClientAgentRepository } from '../../database/repositories/client-agent.repository';
 import { decryptRecord, decrypt } from '../../database/utils/crypto.util';
 import {
   WhatsAppServerConfig,
   loadWhatsAppConfig,
   buildMessagesUrl,
 } from './whatsapp.config';
+import { AgentRoutingService } from '../shared/agent-routing.service';
 
 @Injectable()
 export class WhatsappService {
@@ -18,8 +18,8 @@ export class WhatsappService {
 
   constructor(
     private readonly agentService: AgentService,
-    private readonly clientAgentRepository: ClientAgentRepository,
     private readonly agentRepository: AgentRepository,
+    private readonly agentRoutingService: AgentRoutingService,
   ) {
     this.config = loadWhatsAppConfig();
   }
@@ -85,30 +85,38 @@ export class WhatsappService {
     );
     this.logger.log(`[WhatsApp] Extracted phoneNumberId: ${phoneNumberId}`);
 
-    // Route: find active ClientAgent with matching phoneNumberId in embedded channels
-    const clientAgent = await this.clientAgentRepository.findOneByPhoneNumberId(
-      phoneNumberId,
-    );
+    const routeDecision = await this.agentRoutingService.resolveRoute({
+      channelIdentifier: phoneNumberId,
+      externalUserId: message.from,
+      incomingText: message.text.body,
+      channelType: 'whatsapp',
+    });
 
-    if (!clientAgent) {
+    if (routeDecision.kind === 'unroutable') {
       this.logger.warn(
         `[WhatsApp] No active ClientAgent found for phoneNumberId=${phoneNumberId}.`,
       );
       return;
     }
 
-    // Extract the specific channel config
-    const channelConfig = clientAgent.channels.find(
-      (c) =>
-        c.status === 'active' && c.credentials?.phoneNumberId === phoneNumberId,
-    );
+    if (routeDecision.kind === 'ambiguous') {
+      const fallback = routeDecision.candidates[0];
+      if (!fallback?.channelConfig?.credentials) {
+        this.logger.warn(
+          `[WhatsApp] Unable to send routing clarification for phoneNumberId=${phoneNumberId}: missing credentials.`,
+        );
+        return;
+      }
 
-    if (!channelConfig) {
-      this.logger.warn(
-        `[WhatsApp] Channel config not found in ClientAgent for phoneNumberId=${phoneNumberId} (mismatch).`,
-      );
+      const decryptedCredentials = decryptRecord(fallback.channelConfig.credentials);
+      await this.sendMessage(message.from, routeDecision.prompt, {
+        phoneNumberId: decryptedCredentials.phoneNumberId,
+        accessToken: decryptedCredentials.accessToken,
+      });
       return;
     }
+
+    const { clientAgent, channelConfig } = routeDecision.candidate;
 
     // Guard: credentials may be undefined if select('+channels.credentials') was missed
     if (!channelConfig.credentials) {

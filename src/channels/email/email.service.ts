@@ -9,6 +9,7 @@ import { AgentInput } from '../../agent/contracts/agent-input';
 import { AgentContext } from '../../agent/contracts/agent-context';
 import { AgentRepository } from '../../database/repositories/agent.repository';
 import { ClientAgentRepository } from '../../database/repositories/client-agent.repository';
+import { AgentRoutingService } from '../shared/agent-routing.service';
 import { IncomingEmailDto } from './dto/incoming-email.dto';
 import { decryptRecord, decrypt } from '../../database/utils/crypto.util';
 import * as nodemailer from 'nodemailer';
@@ -36,6 +37,7 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
     private readonly agentService: AgentService,
     private readonly clientAgentRepository: ClientAgentRepository,
     private readonly agentRepository: AgentRepository,
+    private readonly agentRoutingService: AgentRoutingService,
   ) {}
 
   onModuleInit() {
@@ -150,26 +152,31 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
   async handleIncoming(dto: IncomingEmailDto): Promise<void> {
     this.logger.log(`[Email] Incoming email from=${dto.from} to=${dto.to}`);
 
-    // Route: find agent channel by recipient email
-    const clientAgent = await this.clientAgentRepository.findOneByEmail(dto.to);
+    // Route: resolve which agent should handle this email
+    const routeDecision = await this.agentRoutingService.resolveRoute({
+      channelIdentifier: dto.to,
+      externalUserId: dto.from,
+      incomingText: dto.text,
+      channelType: 'email',
+    });
 
-    if (!clientAgent) {
+    if (routeDecision.kind === 'unroutable') {
       this.logger.warn(
         `[Email] No active ClientAgent found for email=${dto.to}. Check if channel exists and is active.`,
       );
       return;
     }
 
-    const channelConfig = clientAgent.channels.find(
-      (c) => c.status === 'active' && c.credentials?.email === dto.to,
-    );
-
-    if (!channelConfig) {
+    if (routeDecision.kind === 'ambiguous') {
+      // Email doesn't support inline disambiguation easily
+      // Future: send disambiguation email to user
       this.logger.warn(
-        `[Email] Channel config not found in ClientAgent for email=${dto.to} (mismatch).`,
+        `[Email] Multiple agents for email=${dto.to}, cannot send disambiguation prompt yet.`,
       );
       return;
     }
+
+    const { clientAgent, channelConfig } = routeDecision.candidate;
 
     // Guard: credentials may be undefined if select('+channels.credentials') was missed
     if (!channelConfig.credentials) {

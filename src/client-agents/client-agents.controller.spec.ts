@@ -42,7 +42,23 @@ describe('ClientAgentsController', () => {
 
   describe('create', () => {
     it('should call service.create', async () => {
-      const dto = { clientId: 'client-1', agentId: 'agent-1', price: 100 };
+      const dto: any = {
+        clientId: 'client-1',
+        agentId: 'agent-1',
+        price: 100,
+        channels: [
+          {
+            channelId: '507f1f77bcf86cd799439011',
+            provider: 'smtp',
+            credentials: { email: 'support@example.com' },
+            llmConfig: {
+              provider: 'openai',
+              apiKey: 'test-key',
+              model: 'gpt-4o',
+            },
+          },
+        ],
+      };
       mockClientAgentsService.create.mockResolvedValue(mockClientAgent);
 
       const result = await controller.create(dto);

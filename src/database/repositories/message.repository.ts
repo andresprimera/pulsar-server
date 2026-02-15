@@ -96,6 +96,25 @@ export class MessageRepository {
     return this.model.find(query).sort({ createdAt: 1 }).exec();
   }
 
+  async findLatestByUserAndAgents(
+    userId: Types.ObjectId,
+    agentIds: Types.ObjectId[],
+    channelIds?: Types.ObjectId[],
+  ): Promise<Message | null> {
+    const query: any = {
+      userId,
+      status: 'active',
+      type: { $in: ['user', 'agent'] },
+      agentId: { $in: agentIds },
+    };
+
+    if (channelIds && channelIds.length > 0) {
+      query.channelId = { $in: channelIds };
+    }
+
+    return this.model.findOne(query).sort({ createdAt: -1 }).exec();
+  }
+
   async countTokensInConversation(
     channelId: Types.ObjectId,
     userId: Types.ObjectId,
