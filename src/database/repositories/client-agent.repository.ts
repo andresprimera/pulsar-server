@@ -98,6 +98,27 @@ export class ClientAgentRepository {
   }
 
   /**
+   * Find ClientAgent by TikTok user ID within embedded channels.
+   * Checks for active status and matching tiktokUserId.
+   */
+  async findOneByTiktokUserId(
+    tiktokUserId: string,
+  ): Promise<ClientAgent | null> {
+    return this.model
+      .findOne({
+        status: 'active',
+        channels: {
+          $elemMatch: {
+            status: 'active',
+            tiktokUserId: tiktokUserId,
+          },
+        },
+      })
+      .select('+channels.credentials +channels.llmConfig.apiKey')
+      .exec();
+  }
+
+  /**
    * Find all ClientAgents with active email channels.
    * Used for IMAP polling.
    */

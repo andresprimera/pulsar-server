@@ -177,6 +177,15 @@ export class OnboardingService {
           email = channelConfig.credentials.email;
         }
 
+        // Extract tiktokUserId for unencrypted storage/lookup
+        let tiktokUserId: string | undefined;
+        if (
+          channelConfig.credentials &&
+          'tiktokUserId' in channelConfig.credentials
+        ) {
+          tiktokUserId = channelConfig.credentials.tiktokUserId;
+        }
+
         hireChannels.push({
           channelId: new Types.ObjectId(channelConfig.channelId),
           provider: normalizedProvider,
@@ -185,6 +194,7 @@ export class OnboardingService {
           // Store unencrypted keys for fast lookup
           phoneNumberId,
           email,
+          tiktokUserId,
           llmConfig: {
             ...channelConfig.llmConfig,
             apiKey: encrypt(channelConfig.llmConfig.apiKey),

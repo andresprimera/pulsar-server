@@ -30,6 +30,22 @@
       }
     },
     {
+      "name": "TikTok",
+      "type": "tiktok",
+      "supportedProviders": ["tiktok"],
+      "agentChannelConfig": {
+        "channelConfig": {
+          "tiktokUserId": "__REPLACE_ME_TIKTOK_USER_ID__",
+          "accessToken": "__REPLACE_ME_TIKTOK_ACCESS_TOKEN__"
+        },
+        "llmConfig": {
+          "provider": "openai",
+          "apiKey": "__REPLACE_ME_API_KEY__",
+          "model": "gpt-4o"
+        }
+      }
+    },
+    {
       "name": "Email",
       "type": "email",
       "supportedProviders": ["smtp", "sendgrid"],

@@ -277,11 +277,21 @@ export class SeederService implements OnApplicationBootstrap {
                 );
               }
 
+              // Handle tiktokUserId for TikTok channels
+              let tiktokUserId: string | undefined;
+              if (
+                channelInfo.config.channelConfig &&
+                'tiktokUserId' in channelInfo.config.channelConfig
+              ) {
+                tiktokUserId = channelInfo.config.channelConfig.tiktokUserId;
+              }
+
               additionalChannels.push({
                 channelId: channelInfo.channel._id as Types.ObjectId,
                 provider: provider.toLowerCase(),
                 status: 'active',
                 credentials: encryptRecord(channelInfo.config.channelConfig),
+                tiktokUserId,
                 llmConfig: {
                   ...channelInfo.config.llmConfig,
                   apiKey: encrypt(channelInfo.config.llmConfig.apiKey),

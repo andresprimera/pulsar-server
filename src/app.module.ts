@@ -4,6 +4,7 @@ import { AppController } from './app.controller';
 import { DatabaseModule } from './database/database.module';
 import { WhatsappModule } from './channels/whatsapp/whatsapp.module';
 import { EmailModule } from './channels/email/email.module';
+import { TiktokModule } from './channels/tiktok/tiktok.module';
 import { AgentsModule } from './agents/agents.module';
 import { UsersModule } from './users/users.module';
 import { ClientsModule } from './clients/clients.module';
@@ -17,6 +18,7 @@ import { OnboardingModule } from './onboarding/onboarding.module';
     DatabaseModule,
     WhatsappModule,
     EmailModule,
+    TiktokModule,
     AgentsModule,
     UsersModule,
     ClientsModule,

@@ -24,6 +24,9 @@ export class HireChannelConfig {
   @Prop({ type: String, required: false, index: true })
   email?: string;
 
+  @Prop({ type: String, required: false, index: true })
+  tiktokUserId?: string;
+
   @Prop({ type: LlmConfigSchema, required: true })
   llmConfig: LlmConfig;
 }
@@ -64,4 +67,5 @@ ClientAgentSchema.index({ clientId: 1, agentId: 1 }, { unique: true });
 // Critical indexes for routing and polling
 ClientAgentSchema.index({ status: 1, 'channels.phoneNumberId': 1 });
 ClientAgentSchema.index({ status: 1, 'channels.email': 1 });
+ClientAgentSchema.index({ status: 1, 'channels.tiktokUserId': 1 });
 ClientAgentSchema.index({ 'channels.status': 1 });

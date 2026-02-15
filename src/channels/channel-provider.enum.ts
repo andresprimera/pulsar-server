@@ -4,4 +4,5 @@ export enum ChannelProvider {
   Smtp = 'smtp',
   Sendgrid = 'sendgrid',
   Resend = 'resend',
+  Tiktok = 'tiktok',
 }

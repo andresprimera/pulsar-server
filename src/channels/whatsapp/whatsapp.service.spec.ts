@@ -5,16 +5,13 @@ import { WhatsappService } from './whatsapp.service';
 import { AgentService } from '../../agent/agent.service';
 import { ClientAgentRepository } from '../../database/repositories/client-agent.repository';
 import { AgentRepository } from '../../database/repositories/agent.repository';
-import { MessagePersistenceService } from '../shared/message-persistence.service';
 import { LlmProvider } from '../../agent/llm/provider.enum';
-import { Types } from 'mongoose';
 
 describe('WhatsappService', () => {
   let service: WhatsappService;
   let agentService: jest.Mocked<AgentService>;
   let clientAgentRepository: jest.Mocked<ClientAgentRepository>;
   let agentRepository: jest.Mocked<AgentRepository>;
-  let messagePersistenceService: jest.Mocked<MessagePersistenceService>;
   let loggerLogSpy: jest.SpyInstance;
   let loggerWarnSpy: jest.SpyInstance;
   let fetchSpy: jest.SpyInstance;
@@ -45,13 +42,6 @@ describe('WhatsappService', () => {
           provide: AgentRepository,
           useValue: { findActiveById: jest.fn() },
         },
-        {
-          provide: MessagePersistenceService,
-          useValue: {
-            handleIncomingMessage: jest.fn(),
-            handleOutgoingMessage: jest.fn(),
-          },
-        },
       ],
     }).compile();
 
@@ -59,7 +49,6 @@ describe('WhatsappService', () => {
     agentService = module.get(AgentService);
     clientAgentRepository = module.get(ClientAgentRepository);
     agentRepository = module.get(AgentRepository);
-    messagePersistenceService = module.get(MessagePersistenceService);
 
     // Spy on Logger.prototype since a new Logger() is instantiated in the service
     loggerLogSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
@@ -216,44 +205,16 @@ describe('WhatsappService', () => {
     });
 
     it('should call agentService.run with correct input and context', async () => {
-      const mockUser = {
-        _id: new Types.ObjectId('507f1f77bcf86cd799439012'),
-        externalUserId: '1234567890',
-        clientId: new Types.ObjectId('507f1f77bcf86cd799439011'),
-        email: '1234567890@external.user',
-        name: '1234567890',
-        status: 'active',
-      };
-
-      const mockConversationHistory = [
-        { role: 'user' as const, content: 'Previous message' },
-      ];
-
       clientAgentRepository.findOneByPhoneNumberId.mockResolvedValue(
         mockClientAgent as any,
       );
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
-      messagePersistenceService.handleIncomingMessage.mockResolvedValue({
-        user: mockUser,
-        conversationHistory: mockConversationHistory,
-      });
       agentService.run.mockResolvedValue({
         reply: { type: 'text', text: 'Hello' },
       });
 
       const payload = createPayload();
       await service.handleIncoming(payload);
-
-      expect(messagePersistenceService.handleIncomingMessage).toHaveBeenCalledWith(
-        'Hello',
-        {
-          channelId: 'whatsapp-1',
-          agentId: 'agent-1',
-          clientId: 'client-1',
-          externalUserId: '1234567890',
-          userName: '1234567890',
-        },
-      );
 
       expect(agentService.run).toHaveBeenCalledWith(
         {
@@ -263,49 +224,21 @@ describe('WhatsappService', () => {
           message: { type: 'text', text: 'Hello' },
           metadata: { messageId: 'msg123', phoneNumberId: 'phone123' },
         },
-        {
-          agentId: 'agent-1',
-          clientId: 'client-1',
-          systemPrompt: 'You are a helpful assistant.',
-          llmConfig: {
-            ...mockClientAgent.channels[0].llmConfig,
-            apiKey: 'sk-mock-key',
-          },
-          channelConfig: mockClientAgent.channels[0].credentials,
-        },
-        mockConversationHistory,
-      );
-
-      expect(messagePersistenceService.handleOutgoingMessage).toHaveBeenCalledWith(
-        'Hello',
-        {
-          channelId: 'whatsapp-1',
-          agentId: 'agent-1',
-          clientId: 'client-1',
-          externalUserId: '1234567890',
-          userName: '1234567890',
-        },
-        mockUser._id,
         expect.objectContaining({
           agentId: 'agent-1',
           clientId: 'client-1',
+          channelId: 'whatsapp-1',
+          systemPrompt: 'You are a helpful assistant.',
+          channelConfig: mockClientAgent.channels[0].credentials,
         }),
       );
     });
 
     it('should log outbound message when reply exists', async () => {
-      const mockUser = {
-        _id: new Types.ObjectId('507f1f77bcf86cd799439012'),
-      };
-
       clientAgentRepository.findOneByPhoneNumberId.mockResolvedValue(
         mockClientAgent as any,
       );
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
-      messagePersistenceService.handleIncomingMessage.mockResolvedValue({
-        user: mockUser,
-        conversationHistory: [],
-      });
       agentService.run.mockResolvedValue({
         reply: { type: 'text', text: 'Echo response' },
       });
@@ -319,18 +252,10 @@ describe('WhatsappService', () => {
     });
 
     it('should not log outbound message when reply is undefined', async () => {
-      const mockUser = {
-        _id: new Types.ObjectId('507f1f77bcf86cd799439012'),
-      };
-
       clientAgentRepository.findOneByPhoneNumberId.mockResolvedValue(
         mockClientAgent as any,
       );
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
-      messagePersistenceService.handleIncomingMessage.mockResolvedValue({
-        user: mockUser,
-        conversationHistory: [],
-      });
       agentService.run.mockResolvedValue({});
 
       const payload = createPayload();

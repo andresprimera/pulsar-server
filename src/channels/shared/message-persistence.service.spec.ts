@@ -12,9 +12,9 @@ describe('MessagePersistenceService', () => {
   let conversationSummaryService: jest.Mocked<ConversationSummaryService>;
 
   const mockContext = {
-    channelId: 'channel-1',
-    agentId: 'agent-1',
-    clientId: 'client-1',
+    channelId: '507f1f77bcf86cd799439014',
+    agentId: '507f1f77bcf86cd799439013',
+    clientId: '507f1f77bcf86cd799439011',
     externalUserId: 'user@example.com',
     userName: 'Test User',
   };
@@ -97,7 +97,7 @@ describe('MessagePersistenceService', () => {
 
       const result = await service.findOrCreateUser(
         'user@example.com',
-        'client-1',
+        '507f1f77bcf86cd799439011',
         'Test User',
       );
 

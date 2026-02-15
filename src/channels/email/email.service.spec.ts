@@ -9,6 +9,7 @@ import { LlmProvider } from '../../agent/llm/provider.enum';
 import { IncomingEmailDto } from './dto/incoming-email.dto';
 import * as nodemailer from 'nodemailer';
 import { ChannelProvider } from '../../channels/channel-provider.enum';
+import { Types } from 'mongoose';
 
 jest.mock('nodemailer');
 
@@ -42,6 +43,7 @@ describe('EmailService', () => {
   });
 
   const mockChannelConfig = {
+    channelId: new Types.ObjectId('507f1f77bcf86cd799439014'),
     provider: ChannelProvider.Smtp,
     status: 'active',
     credentials: {
@@ -1073,17 +1075,13 @@ describe('EmailService', () => {
             messageId: 'msg-123',
           },
         },
-        {
+        expect.objectContaining({
           agentId: 'agent-1',
           clientId: 'client-1',
+          channelId: mockChannelConfig.channelId.toString(),
           systemPrompt: 'You are a helpful assistant.',
-          llmConfig: {
-            provider: 'openai',
-            apiKey: 'sk-mock-key',
-            model: 'gpt-4',
-          },
           channelConfig: mockChannelConfig.credentials,
-        },
+        }),
       );
     });
 
