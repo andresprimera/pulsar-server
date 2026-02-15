@@ -8,46 +8,63 @@ import * as SEED_DATA from '../src/database/data/seed-data.json';
 describe('Seeder (e2e)', () => {
   let app: INestApplication;
   let connection: Connection;
+  let previousSeedDb: string | undefined;
 
   beforeAll(async () => {
+    previousSeedDb = process.env.SEED_DB;
+    process.env.SEED_DB = 'true';
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    await app.init();
-
     connection = moduleFixture.get<Connection>(getConnectionToken());
+    await connection.asPromise();
 
-    // Clean up any existing seed data before running tests
+    // Clean up any existing seed data before app bootstrap triggers seeding
     await cleanupSeededData();
+
+    await app.init();
   });
 
   afterAll(async () => {
+    await cleanupSeededData();
     await app.close();
+
+    if (previousSeedDb === undefined) {
+      delete process.env.SEED_DB;
+    } else {
+      process.env.SEED_DB = previousSeedDb;
+    }
   });
 
   const cleanupSeededData = async () => {
     if (connection) {
-      // Clean up seeded agents
-      await connection.collection('agents').deleteMany({
-        createdBySeeder: true,
-      });
-
-      // Clean up seeded users
       const seedEmails = SEED_DATA.users.map((u) => u.email);
-      await connection.collection('users').deleteMany({
-        email: { $in: seedEmails },
-      });
 
-      // Clean up seeded clients (find by owner user email through users collection)
       const seededUsers = await connection
         .collection('users')
         .find({ email: { $in: seedEmails } })
         .toArray();
       const clientIds = seededUsers.map((u) => u.clientId);
-      await connection.collection('clients').deleteMany({
-        _id: { $in: clientIds },
+
+      const seededPhoneNumberIds = SEED_DATA.users.flatMap((u) =>
+        (u.agentHirings || []).flatMap((h) =>
+          (h.channels || [])
+            .map((c) => c.credentials?.phoneNumberId)
+            .filter((phone): phone is string => Boolean(phone)),
+        ),
+      );
+
+      const uniqueSeededPhoneNumberIds = [...new Set(seededPhoneNumberIds)];
+
+      // Clean up seeded client_phones first to avoid ownership conflicts on next run
+      await connection.collection('client_phones').deleteMany({
+        $or: [
+          { clientId: { $in: clientIds } },
+          { phoneNumberId: { $in: uniqueSeededPhoneNumberIds } },
+        ],
       });
 
       // Clean up seeded client_agents
@@ -55,9 +72,19 @@ describe('Seeder (e2e)', () => {
         clientId: { $in: clientIds.map((id) => id.toString()) },
       });
 
-      // Clean up seeded client_phones
-      await connection.collection('client_phones').deleteMany({
-        clientId: { $in: clientIds },
+      // Clean up seeded clients
+      await connection.collection('clients').deleteMany({
+        _id: { $in: clientIds },
+      });
+
+      // Clean up seeded agents
+      await connection.collection('agents').deleteMany({
+        createdBySeeder: true,
+      });
+
+      // Clean up seeded users
+      await connection.collection('users').deleteMany({
+        email: { $in: seedEmails },
       });
 
       // Clean up seeded channels (WhatsApp and Email from seed data)
@@ -278,6 +305,20 @@ describe('Seeder (e2e)', () => {
         whatsappChannel._id.toString(),
       );
     });
+
+    it('should persist organization client name for User 2', async () => {
+      const user = await connection
+        .collection('users')
+        .findOne({ email: 'user2@example.com' });
+
+      const client = await connection
+        .collection('clients')
+        .findOne({ _id: user.clientId });
+
+      expect(client).toBeDefined();
+      expect(client.type).toBe('organization');
+      expect(client.name).toBe('Demo User 2 LLC');
+    });
   });
 
   describe('User 3 Tests (user3@example.com)', () => {
@@ -368,6 +409,38 @@ describe('Seeder (e2e)', () => {
           whatsappChannel._id.toString(),
         );
       });
+    });
+
+    it('should keep distinct WhatsApp phoneNumberId per hired agent for User 3', async () => {
+      const user = await connection
+        .collection('users')
+        .findOne({ email: 'user3@example.com' });
+
+      const customerServiceAgent = await connection
+        .collection('agents')
+        .findOne({ name: 'Customer Service Agent' });
+      const salesAgent = await connection
+        .collection('agents')
+        .findOne({ name: 'Lead Qualifier & Sales Agent' });
+
+      const customerServiceHiring = await connection
+        .collection('client_agents')
+        .findOne({
+          clientId: user.clientId.toString(),
+          agentId: customerServiceAgent._id.toString(),
+        });
+      const salesHiring = await connection
+        .collection('client_agents')
+        .findOne({
+          clientId: user.clientId.toString(),
+          agentId: salesAgent._id.toString(),
+        });
+
+      expect(customerServiceHiring.channels[0].phoneNumberId).toBe('573332574068');
+      expect(salesHiring.channels[0].phoneNumberId).toBe('573332574069');
+      expect(customerServiceHiring.channels[0].phoneNumberId).not.toBe(
+        salesHiring.channels[0].phoneNumberId,
+      );
     });
   });
 

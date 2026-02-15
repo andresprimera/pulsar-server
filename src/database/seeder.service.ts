@@ -23,6 +23,7 @@ import { ClientRepository } from './repositories/client.repository';
 @Injectable()
 export class SeederService implements OnApplicationBootstrap {
   private readonly logger = new Logger(SeederService.name);
+  private readonly onboardingRetryAttempts = 3;
 
   constructor(
     private readonly userRepository: UserRepository,
@@ -46,9 +47,12 @@ export class SeederService implements OnApplicationBootstrap {
       `Connected to Database: ${uri.replace(/:([^:@]+)@/, ':****@')}`,
     );
 
-    const isProd = process.env.NODE_ENV === 'production';
-    const startSeed = isProd
-      ? process.env.SEED_DB === 'true' // Prod: Must be explicit
+    const nodeEnv = process.env.NODE_ENV;
+    const isProd = nodeEnv === 'production';
+    const isTest = nodeEnv === 'test';
+
+    const startSeed = isProd || isTest
+      ? process.env.SEED_DB === 'true' // Prod/Test: Must be explicit
       : process.env.SEED_DB !== 'false'; // Dev: Default on, explicit off
 
     if (!startSeed) {
@@ -230,13 +234,14 @@ export class SeederService implements OnApplicationBootstrap {
         this.logger.log(
           `Running onboarding flow for user "${userSeed.email}" with agent "${firstAgentHiring.agentName}"...`,
         );
-        const result = await this.onboardingService.registerAndHire({
+        const result = await this.runOnboardingWithRetry({
           user: {
             email: userSeed.email,
             name: userSeed.name,
           },
           client: {
             type: userSeed.client.type as any,
+            ...(userSeed.client.name ? { name: userSeed.client.name } : {}),
           },
           agentHiring: {
             agentId: firstAgent._id.toString(),
@@ -329,11 +334,22 @@ export class SeederService implements OnApplicationBootstrap {
                 tiktokUserId = channelSeed.credentials.tiktokUserId;
               }
 
+              // Handle email for Email channels
+              let email: string | undefined;
+              if (
+                channelSeed.credentials &&
+                'email' in channelSeed.credentials
+              ) {
+                email = channelSeed.credentials.email;
+              }
+
               additionalChannels.push({
                 channelId: channelInfo.channel._id as Types.ObjectId,
                 provider: provider.toLowerCase(),
                 status: channelSeed.status || 'active',
                 credentials: encryptRecord(channelSeed.credentials),
+                phoneNumberId,
+                email,
                 tiktokUserId,
                 llmConfig: {
                   ...channelSeed.llmConfig,
@@ -364,13 +380,46 @@ export class SeederService implements OnApplicationBootstrap {
       this.logger.log('Seeding complete!');
     } catch (error) {
       this.logger.error('Seeding failed', error);
-      // Re-throw explicit data integrity/seed contract errors
-      if (
-        error?.message?.includes('Database is in an inconsistent state') ||
-        error?.message?.includes('Invalid seed-data.json')
-      ) {
+      throw error;
+    }
+  }
+
+  private async runOnboardingWithRetry(dto: any): Promise<any> {
+    for (let attempt = 1; attempt <= this.onboardingRetryAttempts; attempt++) {
+      try {
+        return await this.onboardingService.registerAndHire(dto);
+      } catch (error) {
+        const isRetryable = this.isTransientMongoTransactionError(error);
+        const hasMoreAttempts = attempt < this.onboardingRetryAttempts;
+
+        if (!isRetryable || !hasMoreAttempts) {
           throw error;
+        }
+
+        const delayMs = attempt * 250;
+        this.logger.warn(
+          `Transient transaction error during onboarding. Retrying (${attempt + 1}/${this.onboardingRetryAttempts}) in ${delayMs}ms...`,
+        );
+        await this.sleep(delayMs);
       }
     }
+
+    throw new Error('Onboarding retry loop exhausted unexpectedly.');
+  }
+
+  private isTransientMongoTransactionError(error: any): boolean {
+    const labels = Array.isArray(error?.errorLabels) ? error.errorLabels : [];
+    const message = String(error?.message || '');
+
+    return (
+      labels.includes('TransientTransactionError') ||
+      labels.includes('UnknownTransactionCommitResult') ||
+      message.includes('Please retry your operation or multi-document transaction') ||
+      message.includes('TransientTransactionError')
+    );
+  }
+
+  private async sleep(ms: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

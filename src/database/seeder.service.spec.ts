@@ -11,7 +11,7 @@ import { ClientRepository } from './repositories/client.repository';
 import { ClientAgentRepository } from './repositories/client-agent.repository';
 import { ClientPhoneRepository } from './repositories/client-phone.repository';
 import { OnboardingService } from '../onboarding/onboarding.service';
-import { Logger } from '@nestjs/common';
+import { BadRequestException, Logger } from '@nestjs/common';
 import * as SEED_DATA from './data/seed-data.json';
 
 describe('SeederService', () => {
@@ -68,7 +68,15 @@ describe('SeederService', () => {
     };
 
     mockOnboardingService = {
-      registerAndHire: jest.fn().mockResolvedValue(mockOnboardingResult),
+      registerAndHire: jest.fn().mockImplementation(async (dto: any) => {
+        if (dto?.client?.type === 'organization' && !dto?.client?.name) {
+          throw new BadRequestException(
+            'Client name is required for organization type',
+          );
+        }
+
+        return mockOnboardingResult;
+      }),
     };
 
     mockChannelRepository = {
@@ -82,7 +90,9 @@ describe('SeederService', () => {
 
     mockClientAgentRepository = {
       findByClient: jest.fn(),
-      create: jest.fn(),
+      create: jest.fn().mockResolvedValue({
+        _id: 'additional-client-agent-id',
+      }),
     };
 
     mockClientPhoneRepository = {
@@ -456,6 +466,153 @@ describe('SeederService', () => {
           '507f1f77bcf86cd799439011',
           '573332574069',
           { provider: 'meta' },
+        );
+      } finally {
+        (SEED_DATA as any).users = originalUsers;
+      }
+    });
+
+    it('should retry onboarding when transient transaction error occurs', async () => {
+      process.env.NODE_ENV = 'development';
+
+      const originalUsers = SEED_DATA.users;
+      (SEED_DATA as any).users = [SEED_DATA.users[0]];
+
+      const transientError: any = new Error(
+        'Please retry your operation or multi-document transaction.',
+      );
+      transientError.errorLabels = ['TransientTransactionError'];
+
+      mockUserRepository.findByEmail.mockResolvedValue(null);
+      mockAgentModel.findOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
+      });
+      mockAgentModel.create.mockResolvedValue({
+        _id: mockAgentId,
+        name: SEED_DATA.agents[0].name,
+      });
+
+      mockChannelRepository.findOrCreateByName
+        .mockResolvedValueOnce({
+          _id: 'wa-channel-id',
+          name: 'WhatsApp',
+          supportedProviders: ['meta', 'twilio'],
+        })
+        .mockResolvedValueOnce({
+          _id: 'tiktok-channel-id',
+          name: 'TikTok',
+          supportedProviders: ['tiktok'],
+        })
+        .mockResolvedValueOnce({
+          _id: 'email-channel-id',
+          name: 'Email',
+          supportedProviders: ['smtp', 'sendgrid'],
+        });
+
+      mockOnboardingService.registerAndHire
+        .mockRejectedValueOnce(transientError)
+        .mockResolvedValue(mockOnboardingResult);
+
+      try {
+        await service.onApplicationBootstrap();
+
+        expect(mockOnboardingService.registerAndHire).toHaveBeenCalledTimes(2);
+      } finally {
+        (SEED_DATA as any).users = originalUsers;
+      }
+    });
+
+    it('should throw when transient transaction keeps failing after max retries', async () => {
+      process.env.NODE_ENV = 'development';
+
+      const originalUsers = SEED_DATA.users;
+      (SEED_DATA as any).users = [SEED_DATA.users[0]];
+
+      const transientError: any = new Error(
+        'Please retry your operation or multi-document transaction.',
+      );
+      transientError.errorLabels = ['TransientTransactionError'];
+
+      mockUserRepository.findByEmail.mockResolvedValue(null);
+      mockAgentModel.findOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
+      });
+      mockAgentModel.create.mockResolvedValue({
+        _id: mockAgentId,
+        name: SEED_DATA.agents[0].name,
+      });
+
+      mockChannelRepository.findOrCreateByName
+        .mockResolvedValueOnce({
+          _id: 'wa-channel-id',
+          name: 'WhatsApp',
+          supportedProviders: ['meta', 'twilio'],
+        })
+        .mockResolvedValueOnce({
+          _id: 'tiktok-channel-id',
+          name: 'TikTok',
+          supportedProviders: ['tiktok'],
+        })
+        .mockResolvedValueOnce({
+          _id: 'email-channel-id',
+          name: 'Email',
+          supportedProviders: ['smtp', 'sendgrid'],
+        });
+
+      mockOnboardingService.registerAndHire.mockRejectedValue(transientError);
+
+      try {
+        await expect(service.onApplicationBootstrap()).rejects.toThrow(
+          /Please retry your operation or multi-document transaction/,
+        );
+        expect(mockOnboardingService.registerAndHire).toHaveBeenCalledTimes(3);
+      } finally {
+        (SEED_DATA as any).users = originalUsers;
+      }
+    });
+
+    it('should pass organization client name to onboarding', async () => {
+      process.env.NODE_ENV = 'development';
+
+      const originalUsers = SEED_DATA.users;
+      (SEED_DATA as any).users = [SEED_DATA.users[1]];
+
+      mockUserRepository.findByEmail.mockResolvedValue(null);
+      mockAgentModel.findOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
+      });
+      mockAgentModel.create.mockResolvedValue({
+        _id: mockAgentId,
+        name: SEED_DATA.agents[1].name,
+      });
+
+      mockChannelRepository.findOrCreateByName
+        .mockResolvedValueOnce({
+          _id: 'wa-channel-id',
+          name: 'WhatsApp',
+          supportedProviders: ['meta', 'twilio'],
+        })
+        .mockResolvedValueOnce({
+          _id: 'tiktok-channel-id',
+          name: 'TikTok',
+          supportedProviders: ['tiktok'],
+        })
+        .mockResolvedValueOnce({
+          _id: 'email-channel-id',
+          name: 'Email',
+          supportedProviders: ['smtp', 'sendgrid'],
+        });
+
+      try {
+        await service.onApplicationBootstrap();
+
+        expect(mockOnboardingService.registerAndHire).toHaveBeenCalledWith(
+          expect.objectContaining({
+            client: expect.objectContaining({
+              type: 'organization',
+              name: 'Demo User 2 LLC',
+            }),
+          }),
         );
       } finally {
         (SEED_DATA as any).users = originalUsers;

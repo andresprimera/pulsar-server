@@ -12,6 +12,12 @@ global.fetch = jest.fn().mockResolvedValue({
   text: jest.fn().mockResolvedValue(''),
 } as any);
 
+jest.mock('ai', () => ({
+  generateText: jest.fn().mockResolvedValue({
+    text: 'Mock agent response',
+  }),
+}));
+
 describe('Message Persistence (e2e)', () => {
   let app: INestApplication;
   let whatsappService: WhatsappService;
@@ -77,6 +83,7 @@ describe('Message Persistence (e2e)', () => {
           channelId: channelIdObj,
           provider: 'meta',
           status: 'active',
+          phoneNumberId: phoneNumberId,
           credentials: {
             phoneNumberId: phoneNumberId,
           },

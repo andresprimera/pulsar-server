@@ -1,0 +1,2 @@
+pnpm test:e2e -- test/seeder.e2e-spec.ts
+pnpm test:e2e

@@ -4,19 +4,105 @@ import * as request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { Connection } from 'mongoose';
 import { getConnectionToken } from '@nestjs/mongoose';
+import * as SEED_DATA from '../src/database/data/seed-data.json';
+import { AgentService } from '../src/agent/agent.service';
 
 describe('WhatsApp Message Routing (e2e)', () => {
   let app: INestApplication;
   let connection: Connection;
+  let previousSeedDb: string | undefined;
+  let mockAgentService: Partial<AgentService>;
   let user1PhoneNumberId: string;
   let user2PhoneNumberId: string;
   let user3Agent1PhoneNumberId: string;
   let user3Agent2PhoneNumberId: string;
 
+  const cleanupSeededData = async () => {
+    if (!connection) {
+      return;
+    }
+
+    const seedEmails = SEED_DATA.users.map((u) => u.email);
+
+    const seededUsers = await connection
+      .collection('users')
+      .find({ email: { $in: seedEmails } })
+      .toArray();
+    const clientIds = seededUsers.map((u) => u.clientId);
+
+    const seededPhoneNumberIds = SEED_DATA.users.flatMap((u) =>
+      (u.agentHirings || []).flatMap((h) =>
+        (h.channels || [])
+          .map((c) => c.credentials?.phoneNumberId)
+          .filter((phone): phone is string => Boolean(phone)),
+      ),
+    );
+
+    const uniqueSeededPhoneNumberIds = [...new Set(seededPhoneNumberIds)];
+
+    await connection.collection('client_phones').deleteMany({
+      $or: [
+        { clientId: { $in: clientIds } },
+        { phoneNumberId: { $in: uniqueSeededPhoneNumberIds } },
+      ],
+    });
+
+    await connection.collection('client_agents').deleteMany({
+      clientId: { $in: clientIds.map((id) => id.toString()) },
+    });
+
+    await connection.collection('clients').deleteMany({
+      _id: { $in: clientIds },
+    });
+
+    await connection.collection('agents').deleteMany({
+      createdBySeeder: true,
+    });
+
+    await connection.collection('users').deleteMany({
+      email: { $in: seedEmails },
+    });
+
+    const seedChannelNames = SEED_DATA.channels.map((c) => c.name);
+    await connection.collection('channels').deleteMany({
+      name: { $in: seedChannelNames },
+    });
+  };
+
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
+    previousSeedDb = process.env.SEED_DB;
+    process.env.SEED_DB = 'true';
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      text: jest.fn().mockResolvedValue('ok'),
+      json: jest.fn().mockResolvedValue({}),
+    } as any);
+
+    mockAgentService = {
+      run: jest.fn().mockResolvedValue({
+        reply: { type: 'text', text: 'Mock routing reply' },
+        conversationId: 'mock-conversation-id',
+        usage: { totalTokens: 10, promptTokens: 5, completionTokens: 5 },
+      }),
+    };
+
+    // Ensure deterministic seeding by removing partially-seeded remnants
+    // before app bootstrap triggers SeederService.
+    const tempModule: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
+    connection = tempModule.get<Connection>(getConnectionToken());
+    await connection.asPromise();
+    await cleanupSeededData();
+    await tempModule.close();
+
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    })
+      .overrideProvider(AgentService)
+      .useValue(mockAgentService)
+      .compile();
 
     app = moduleFixture.createNestApplication();
     await app.init();
@@ -28,7 +114,15 @@ describe('WhatsApp Message Routing (e2e)', () => {
   });
 
   afterAll(async () => {
+    await cleanupSeededData();
     await app.close();
+    jest.restoreAllMocks();
+
+    if (previousSeedDb === undefined) {
+      delete process.env.SEED_DB;
+    } else {
+      process.env.SEED_DB = previousSeedDb;
+    }
   });
 
   const getClientAgentPhoneNumberId = async (clientId: string): Promise<string | null> => {
@@ -46,10 +140,10 @@ describe('WhatsApp Message Routing (e2e)', () => {
 
     if (clientAgent) {
       const whatsappChannel = clientAgent.channels.find(
-        (c: any) => c.credentials?.phoneNumberId,
+        (c: any) => c.phoneNumberId || c.credentials?.phoneNumberId,
       );
       if (whatsappChannel) {
-        return whatsappChannel.credentials.phoneNumberId;
+        return whatsappChannel.phoneNumberId || whatsappChannel.credentials?.phoneNumberId;
       }
     }
     return null;
@@ -106,10 +200,11 @@ describe('WhatsApp Message Routing (e2e)', () => {
       );
       if (user3Agent1) {
         const whatsappChannel = user3Agent1.channels.find(
-          (c: any) => c.credentials?.phoneNumberId,
+          (c: any) => c.phoneNumberId || c.credentials?.phoneNumberId,
         );
         if (whatsappChannel) {
-          user3Agent1PhoneNumberId = whatsappChannel.credentials.phoneNumberId;
+          user3Agent1PhoneNumberId =
+            whatsappChannel.phoneNumberId || whatsappChannel.credentials?.phoneNumberId;
         }
       }
 
@@ -118,10 +213,11 @@ describe('WhatsApp Message Routing (e2e)', () => {
       );
       if (user3Agent2) {
         const whatsappChannel = user3Agent2.channels.find(
-          (c: any) => c.credentials?.phoneNumberId,
+          (c: any) => c.phoneNumberId || c.credentials?.phoneNumberId,
         );
         if (whatsappChannel) {
-          user3Agent2PhoneNumberId = whatsappChannel.credentials.phoneNumberId;
+          user3Agent2PhoneNumberId =
+            whatsappChannel.phoneNumberId || whatsappChannel.credentials?.phoneNumberId;
         }
       }
     }

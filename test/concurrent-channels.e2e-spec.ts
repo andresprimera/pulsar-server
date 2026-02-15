@@ -28,6 +28,8 @@ describe('Concurrent Channels (e2e)', () => {
   const agentId = agentIdObj.toString();
   const clientAgentIdObj = new Types.ObjectId();
   const clientAgentId = clientAgentIdObj.toString();
+  const emailChannelIdObj = new Types.ObjectId();
+  const whatsappChannelIdObj = new Types.ObjectId();
   
   // Valid Channels Config
   const validPhoneNumberId = 'valid-phone-123';
@@ -84,7 +86,23 @@ describe('Concurrent Channels (e2e)', () => {
       await connection.collection('clients').deleteMany({});
       await connection.collection('agents').deleteMany({});
       await connection.collection('client_agents').deleteMany({});
+      await connection.collection('channels').deleteMany({ _id: { $in: [emailChannelIdObj, whatsappChannelIdObj] } });
     }
+
+    await connection.collection('channels').insertMany([
+      {
+        _id: emailChannelIdObj,
+        name: 'E2E Concurrent Email Channel',
+        type: 'email',
+        supportedProviders: ['smtp'],
+      },
+      {
+        _id: whatsappChannelIdObj,
+        name: 'E2E Concurrent WhatsApp Channel',
+        type: 'whatsapp',
+        supportedProviders: ['meta'],
+      },
+    ]);
 
     // Create Client
     await connection.collection('clients').insertOne({
@@ -111,8 +129,10 @@ describe('Concurrent Channels (e2e)', () => {
       status: 'active',
       channels: [
         {
+          channelId: emailChannelIdObj,
           provider: 'smtp',
           status: 'active',
+          email: validBotEmail,
           credentials: {
             email: validBotEmail,
             password: 'password123',
@@ -121,15 +141,17 @@ describe('Concurrent Channels (e2e)', () => {
             smtpHost: 'smtp.test.com',
             smtpPort: 587,
           },
-          llmConfig: { provider: 'openai', model: 'gpt-4' },
+          llmConfig: { provider: 'openai', model: 'gpt-4', apiKey: 'test-key' },
         },
         {
+          channelId: whatsappChannelIdObj,
           provider: 'whatsapp',
           status: 'active',
+          phoneNumberId: validPhoneNumberId,
           credentials: {
             phoneNumberId: validPhoneNumberId,
           },
-          llmConfig: { provider: 'openai', model: 'gpt-4' },
+          llmConfig: { provider: 'openai', model: 'gpt-4', apiKey: 'test-key' },
         },
       ],
     });
@@ -140,6 +162,7 @@ describe('Concurrent Channels (e2e)', () => {
         await connection.collection('clients').deleteMany({});
         await connection.collection('agents').deleteMany({});
         await connection.collection('client_agents').deleteMany({});
+      await connection.collection('channels').deleteMany({ _id: { $in: [emailChannelIdObj, whatsappChannelIdObj] } });
     }
     await app.close();
     jest.restoreAllMocks();
@@ -357,6 +380,7 @@ describe('Concurrent Channels (e2e)', () => {
       ChannelProvider.Twilio,
       ChannelProvider.Sendgrid,
       ChannelProvider.Resend,
+      ChannelProvider.Tiktok,
     ];
 
     // 2. Get all defined providers from Enum

@@ -25,6 +25,7 @@ describe('Email Feature (e2e)', () => {
   const agentId = agentIdObj.toString();
   const clientAgentIdObj = new Types.ObjectId();
   const clientAgentId = clientAgentIdObj.toString();
+  const emailChannelIdObj = new Types.ObjectId();
   const senderEmail = 'user@example.com';
   const botEmail = 'support@example.com';
 
@@ -69,7 +70,15 @@ describe('Email Feature (e2e)', () => {
       await connection
         .collection('client_agents')
         .deleteOne({ _id: clientAgentIdObj });
+      await connection.collection('channels').deleteOne({ _id: emailChannelIdObj });
     }
+
+    await connection.collection('channels').insertOne({
+      _id: emailChannelIdObj,
+      name: 'E2E Test Email Channel',
+      type: 'email',
+      supportedProviders: ['smtp'],
+    });
 
     // Create Client
     await connection.collection('clients').insertOne({
@@ -96,8 +105,10 @@ describe('Email Feature (e2e)', () => {
       status: 'active',
       channels: [
         {
+          channelId: emailChannelIdObj,
           provider: 'smtp',
           status: 'active',
+          email: botEmail,
           credentials: {
             email: botEmail,
             password: 'password123',
@@ -122,6 +133,7 @@ describe('Email Feature (e2e)', () => {
       await connection
         .collection('client_agents')
         .deleteOne({ _id: clientAgentIdObj });
+      await connection.collection('channels').deleteOne({ _id: emailChannelIdObj });
     }
     await app.close();
     jest.restoreAllMocks();
