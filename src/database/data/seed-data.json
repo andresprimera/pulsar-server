@@ -15,55 +15,17 @@
     {
       "name": "WhatsApp",
       "type": "whatsapp",
-      "supportedProviders": ["meta", "twilio"],
-      "agentChannelConfig": {
-        "channelConfig": {
-          "phoneNumberId": "573332574065",
-          "accessToken": "__REPLACE_ME_ACCESS_TOKEN__",
-          "webhookVerifyToken": "__REPLACE_ME_VERIFY_TOKEN__"
-        },
-        "llmConfig": {
-          "provider": "openai",
-          "apiKey": "__REPLACE_ME_API_KEY__",
-          "model": "gpt-4o"
-        }
-      }
+      "supportedProviders": ["meta", "twilio"]
     },
     {
       "name": "TikTok",
       "type": "tiktok",
-      "supportedProviders": ["tiktok"],
-      "agentChannelConfig": {
-        "channelConfig": {
-          "tiktokUserId": "__REPLACE_ME_TIKTOK_USER_ID__",
-          "accessToken": "__REPLACE_ME_TIKTOK_ACCESS_TOKEN__"
-        },
-        "llmConfig": {
-          "provider": "openai",
-          "apiKey": "__REPLACE_ME_API_KEY__",
-          "model": "gpt-4o"
-        }
-      }
+      "supportedProviders": ["tiktok"]
     },
     {
       "name": "Email",
       "type": "email",
-      "supportedProviders": ["smtp", "sendgrid"],
-      "agentChannelConfig": {
-        "channelConfig": {
-          "email": "codingboxapp@gmail.com",
-          "password": "Coding.2022",
-          "smtpHost": "smtp.gmail.com",
-          "smtpPort": 587,
-          "imapHost": "imap.gmail.com",
-          "imapPort": 993
-        },
-        "llmConfig": {
-          "provider": "openai",
-          "apiKey": "__REPLACE_ME_API_KEY__",
-          "model": "gpt-4o"
-        }
-      }
+      "supportedProviders": ["smtp", "sendgrid"]
     }
   ],
   "users": [
@@ -76,51 +38,127 @@
       "agentHirings": [
         {
           "agentName": "Customer Service Agent",
-          "price": 100
+          "price": 100,
+          "channels": [
+            {
+              "channelName": "WhatsApp",
+              "provider": "meta",
+              "status": "active",
+              "credentials": {
+                "phoneNumberId": "573332574065",
+                "accessToken": "__REPLACE_ME_ACCESS_TOKEN__",
+                "webhookVerifyToken": "__REPLACE_ME_VERIFY_TOKEN__"
+              },
+              "llmConfig": {
+                "provider": "openai",
+                "apiKey": "__REPLACE_ME_API_KEY__",
+                "model": "gpt-4o"
+              }
+            },
+            {
+              "channelName": "Email",
+              "provider": "smtp",
+              "status": "active",
+              "credentials": {
+                "email": "codingboxapp@gmail.com",
+                "password": "Coding.2022",
+                "smtpHost": "smtp.gmail.com",
+                "smtpPort": 587,
+                "imapHost": "imap.gmail.com",
+                "imapPort": 993
+              },
+              "llmConfig": {
+                "provider": "openai",
+                "apiKey": "__REPLACE_ME_API_KEY__",
+                "model": "gpt-4o"
+              }
+            }
+          ]
         }
-      ],
-      "channelNames": ["WhatsApp", "Email"]
+      ]
     },
     {
       "email": "user2@example.com",
       "name": "Demo User 2",
       "client": {
-        "type": "individual"
+        "type": "organization",
+        "name": "Demo User 2 LLC"
       },
       "agentHirings": [
         {
           "agentName": "Lead Qualifier & Sales Agent",
-          "price": 100
+          "price": 100,
+          "channels": [
+            {
+              "channelName": "WhatsApp",
+              "provider": "meta",
+              "status": "active",
+              "credentials": {
+                "phoneNumberId": "573332574067",
+                "accessToken": "__REPLACE_ME_ACCESS_TOKEN__",
+                "webhookVerifyToken": "__REPLACE_ME_VERIFY_TOKEN__"
+              },
+              "llmConfig": {
+                "provider": "openai",
+                "apiKey": "__REPLACE_ME_API_KEY__",
+                "model": "gpt-4o"
+              }
+            }
+          ]
         }
-      ],
-      "channelNames": ["WhatsApp"]
+      ]
     },
     {
       "email": "user3@example.com",
       "name": "Demo User 3",
       "client": {
-        "type": "individual"
+        "type": "organization",
+        "name": "Demo User 3 Inc"
       },
       "agentHirings": [
         {
           "agentName": "Customer Service Agent",
-          "price": 100
+          "price": 100,
+          "channels": [
+            {
+              "channelName": "WhatsApp",
+              "provider": "meta",
+              "status": "active",
+              "credentials": {
+                "phoneNumberId": "573332574068",
+                "accessToken": "__REPLACE_ME_ACCESS_TOKEN__",
+                "webhookVerifyToken": "__REPLACE_ME_VERIFY_TOKEN__"
+              },
+              "llmConfig": {
+                "provider": "openai",
+                "apiKey": "__REPLACE_ME_API_KEY__",
+                "model": "gpt-4o"
+              }
+            }
+          ]
         },
         {
           "agentName": "Lead Qualifier & Sales Agent",
-          "price": 100
+          "price": 100,
+          "channels": [
+            {
+              "channelName": "WhatsApp",
+              "provider": "meta",
+              "status": "active",
+              "credentials": {
+                "phoneNumberId": "573332574069",
+                "accessToken": "__REPLACE_ME_ACCESS_TOKEN__",
+                "webhookVerifyToken": "__REPLACE_ME_VERIFY_TOKEN__"
+              },
+              "llmConfig": {
+                "provider": "openai",
+                "apiKey": "__REPLACE_ME_API_KEY__",
+                "model": "gpt-4o"
+              }
+            }
+          ]
         }
-      ],
-      "channelNames": ["WhatsApp"]
-    },
-    {
-      "email": "user4@example.com",
-      "name": "Demo User 4",
-      "client": {
-        "type": "individual"
-      },
-      "agentHirings": [],
-      "channelNames": ["WhatsApp"]
+      ]
     }
   ]
 }

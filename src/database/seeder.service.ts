@@ -128,10 +128,7 @@ export class SeederService implements OnApplicationBootstrap {
             ),
           },
         );
-        channelsMap.set(channelSeed.name, {
-          channel,
-          config: channelSeed.agentChannelConfig,
-        });
+        channelsMap.set(channelSeed.name, { channel });
       }
 
       // Ensure indexes are built before transaction starts to avoid "catalog changes" error
@@ -143,6 +140,27 @@ export class SeederService implements OnApplicationBootstrap {
 
       // 3. Process each user
       for (const userSeed of SEED_DATA.users) {
+        const resolveHiringChannels = (hiringSeed: any) => {
+          const channelsFromHiring = Array.isArray(hiringSeed.channels)
+            ? hiringSeed.channels
+            : [];
+
+          return channelsFromHiring;
+        };
+
+        const assertHiringChannelsOrThrow = (hiringSeed: any) => {
+          const hiringChannels = resolveHiringChannels(hiringSeed);
+          if (hiringChannels.length === 0) {
+            const agentName = hiringSeed?.agentName || 'unknown-agent';
+            this.logger.error(
+              `Invalid seed for user "${userSeed.email}": agent hiring "${agentName}" has no channels configured.`,
+            );
+            throw new Error(
+              `Invalid seed-data.json: user "${userSeed.email}" agent hiring "${agentName}" must include at least one channel in agentHirings[].channels.`,
+            );
+          }
+        };
+
         this.logger.log(
           `Processing user: ${userSeed.email} (${userSeed.name})`,
         );
@@ -168,6 +186,7 @@ export class SeederService implements OnApplicationBootstrap {
 
         // Process first agent hiring using onboarding service
         const firstAgentHiring = userSeed.agentHirings[0];
+        assertHiringChannelsOrThrow(firstAgentHiring);
         const firstAgent = agentsMap.get(firstAgentHiring.agentName);
         if (!firstAgent) {
           this.logger.warn(
@@ -176,27 +195,27 @@ export class SeederService implements OnApplicationBootstrap {
           continue;
         }
 
-        // Build channels DTO based on user's channel names
+        // Build channels DTO based on the hired agent's channel config
         const channelsDto = [];
-        for (const channelName of userSeed.channelNames) {
-          const channelInfo = channelsMap.get(channelName);
+        const firstHiringChannels = resolveHiringChannels(firstAgentHiring);
+        for (const channelSeed of firstHiringChannels) {
+          const channelInfo = channelsMap.get(channelSeed.channelName);
           if (!channelInfo) {
             this.logger.warn(
-              `Channel "${channelName}" not found for user "${userSeed.email}". Skipping.`,
+              `Channel "${channelSeed.channelName}" not found for user "${userSeed.email}". Skipping.`,
             );
             continue;
           }
 
           const provider =
-            (channelInfo.config as any).defaultProvider ||
-            channelInfo.channel.supportedProviders[0];
+            channelSeed.provider || channelInfo.channel.supportedProviders[0];
 
           channelsDto.push({
             channelId: channelInfo.channel._id.toString(),
             provider: provider,
-            status: 'active',
-            credentials: channelInfo.config.channelConfig,
-            llmConfig: channelInfo.config.llmConfig,
+            status: channelSeed.status || 'active',
+            credentials: channelSeed.credentials,
+            llmConfig: channelSeed.llmConfig,
           });
         }
 
@@ -245,25 +264,29 @@ export class SeederService implements OnApplicationBootstrap {
               continue;
             }
 
+            assertHiringChannelsOrThrow(additionalHiring);
+
             // Prepare channels for additional agent
             const additionalChannels = [];
-            for (const channelName of userSeed.channelNames) {
-              const channelInfo = channelsMap.get(channelName);
+            const additionalHiringChannels =
+              resolveHiringChannels(additionalHiring);
+
+            for (const channelSeed of additionalHiringChannels) {
+              const channelInfo = channelsMap.get(channelSeed.channelName);
               if (!channelInfo) {
                 continue;
               }
 
               const provider =
-                (channelInfo.config as any).defaultProvider ||
-                channelInfo.channel.supportedProviders[0];
+                channelSeed.provider || channelInfo.channel.supportedProviders[0];
 
               // Handle phone number for WhatsApp channels
               let phoneNumberId: string | undefined;
               if (
-                channelInfo.config.channelConfig &&
-                'phoneNumberId' in channelInfo.config.channelConfig
+                channelSeed.credentials &&
+                'phoneNumberId' in channelSeed.credentials
               ) {
-                phoneNumberId = channelInfo.config.channelConfig.phoneNumberId;
+                phoneNumberId = channelSeed.credentials.phoneNumberId;
               }
 
               if (phoneNumberId) {
@@ -300,21 +323,21 @@ export class SeederService implements OnApplicationBootstrap {
               // Handle tiktokUserId for TikTok channels
               let tiktokUserId: string | undefined;
               if (
-                channelInfo.config.channelConfig &&
-                'tiktokUserId' in channelInfo.config.channelConfig
+                channelSeed.credentials &&
+                'tiktokUserId' in channelSeed.credentials
               ) {
-                tiktokUserId = channelInfo.config.channelConfig.tiktokUserId;
+                tiktokUserId = channelSeed.credentials.tiktokUserId;
               }
 
               additionalChannels.push({
                 channelId: channelInfo.channel._id as Types.ObjectId,
                 provider: provider.toLowerCase(),
-                status: 'active',
-                credentials: encryptRecord(channelInfo.config.channelConfig),
+                status: channelSeed.status || 'active',
+                credentials: encryptRecord(channelSeed.credentials),
                 tiktokUserId,
                 llmConfig: {
-                  ...channelInfo.config.llmConfig,
-                  apiKey: encrypt(channelInfo.config.llmConfig.apiKey),
+                  ...channelSeed.llmConfig,
+                  apiKey: encrypt(channelSeed.llmConfig.apiKey),
                 },
               });
             }
@@ -341,8 +364,11 @@ export class SeederService implements OnApplicationBootstrap {
       this.logger.log('Seeding complete!');
     } catch (error) {
       this.logger.error('Seeding failed', error);
-      // Re-throw if it's our specific consistency error, otherwise log and continue
-      if (error.message.includes('Database is in an inconsistent state')) {
+      // Re-throw explicit data integrity/seed contract errors
+      if (
+        error?.message?.includes('Database is in an inconsistent state') ||
+        error?.message?.includes('Invalid seed-data.json')
+      ) {
           throw error;
       }
     }

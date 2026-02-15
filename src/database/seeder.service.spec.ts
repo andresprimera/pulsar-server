@@ -310,5 +310,156 @@ describe('SeederService', () => {
         }),
       );
     });
+
+    it('should use per-hiring channel credentials when building onboarding DTO', async () => {
+      process.env.NODE_ENV = 'development';
+
+      mockUserRepository.findByEmail.mockResolvedValue(null);
+      mockAgentModel.findOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
+      });
+      mockAgentModel.create.mockResolvedValue({
+        _id: mockAgentId,
+        name: SEED_DATA.agents[0].name,
+      });
+
+      mockChannelRepository.findOrCreateByName
+        .mockResolvedValueOnce({
+          _id: 'wa-channel-id',
+          name: 'WhatsApp',
+          supportedProviders: ['meta', 'twilio'],
+        })
+        .mockResolvedValueOnce({
+          _id: 'tiktok-channel-id',
+          name: 'TikTok',
+          supportedProviders: ['tiktok'],
+        })
+        .mockResolvedValueOnce({
+          _id: 'email-channel-id',
+          name: 'Email',
+          supportedProviders: ['smtp', 'sendgrid'],
+        });
+
+      await service.onApplicationBootstrap();
+
+      expect(mockOnboardingService.registerAndHire).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channels: expect.arrayContaining([
+            expect.objectContaining({
+              channelId: 'wa-channel-id',
+              provider: 'meta',
+              credentials: expect.objectContaining({
+                phoneNumberId:
+                  SEED_DATA.users[0].agentHirings[0].channels[0].credentials
+                    .phoneNumberId,
+              }),
+            }),
+            expect.objectContaining({
+              channelId: 'email-channel-id',
+              provider: 'smtp',
+              credentials: expect.objectContaining({
+                email: 'codingboxapp@gmail.com',
+              }),
+            }),
+          ]),
+        }),
+      );
+    });
+
+    it('should fail fast when an agent hiring has no channels', async () => {
+      process.env.NODE_ENV = 'development';
+
+      const originalChannels = SEED_DATA.users[0].agentHirings[0].channels;
+      (SEED_DATA.users[0].agentHirings[0] as any).channels = [];
+
+      try {
+        mockUserRepository.findByEmail.mockResolvedValue(null);
+        mockAgentModel.findOne.mockReturnValue({
+          exec: jest.fn().mockResolvedValue(null),
+        });
+        mockAgentModel.create.mockResolvedValue({
+          _id: mockAgentId,
+          name: SEED_DATA.agents[0].name,
+        });
+        mockChannelRepository.findOrCreateByName.mockResolvedValue({
+          _id: 'channel-id',
+          name: 'WhatsApp',
+          supportedProviders: ['meta', 'twilio'],
+        });
+
+        await expect(service.onApplicationBootstrap()).rejects.toThrow(
+          /Invalid seed-data\.json/,
+        );
+      } finally {
+        (SEED_DATA.users[0].agentHirings[0] as any).channels = originalChannels;
+      }
+    });
+
+    it('should use additional hiring phone number for client phone resolution', async () => {
+      process.env.NODE_ENV = 'development';
+
+      const originalUsers = SEED_DATA.users;
+      (SEED_DATA as any).users = [SEED_DATA.users[2]];
+
+      const customerServiceAgentId = new Types.ObjectId(
+        'bbbbbbbbbbbbbbbbbbbbbbbb',
+      );
+      const salesAgentId = new Types.ObjectId('cccccccccccccccccccccccc');
+
+      mockUserRepository.findByEmail.mockResolvedValue(null);
+      mockAgentModel.findOne
+        .mockReturnValueOnce({
+          exec: jest.fn().mockResolvedValue({
+            _id: customerServiceAgentId,
+            name: SEED_DATA.agents[0].name,
+          }),
+        })
+        .mockReturnValueOnce({
+          exec: jest.fn().mockResolvedValue({
+            _id: salesAgentId,
+            name: SEED_DATA.agents[1].name,
+          }),
+        });
+
+      mockChannelRepository.findOrCreateByName
+        .mockResolvedValueOnce({
+          _id: 'wa-channel-id',
+          name: 'WhatsApp',
+          supportedProviders: ['meta', 'twilio'],
+        })
+        .mockResolvedValueOnce({
+          _id: 'tiktok-channel-id',
+          name: 'TikTok',
+          supportedProviders: ['tiktok'],
+        })
+        .mockResolvedValueOnce({
+          _id: 'email-channel-id',
+          name: 'Email',
+          supportedProviders: ['smtp', 'sendgrid'],
+        });
+
+      const onboardingResultForUser3 = {
+        ...mockOnboardingResult,
+        client: {
+          ...mockOnboardingResult.client,
+          _id: '507f1f77bcf86cd799439011',
+        },
+      };
+      mockOnboardingService.registerAndHire.mockResolvedValueOnce(
+        onboardingResultForUser3,
+      );
+
+      try {
+        await service.onApplicationBootstrap();
+
+        expect(mockClientPhoneRepository.resolveOrCreate).toHaveBeenCalledWith(
+          '507f1f77bcf86cd799439011',
+          '573332574069',
+          { provider: 'meta' },
+        );
+      } finally {
+        (SEED_DATA as any).users = originalUsers;
+      }
+    });
   });
 });
