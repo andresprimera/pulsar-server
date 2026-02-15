@@ -5,12 +5,12 @@ import { WhatsappService } from './whatsapp.service';
 import { AgentService } from '../../agent/agent.service';
 import { AgentRepository } from '../../database/repositories/agent.repository';
 import { LlmProvider } from '../../agent/llm/provider.enum';
-import { WhatsappRoutingService } from './whatsapp-routing.service';
+import { AgentRoutingService } from '../shared/agent-routing.service';
 
 describe('WhatsappService', () => {
   let service: WhatsappService;
   let agentService: jest.Mocked<AgentService>;
-  let whatsappRoutingService: jest.Mocked<WhatsappRoutingService>;
+  let agentRoutingService: jest.Mocked<AgentRoutingService>;
   let agentRepository: jest.Mocked<AgentRepository>;
   let loggerLogSpy: jest.SpyInstance;
   let loggerWarnSpy: jest.SpyInstance;
@@ -35,7 +35,7 @@ describe('WhatsappService', () => {
           useValue: { run: jest.fn() },
         },
         {
-          provide: WhatsappRoutingService,
+          provide: AgentRoutingService,
           useValue: { resolveRoute: jest.fn() },
         },
         {
@@ -47,7 +47,7 @@ describe('WhatsappService', () => {
 
     service = module.get<WhatsappService>(WhatsappService);
     agentService = module.get(AgentService);
-    whatsappRoutingService = module.get(WhatsappRoutingService);
+    agentRoutingService = module.get(AgentRoutingService);
     agentRepository = module.get(AgentRepository);
 
     // Spy on Logger.prototype since a new Logger() is instantiated in the service
@@ -158,12 +158,12 @@ describe('WhatsappService', () => {
 
     it('should return early when payload has no messages', async () => {
       await service.handleIncoming({});
-      expect(whatsappRoutingService.resolveRoute).not.toHaveBeenCalled();
+      expect(agentRoutingService.resolveRoute).not.toHaveBeenCalled();
     });
 
     it('should return early when payload has no entry', async () => {
       await service.handleIncoming({ entry: [] });
-      expect(whatsappRoutingService.resolveRoute).not.toHaveBeenCalled();
+      expect(agentRoutingService.resolveRoute).not.toHaveBeenCalled();
     });
 
     it('should return early when message type is not text', async () => {
@@ -173,7 +173,7 @@ describe('WhatsappService', () => {
     });
 
     it('should log warning when no route is found for phoneNumberId', async () => {
-      whatsappRoutingService.resolveRoute.mockResolvedValue({
+      agentRoutingService.resolveRoute.mockResolvedValue({
         kind: 'unroutable',
         reason: 'no-candidates',
       });
@@ -190,7 +190,7 @@ describe('WhatsappService', () => {
     });
 
     it('should send clarification prompt when routing is ambiguous', async () => {
-      whatsappRoutingService.resolveRoute.mockResolvedValue({
+      agentRoutingService.resolveRoute.mockResolvedValue({
         kind: 'ambiguous',
         candidates: [
           {
@@ -213,7 +213,7 @@ describe('WhatsappService', () => {
     });
 
     it('should call agentService.run with correct input and context', async () => {
-      whatsappRoutingService.resolveRoute.mockResolvedValue(mockResolvedRoute as any);
+      agentRoutingService.resolveRoute.mockResolvedValue(mockResolvedRoute as any);
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({
         reply: { type: 'text', text: 'Hello' },
@@ -241,7 +241,7 @@ describe('WhatsappService', () => {
     });
 
     it('should log outbound message when reply exists', async () => {
-      whatsappRoutingService.resolveRoute.mockResolvedValue(mockResolvedRoute as any);
+      agentRoutingService.resolveRoute.mockResolvedValue(mockResolvedRoute as any);
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({
         reply: { type: 'text', text: 'Echo response' },
@@ -256,7 +256,7 @@ describe('WhatsappService', () => {
     });
 
     it('should not log outbound message when reply is undefined', async () => {
-      whatsappRoutingService.resolveRoute.mockResolvedValue(mockResolvedRoute as any);
+      agentRoutingService.resolveRoute.mockResolvedValue(mockResolvedRoute as any);
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({});
 
@@ -269,7 +269,7 @@ describe('WhatsappService', () => {
     });
 
     it('should skip processing when agent is not active', async () => {
-      whatsappRoutingService.resolveRoute.mockResolvedValue(mockResolvedRoute as any);
+      agentRoutingService.resolveRoute.mockResolvedValue(mockResolvedRoute as any);
       agentRepository.findActiveById.mockResolvedValue(null);
 
       const payload = createPayload();

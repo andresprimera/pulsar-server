@@ -9,13 +9,13 @@ import { ClientAgent, HireChannelConfig } from '../../database/schemas/client-ag
 import { createLLMModel } from '../../agent/llm/llm.factory';
 import { LlmProvider } from '../../agent/llm/provider.enum';
 
-interface RouteCandidate {
+export interface RouteCandidate {
   clientAgent: ClientAgent;
   channelConfig: HireChannelConfig;
   agentName: string;
 }
 
-export type WhatsappRouteDecision =
+export type AgentRouteDecision =
   | {
       kind: 'resolved';
       candidate: RouteCandidate;
@@ -27,12 +27,26 @@ export type WhatsappRouteDecision =
     }
   | {
       kind: 'unroutable';
-      reason: 'missing-phone-number' | 'no-candidates';
+      reason: 'missing-identifier' | 'no-candidates';
     };
 
+/**
+ * Channel-specific routing context
+ */
+export interface ChannelRoutingContext {
+  /** Channel identifier (phoneNumberId, email, tiktokUserId, etc.) */
+  channelIdentifier: string;
+  /** External user identifier (phone, email, userId) */
+  externalUserId: string;
+  /** Incoming message text */
+  incomingText: string;
+  /** Channel type for logging */
+  channelType: 'whatsapp' | 'email' | 'tiktok';
+}
+
 @Injectable()
-export class WhatsappRoutingService {
-  private readonly logger = new Logger(WhatsappRoutingService.name);
+export class AgentRoutingService {
+  private readonly logger = new Logger(AgentRoutingService.name);
   private readonly enableSemanticRouting: boolean;
 
   constructor(
@@ -45,19 +59,27 @@ export class WhatsappRoutingService {
       process.env.ENABLE_SEMANTIC_ROUTING === 'true';
   }
 
+  /**
+   * Resolve which agent should handle an incoming message.
+   * Works for any channel type (WhatsApp, Email, TikTok).
+   */
   async resolveRoute(
-    phoneNumberId: string | undefined,
-    externalUserId: string,
-    incomingText: string,
-  ): Promise<WhatsappRouteDecision> {
-    if (!phoneNumberId) {
-      return { kind: 'unroutable', reason: 'missing-phone-number' };
+    context: ChannelRoutingContext,
+  ): Promise<AgentRouteDecision> {
+    if (!context.channelIdentifier) {
+      return { kind: 'unroutable', reason: 'missing-identifier' };
     }
 
-    const clientAgents =
-      await this.clientAgentRepository.findActiveByPhoneNumberId(phoneNumberId);
+    const clientAgents = await this.findCandidatesByChannel(
+      context.channelType,
+      context.channelIdentifier,
+    );
 
-    const candidates = await this.buildCandidates(clientAgents, phoneNumberId);
+    const candidates = await this.buildCandidates(
+      clientAgents,
+      context.channelIdentifier,
+      context.channelType,
+    );
 
     if (candidates.length === 0) {
       return { kind: 'unroutable', reason: 'no-candidates' };
@@ -67,17 +89,17 @@ export class WhatsappRoutingService {
       return { kind: 'resolved', candidate: candidates[0] };
     }
 
-    const explicit = this.resolveExplicitSelection(candidates, incomingText);
+    const explicit = this.resolveExplicitSelection(candidates, context.incomingText);
     if (explicit) {
       return { kind: 'resolved', candidate: explicit };
     }
 
-    const sticky = await this.resolveFromRecentHistory(candidates, externalUserId);
+    const sticky = await this.resolveFromRecentHistory(candidates, context.externalUserId);
     if (sticky) {
       return { kind: 'resolved', candidate: sticky };
     }
 
-    const keywordBased = this.resolveFromKeywordScore(candidates, incomingText);
+    const keywordBased = this.resolveFromKeywordScore(candidates, context.incomingText);
     if (keywordBased) {
       return { kind: 'resolved', candidate: keywordBased };
     }
@@ -86,7 +108,7 @@ export class WhatsappRoutingService {
     if (this.enableSemanticRouting) {
       const semantic = await this.resolveFromSemanticAnalysis(
         candidates,
-        incomingText,
+        context.incomingText,
       );
       if (semantic) {
         return { kind: 'resolved', candidate: semantic };
@@ -104,15 +126,45 @@ export class WhatsappRoutingService {
     };
   }
 
+  /**
+   * Find candidate ClientAgents based on channel type.
+   */
+  private async findCandidatesByChannel(
+    channelType: 'whatsapp' | 'email' | 'tiktok',
+    identifier: string,
+  ): Promise<ClientAgent[]> {
+    switch (channelType) {
+      case 'whatsapp':
+        return this.clientAgentRepository.findActiveByPhoneNumberId(identifier);
+      case 'email':
+        return this.clientAgentRepository.findActiveByEmail(identifier);
+      case 'tiktok':
+        return this.clientAgentRepository.findActiveByTiktokUserId(identifier);
+    }
+  }
+
+  /**
+   * Build routing candidates by matching channel configs.
+   */
   private async buildCandidates(
     clientAgents: ClientAgent[],
-    phoneNumberId: string,
+    identifier: string,
+    channelType: 'whatsapp' | 'email' | 'tiktok',
   ): Promise<RouteCandidate[]> {
     const unresolved = clientAgents
       .map((clientAgent) => {
-        const channelConfig = clientAgent.channels.find(
-          (channel) => channel.status === 'active' && channel.phoneNumberId === phoneNumberId,
-        );
+        const channelConfig = clientAgent.channels.find((channel) => {
+          if (channel.status !== 'active') return false;
+          
+          switch (channelType) {
+            case 'whatsapp':
+              return channel.phoneNumberId === identifier;
+            case 'email':
+              return channel.email === identifier;
+            case 'tiktok':
+              return channel.tiktokUserId === identifier;
+          }
+        });
 
         if (!channelConfig) {
           return null;
@@ -292,7 +344,7 @@ export class WhatsappRoutingService {
       const apiKey = process.env.OPENAI_API_KEY;
       if (!apiKey) {
         this.logger.warn(
-          '[WhatsAppRouter] OPENAI_API_KEY missing, skipping semantic routing',
+          '[AgentRouter] OPENAI_API_KEY missing, skipping semantic routing',
         );
         return null;
       }
@@ -328,7 +380,7 @@ Respond with ONLY the number of the most appropriate agent (1, 2, etc.). If no a
         const selectedIndex = Number(trimmed) - 1;
         if (selectedIndex >= 0 && selectedIndex < candidates.length) {
           this.logger.log(
-            `[WhatsAppRouter] Semantic routing selected agent ${selectedIndex + 1}`,
+            `[AgentRouter] Semantic routing selected agent ${selectedIndex + 1}`,
           );
           return candidates[selectedIndex];
         }
@@ -337,7 +389,7 @@ Respond with ONLY the number of the most appropriate agent (1, 2, etc.). If no a
       return null;
     } catch (error) {
       this.logger.error(
-        `[WhatsAppRouter] Semantic routing failed: ${error instanceof Error ? error.message : String(error)}`,
+        `[AgentRouter] Semantic routing failed: ${error instanceof Error ? error.message : String(error)}`,
       );
       return null;
     }

@@ -9,7 +9,7 @@ import {
   loadWhatsAppConfig,
   buildMessagesUrl,
 } from './whatsapp.config';
-import { WhatsappRoutingService } from './whatsapp-routing.service';
+import { AgentRoutingService } from '../shared/agent-routing.service';
 
 @Injectable()
 export class WhatsappService {
@@ -19,7 +19,7 @@ export class WhatsappService {
   constructor(
     private readonly agentService: AgentService,
     private readonly agentRepository: AgentRepository,
-    private readonly whatsappRoutingService: WhatsappRoutingService,
+    private readonly agentRoutingService: AgentRoutingService,
   ) {
     this.config = loadWhatsAppConfig();
   }
@@ -85,11 +85,12 @@ export class WhatsappService {
     );
     this.logger.log(`[WhatsApp] Extracted phoneNumberId: ${phoneNumberId}`);
 
-    const routeDecision = await this.whatsappRoutingService.resolveRoute(
-      phoneNumberId,
-      message.from,
-      message.text.body,
-    );
+    const routeDecision = await this.agentRoutingService.resolveRoute({
+      channelIdentifier: phoneNumberId,
+      externalUserId: message.from,
+      incomingText: message.text.body,
+      channelType: 'whatsapp',
+    });
 
     if (routeDecision.kind === 'unroutable') {
       this.logger.warn(

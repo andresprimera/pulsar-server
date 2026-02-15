@@ -3,7 +3,7 @@ import { AgentService } from '../../agent/agent.service';
 import { AgentInput } from '../../agent/contracts/agent-input';
 import { AgentContext } from '../../agent/contracts/agent-context';
 import { AgentRepository } from '../../database/repositories/agent.repository';
-import { ClientAgentRepository } from '../../database/repositories/client-agent.repository';
+import { AgentRoutingService } from '../shared/agent-routing.service';
 import { decryptRecord, decrypt } from '../../database/utils/crypto.util';
 import { TIKTOK_API_BASE_URL } from './tiktok.config';
 
@@ -13,7 +13,7 @@ export class TiktokService {
 
   constructor(
     private readonly agentService: AgentService,
-    private readonly clientAgentRepository: ClientAgentRepository,
+    private readonly agentRoutingService: AgentRoutingService,
     private readonly agentRepository: AgentRepository,
   ) {}
 
@@ -37,30 +37,31 @@ export class TiktokService {
       `[TikTok] Incoming message from sender=${data.sender?.user_id} to recipient=${recipientUserId}`,
     );
 
-    // Route: find active ClientAgent with matching tiktokUserId in embedded channels
-    const clientAgent =
-      await this.clientAgentRepository.findOneByTiktokUserId(recipientUserId);
+    // Route: resolve which agent should handle this message
+    const routeDecision = await this.agentRoutingService.resolveRoute({
+      channelIdentifier: recipientUserId,
+      externalUserId: data.sender.user_id,
+      incomingText: data.message.text,
+      channelType: 'tiktok',
+    });
 
-    if (!clientAgent) {
+    if (routeDecision.kind === 'unroutable') {
       this.logger.warn(
         `[TikTok] No active ClientAgent found for tiktokUserId=${recipientUserId}.`,
       );
       return;
     }
 
-    // Extract the specific channel config
-    const channelConfig = clientAgent.channels.find(
-      (c) =>
-        c.status === 'active' &&
-        c.credentials?.tiktokUserId === recipientUserId,
-    );
-
-    if (!channelConfig) {
+    if (routeDecision.kind === 'ambiguous') {
+      // TikTok doesn't support channel-agnostic sending from this context
+      // Future: implement ambiguity prompt via TikTok API
       this.logger.warn(
-        `[TikTok] Channel config not found in ClientAgent for tiktokUserId=${recipientUserId} (mismatch).`,
+        `[TikTok] Multiple agents for tiktokUserId=${recipientUserId}, cannot send disambiguation prompt yet.`,
       );
       return;
     }
+
+    const { clientAgent, channelConfig } = routeDecision.candidate;
 
     // Guard: credentials may be undefined if select('+channels.credentials') was missed
     if (!channelConfig.credentials) {

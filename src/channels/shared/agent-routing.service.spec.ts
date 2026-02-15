@@ -4,10 +4,10 @@ import { AgentRepository } from '../../database/repositories/agent.repository';
 import { ClientAgentRepository } from '../../database/repositories/client-agent.repository';
 import { MessageRepository } from '../../database/repositories/message.repository';
 import { UserRepository } from '../../database/repositories/user.repository';
-import { WhatsappRoutingService } from './whatsapp-routing.service';
+import { AgentRoutingService } from './agent-routing.service';
 
-describe('WhatsappRoutingService', () => {
-  let service: WhatsappRoutingService;
+describe('AgentRoutingService', () => {
+  let service: AgentRoutingService;
   let clientAgentRepository: jest.Mocked<ClientAgentRepository>;
   let userRepository: jest.Mocked<UserRepository>;
   let messageRepository: jest.Mocked<MessageRepository>;
@@ -46,10 +46,14 @@ describe('WhatsappRoutingService', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        WhatsappRoutingService,
+        AgentRoutingService,
         {
           provide: ClientAgentRepository,
-          useValue: { findActiveByPhoneNumberId: jest.fn() },
+          useValue: { 
+            findActiveByPhoneNumberId: jest.fn(),
+            findActiveByEmail: jest.fn(),
+            findActiveByTiktokUserId: jest.fn(),
+          },
         },
         {
           provide: UserRepository,
@@ -66,7 +70,7 @@ describe('WhatsappRoutingService', () => {
       ],
     }).compile();
 
-    service = module.get(WhatsappRoutingService);
+    service = module.get(AgentRoutingService);
     clientAgentRepository = module.get(ClientAgentRepository);
     userRepository = module.get(UserRepository);
     messageRepository = module.get(MessageRepository);
@@ -85,7 +89,12 @@ describe('WhatsappRoutingService', () => {
       status: 'active',
     } as any);
 
-    const result = await service.resolveRoute('phone-1', 'user-1', 'hello');
+    const result = await service.resolveRoute({
+      channelIdentifier: 'phone-1',
+      externalUserId: 'user-1',
+      incomingText: 'hello',
+      channelType: 'whatsapp',
+    });
 
     expect(result.kind).toBe('resolved');
   });
@@ -111,7 +120,12 @@ describe('WhatsappRoutingService', () => {
         status: 'active',
       } as any);
 
-    const result = await service.resolveRoute('phone-1', 'user-1', '2');
+    const result = await service.resolveRoute({
+      channelIdentifier: 'phone-1',
+      externalUserId: 'user-1',
+      incomingText: '2',
+      channelType: 'whatsapp',
+    });
 
     expect(result.kind).toBe('resolved');
     if (result.kind === 'resolved') {
@@ -143,7 +157,12 @@ describe('WhatsappRoutingService', () => {
     userRepository.findByExternalUserId.mockResolvedValue(null);
     messageRepository.findLatestByUserAndAgents.mockResolvedValue(null);
 
-    const result = await service.resolveRoute('phone-1', 'user-1', 'hello there');
+    const result = await service.resolveRoute({
+      channelIdentifier: 'phone-1',
+      externalUserId: 'user-1',
+      incomingText: 'hello there',
+      channelType: 'whatsapp',
+    });
 
     expect(result.kind).toBe('ambiguous');
     if (result.kind === 'ambiguous') {

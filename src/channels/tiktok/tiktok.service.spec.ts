@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
 import { TiktokService } from './tiktok.service';
 import { AgentService } from '../../agent/agent.service';
-import { ClientAgentRepository } from '../../database/repositories/client-agent.repository';
+import { AgentRoutingService } from '../shared/agent-routing.service';
 import { AgentRepository } from '../../database/repositories/agent.repository';
 import { AgentOutput } from '../../agent/contracts/agent-output';
 import { encrypt } from '../../database/utils/crypto.util';
@@ -10,7 +10,7 @@ import { encrypt } from '../../database/utils/crypto.util';
 describe('TiktokService', () => {
   let service: TiktokService;
   let agentService: jest.Mocked<AgentService>;
-  let clientAgentRepository: jest.Mocked<ClientAgentRepository>;
+  let agentRoutingService: jest.Mocked<AgentRoutingService>;
   let agentRepository: jest.Mocked<AgentRepository>;
   let loggerLogSpy: jest.SpyInstance;
   let loggerWarnSpy: jest.SpyInstance;
@@ -35,8 +35,8 @@ describe('TiktokService', () => {
           useValue: { run: jest.fn() },
         },
         {
-          provide: ClientAgentRepository,
-          useValue: { findOneByTiktokUserId: jest.fn() },
+          provide: AgentRoutingService,
+          useValue: { resolveRoute: jest.fn() },
         },
         {
           provide: AgentRepository,
@@ -47,7 +47,7 @@ describe('TiktokService', () => {
 
     service = module.get<TiktokService>(TiktokService);
     agentService = module.get(AgentService);
-    clientAgentRepository = module.get(ClientAgentRepository);
+    agentRoutingService = module.get(AgentRoutingService);
     agentRepository = module.get(AgentRepository);
 
     loggerLogSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
@@ -121,22 +121,22 @@ describe('TiktokService', () => {
 
     it('should ignore non-message events', async () => {
       await service.handleIncoming(createPayload({ root: { event: 'other_event' } }));
-      expect(clientAgentRepository.findOneByTiktokUserId).not.toHaveBeenCalled();
+      expect(agentRoutingService.resolveRoute).not.toHaveBeenCalled();
     });
 
     it('should ignore messages without text', async () => {
       await service.handleIncoming(createPayload({ message: { type: 'image' } }));
-      expect(clientAgentRepository.findOneByTiktokUserId).not.toHaveBeenCalled();
+      expect(agentRoutingService.resolveRoute).not.toHaveBeenCalled();
     });
 
     it('should ignore messages without recipient user_id', async () => {
         await service.handleIncoming(createPayload({ recipient: { user_id: undefined } }));
         expect(loggerWarnSpy).toHaveBeenCalledWith('[TikTok] Missing recipient.user_id in payload.');
-        expect(clientAgentRepository.findOneByTiktokUserId).not.toHaveBeenCalled();
+        expect(agentRoutingService.resolveRoute).not.toHaveBeenCalled();
     });
 
     it('should log warning when no ClientAgent found for tiktokUserId', async () => {
-        clientAgentRepository.findOneByTiktokUserId.mockResolvedValue(null);
+        agentRoutingService.resolveRoute.mockResolvedValue({ kind: 'unroutable', reason: 'no-candidates' });
         await service.handleIncoming(createPayload());
         expect(loggerWarnSpy).toHaveBeenCalledWith(
             '[TikTok] No active ClientAgent found for tiktokUserId=tiktok_user_123.',
@@ -145,25 +145,23 @@ describe('TiktokService', () => {
     });
 
     it('should log warning when channel config mismatch in ClientAgent', async () => {
-        const mismatchClientAgent = {
-            ...mockClientAgent,
-            channels: [
-                {
-                    ...mockClientAgent.channels[0],
-                    credentials: { ...encryptedCredsRecord, tiktokUserId: encrypt('other_user') },
-                }
-            ]
-        };
-        clientAgentRepository.findOneByTiktokUserId.mockResolvedValue(mismatchClientAgent as any);
+        agentRoutingService.resolveRoute.mockResolvedValue({ kind: 'unroutable', reason: 'no-candidates' });
         await service.handleIncoming(createPayload());
         expect(loggerWarnSpy).toHaveBeenCalledWith(
-            '[TikTok] Channel config not found in ClientAgent for tiktokUserId=tiktok_user_123 (mismatch).',
+            '[TikTok] No active ClientAgent found for tiktokUserId=tiktok_user_123.',
         );
          expect(agentService.run).not.toHaveBeenCalled();
     });
 
     it('should process valid text message and send reply', async () => {
-      clientAgentRepository.findOneByTiktokUserId.mockResolvedValue(mockClientAgent as any);
+      agentRoutingService.resolveRoute.mockResolvedValue({
+        kind: 'resolved',
+        candidate: {
+          clientAgent: mockClientAgent,
+          channelConfig: mockClientAgent.channels[0],
+          agentName: 'Test Agent',
+        },
+      } as any);
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({
         reply: { text: 'Hello back!', type: 'text' },
@@ -171,7 +169,7 @@ describe('TiktokService', () => {
 
       await service.handleIncoming(createPayload());
 
-      expect(clientAgentRepository.findOneByTiktokUserId).toHaveBeenCalledWith('tiktok_user_123');
+      expect(agentRoutingService.resolveRoute).toHaveBeenCalled();
       expect(agentService.run).toHaveBeenCalled();
       
       // Verify fetch was called with correct args
@@ -189,7 +187,14 @@ describe('TiktokService', () => {
     });
 
     it('should handle API errors when sending reply', async () => {
-      clientAgentRepository.findOneByTiktokUserId.mockResolvedValue(mockClientAgent as any);
+      agentRoutingService.resolveRoute.mockResolvedValue({
+        kind: 'resolved',
+        candidate: {
+          clientAgent: mockClientAgent,
+          channelConfig: mockClientAgent.channels[0],
+          agentName: 'Test Agent',
+        },
+      } as any);
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({
         reply: { text: 'Hello back!', type: 'text' },

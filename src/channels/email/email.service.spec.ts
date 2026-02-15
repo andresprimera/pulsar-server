@@ -4,6 +4,7 @@ import { EmailService, EmailCredentials } from './email.service';
 import { AgentService } from '../../agent/agent.service';
 import { ClientAgentRepository } from '../../database/repositories/client-agent.repository';
 import { AgentRepository } from '../../database/repositories/agent.repository';
+import { AgentRoutingService } from '../shared/agent-routing.service';
 import { ClientAgent } from '../../database/schemas/client-agent.schema';
 import { LlmProvider } from '../../agent/llm/provider.enum';
 import { IncomingEmailDto } from './dto/incoming-email.dto';
@@ -27,6 +28,7 @@ describe('EmailService', () => {
   let agentService: jest.Mocked<AgentService>;
   let clientAgentRepository: jest.Mocked<ClientAgentRepository>;
   let agentRepository: jest.Mocked<AgentRepository>;
+  let agentRoutingService: jest.Mocked<AgentRoutingService>;
   let loggerLogSpy: jest.SpyInstance;
   let loggerWarnSpy: jest.SpyInstance;
   let loggerErrorSpy: jest.SpyInstance;
@@ -102,6 +104,10 @@ describe('EmailService', () => {
           provide: AgentRepository,
           useValue: { findActiveById: jest.fn() },
         },
+        {
+          provide: AgentRoutingService,
+          useValue: { resolveRoute: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -109,6 +115,17 @@ describe('EmailService', () => {
     agentService = module.get(AgentService);
     clientAgentRepository = module.get(ClientAgentRepository);
     agentRepository = module.get(AgentRepository);
+    agentRoutingService = module.get(AgentRoutingService);
+
+    // Default routing behavior: resolve to mockClientAgent when called
+    agentRoutingService.resolveRoute.mockResolvedValue({
+      kind: 'resolved',
+      candidate: {
+        clientAgent: mockClientAgent as any,
+        channelConfig: mockChannelConfig as any,
+        agentName: 'Support Bot',
+      },
+    });
 
     loggerLogSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
     loggerWarnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
@@ -457,9 +474,6 @@ describe('EmailService', () => {
         })(),
       );
 
-      clientAgentRepository.findOneByEmail.mockResolvedValue(
-        mockClientAgent as any,
-      );
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({
         reply: { type: 'text', text: 'Reply' },
@@ -470,9 +484,12 @@ describe('EmailService', () => {
         mockClientAgent as unknown as ClientAgent,
       );
 
-      expect(clientAgentRepository.findOneByEmail).toHaveBeenCalledWith(
-        'support@example.com',
-      );
+      expect(agentRoutingService.resolveRoute).toHaveBeenCalledWith({
+        channelIdentifier: 'support@example.com',
+        externalUserId: 'sender@example.com',
+        incomingText: 'Hello there',
+        channelType: 'email',
+      });
       expect(agentService.run).toHaveBeenCalled();
       expect(mockMessageFlagsAdd).toHaveBeenCalledWith(42, ['\\Seen'], {
         uid: true,
@@ -480,21 +497,16 @@ describe('EmailService', () => {
     });
 
     it('should ignore inactive channels even if email matches', async () => {
-      const inactiveChannel = { ...mockChannelConfig, status: 'inactive' };
-      const clientAgentWithInactive = {
-        ...mockClientAgent,
-        channels: [inactiveChannel],
-      };
-
-      clientAgentRepository.findOneByEmail.mockResolvedValue(
-        clientAgentWithInactive as any,
-      );
+      agentRoutingService.resolveRoute.mockResolvedValue({
+        kind: 'unroutable',
+        reason: 'no-candidates',
+      });
 
       await service.handleIncoming(createDto());
 
       expect(loggerWarnSpy).toHaveBeenCalledWith(
         expect.stringContaining(
-          '[Email] Channel config not found in ClientAgent for email=support@example.com (mismatch).',
+          '[Email] No active ClientAgent found for email=support@example.com',
         ),
       );
       expect(agentService.run).not.toHaveBeenCalled();
@@ -555,9 +567,6 @@ describe('EmailService', () => {
         })(),
       );
 
-      clientAgentRepository.findOneByEmail.mockResolvedValue(
-        mockClientAgent as any,
-      );
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({
         reply: { type: 'text', text: 'Reply' },
@@ -568,7 +577,7 @@ describe('EmailService', () => {
         mockClientAgent as unknown as ClientAgent,
       );
 
-      expect(clientAgentRepository.findOneByEmail).toHaveBeenCalledTimes(3);
+      expect(agentRoutingService.resolveRoute).toHaveBeenCalledTimes(3);
       expect(agentService.run).toHaveBeenCalledTimes(3);
       expect(mockMessageFlagsAdd).toHaveBeenCalledTimes(3);
       expect(mockMessageFlagsAdd).toHaveBeenCalledWith(1, ['\\Seen'], {
@@ -597,9 +606,6 @@ describe('EmailService', () => {
         })(),
       );
 
-      clientAgentRepository.findOneByEmail.mockResolvedValue(
-        mockClientAgent as any,
-      );
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({});
 
@@ -609,8 +615,11 @@ describe('EmailService', () => {
       );
 
       // from should default to empty string
-      expect(clientAgentRepository.findOneByEmail).toHaveBeenCalledWith(
-        'support@example.com',
+      expect(agentRoutingService.resolveRoute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          externalUserId: '',
+          channelIdentifier: 'support@example.com',
+        }),
       );
     });
 
@@ -629,9 +638,6 @@ describe('EmailService', () => {
         })(),
       );
 
-      clientAgentRepository.findOneByEmail.mockResolvedValue(
-        mockClientAgent as any,
-      );
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({});
 
@@ -641,8 +647,10 @@ describe('EmailService', () => {
       );
 
       // to should fallback to channelConfig.email
-      expect(clientAgentRepository.findOneByEmail).toHaveBeenCalledWith(
-        'support@example.com',
+      expect(agentRoutingService.resolveRoute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channelIdentifier: 'support@example.com',
+        }),
       );
     });
 
@@ -778,8 +786,8 @@ describe('EmailService', () => {
         })(),
       );
 
-      clientAgentRepository.findOneByEmail.mockRejectedValue(
-        new Error('DB error'),
+      agentRoutingService.resolveRoute.mockRejectedValue(
+        new Error('Routing error'),
       );
 
       await service.pollMailbox(
@@ -817,9 +825,16 @@ describe('EmailService', () => {
         })(),
       );
 
-      clientAgentRepository.findOneByEmail
-        .mockRejectedValueOnce(new Error('DB error'))
-        .mockResolvedValueOnce(mockClientAgent as any);
+      agentRoutingService.resolveRoute
+        .mockRejectedValueOnce(new Error('Routing error'))
+        .mockResolvedValueOnce({
+          kind: 'resolved',
+          candidate: {
+            clientAgent: mockClientAgent as any,
+            channelConfig: mockChannelConfig as any,
+            agentName: 'Support Bot',
+          },
+        });
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({
         reply: { type: 'text', text: 'Reply' },
@@ -987,17 +1002,26 @@ describe('EmailService', () => {
     });
 
     it('should look up agent channel by recipient email', async () => {
-      clientAgentRepository.findOneByEmail.mockResolvedValue(null);
+      agentRoutingService.resolveRoute.mockResolvedValue({
+        kind: 'unroutable',
+        reason: 'no-candidates',
+      });
 
       await service.handleIncoming(createDto({ to: 'lookup@example.com' }));
 
-      expect(clientAgentRepository.findOneByEmail).toHaveBeenCalledWith(
-        'lookup@example.com',
+      expect(agentRoutingService.resolveRoute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channelIdentifier: 'lookup@example.com',
+          channelType: 'email',
+        }),
       );
     });
 
     it('should log warning when no agent found for email', async () => {
-      clientAgentRepository.findOneByEmail.mockResolvedValue(null);
+      agentRoutingService.resolveRoute.mockResolvedValue({
+        kind: 'unroutable',
+        reason: 'no-candidates',
+      });
 
       await service.handleIncoming(createDto({ to: 'unknown@example.com' }));
 
@@ -1008,7 +1032,10 @@ describe('EmailService', () => {
     });
 
     it('should not call agentRepository when no agent found', async () => {
-      clientAgentRepository.findOneByEmail.mockResolvedValue(null);
+      agentRoutingService.resolveRoute.mockResolvedValue({
+        kind: 'unroutable',
+        reason: 'no-candidates',
+      });
 
       await service.handleIncoming(createDto());
 
@@ -1024,19 +1051,17 @@ describe('EmailService', () => {
     });
 
     it('should log warning when channel config not found in agent', async () => {
-      // Agent exists but no matching channel for this email
-      const mismatchedAgent = {
-        ...mockClientAgent,
-        channels: [],
-      };
-      clientAgentRepository.findOneByEmail.mockResolvedValue(
-        mismatchedAgent as any,
-      );
+      // Routing returns ambiguous when it cannot determine the agent
+      agentRoutingService.resolveRoute.mockResolvedValue({
+        kind: 'ambiguous',
+        candidates: [],
+        prompt: 'Cannot determine agent',
+      });
 
       await service.handleIncoming(createDto({ to: 'support@example.com' }));
 
       expect(loggerWarnSpy).toHaveBeenCalledWith(
-        '[Email] Channel config not found in ClientAgent for email=support@example.com (mismatch).',
+        '[Email] Multiple agents for email=support@example.com, cannot send disambiguation prompt yet.',
       );
       expect(agentService.run).not.toHaveBeenCalled();
     });
@@ -1237,14 +1262,14 @@ describe('EmailService', () => {
         credentials: { email: 'support@example.com', password: 'secret' },
       };
 
-      const minimalClientAgent = {
-        ...mockClientAgent,
-        channels: [minimalConfig],
-      };
-
-      clientAgentRepository.findOneByEmail.mockResolvedValue(
-        minimalClientAgent as any,
-      );
+      agentRoutingService.resolveRoute.mockResolvedValue({
+        kind: 'resolved',
+        candidate: {
+          clientAgent: mockClientAgent as any,
+          channelConfig: minimalConfig as any,
+          agentName: 'Support Bot',
+        },
+      });
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
       agentService.run.mockResolvedValue({
         reply: { type: 'text', text: 'Hello' },
