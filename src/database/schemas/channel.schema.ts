@@ -8,9 +8,9 @@ export class Channel extends Document {
 
   @Prop({
     required: true,
-    enum: ['whatsapp', 'telegram', 'web', 'api', 'email', 'tiktok'],
+    enum: ['whatsapp', 'telegram', 'web', 'api', 'tiktok', 'instagram'],
   })
-  type: 'whatsapp' | 'telegram' | 'web' | 'api' | 'email' | 'tiktok';
+  type: 'whatsapp' | 'telegram' | 'web' | 'api' | 'tiktok' | 'instagram';
 
   @Prop({ required: true, type: [String] })
   supportedProviders: string[];

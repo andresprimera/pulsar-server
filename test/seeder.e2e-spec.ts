@@ -87,7 +87,7 @@ describe('Seeder (e2e)', () => {
         email: { $in: seedEmails },
       });
 
-      // Clean up seeded channels (WhatsApp and Email from seed data)
+      // Clean up seeded channels from seed data
       const seedChannelNames = SEED_DATA.channels.map((c) => c.name);
       await connection.collection('channels').deleteMany({
         name: { $in: seedChannelNames },
@@ -136,7 +136,7 @@ describe('Seeder (e2e)', () => {
   });
 
   describe('Channel Infrastructure Tests', () => {
-    it('should provision WhatsApp and Email channels', async () => {
+    it('should provision WhatsApp, TikTok, and Instagram channels', async () => {
       const whatsappChannel = await connection
         .collection('channels')
         .findOne({ name: 'WhatsApp' });
@@ -144,12 +144,19 @@ describe('Seeder (e2e)', () => {
       expect(whatsappChannel).toBeDefined();
       expect(whatsappChannel.type).toBe('whatsapp');
 
-      const emailChannel = await connection
+      const tiktokChannel = await connection
         .collection('channels')
-        .findOne({ name: 'Email' });
+        .findOne({ name: 'TikTok' });
 
-      expect(emailChannel).toBeDefined();
-      expect(emailChannel.type).toBe('email');
+      expect(tiktokChannel).toBeDefined();
+      expect(tiktokChannel.type).toBe('tiktok');
+
+      const instagramChannel = await connection
+        .collection('channels')
+        .findOne({ name: 'Instagram' });
+
+      expect(instagramChannel).toBeDefined();
+      expect(instagramChannel.type).toBe('instagram');
     });
 
     it('should set correct supportedProviders for channels', async () => {
@@ -160,12 +167,17 @@ describe('Seeder (e2e)', () => {
       expect(whatsappChannel.supportedProviders).toContain('meta');
       expect(whatsappChannel.supportedProviders).toContain('twilio');
 
-      const emailChannel = await connection
+      const tiktokChannel = await connection
         .collection('channels')
-        .findOne({ name: 'Email' });
+        .findOne({ name: 'TikTok' });
 
-      expect(emailChannel.supportedProviders).toContain('smtp');
-      expect(emailChannel.supportedProviders).toContain('sendgrid');
+      expect(tiktokChannel.supportedProviders).toContain('tiktok');
+
+      const instagramChannel = await connection
+        .collection('channels')
+        .findOne({ name: 'Instagram' });
+
+      expect(instagramChannel.supportedProviders).toContain('instagram');
     });
   });
 
@@ -216,7 +228,7 @@ describe('Seeder (e2e)', () => {
       expect(clientAgents[0].price).toBe(100);
     });
 
-    it('should configure User 1 with WhatsApp + Email channels', async () => {
+    it('should configure User 1 with WhatsApp + Instagram channels', async () => {
       const user = await connection
         .collection('users')
         .findOne({ email: 'andresprimera@gmail.com' });
@@ -237,13 +249,13 @@ describe('Seeder (e2e)', () => {
       const whatsappChannel = await connection
         .collection('channels')
         .findOne({ name: 'WhatsApp' });
-      const emailChannel = await connection
+      const instagramChannel = await connection
         .collection('channels')
-        .findOne({ name: 'Email' });
+        .findOne({ name: 'Instagram' });
 
       const channelIds = clientAgent.channels.map((c) => c.channelId.toString());
       expect(channelIds).toContain(whatsappChannel._id.toString());
-      expect(channelIds).toContain(emailChannel._id.toString());
+      expect(channelIds).toContain(instagramChannel._id.toString());
     });
   });
 
@@ -279,7 +291,7 @@ describe('Seeder (e2e)', () => {
       expect(clientAgents[0].status).toBe('active');
     });
 
-    it('should configure User 2 with WhatsApp only', async () => {
+    it('should configure User 2 with TikTok + Instagram channels', async () => {
       const user = await connection
         .collection('users')
         .findOne({ email: 'user2@example.com' });
@@ -295,15 +307,19 @@ describe('Seeder (e2e)', () => {
           agentId: salesAgent._id.toString(),
         });
 
-      expect(clientAgent.channels).toHaveLength(1);
+      expect(clientAgent.channels).toHaveLength(2);
 
-      const whatsappChannel = await connection
+      const tiktokChannel = await connection
         .collection('channels')
-        .findOne({ name: 'WhatsApp' });
+        .findOne({ name: 'TikTok' });
 
-      expect(clientAgent.channels[0].channelId.toString()).toBe(
-        whatsappChannel._id.toString(),
-      );
+      const instagramChannel = await connection
+        .collection('channels')
+        .findOne({ name: 'Instagram' });
+
+      const channelIds = clientAgent.channels.map((c) => c.channelId.toString());
+      expect(channelIds).toContain(tiktokChannel._id.toString());
+      expect(channelIds).toContain(instagramChannel._id.toString());
     });
 
     it('should persist organization client name for User 2', async () => {
@@ -387,7 +403,7 @@ describe('Seeder (e2e)', () => {
       expect(clientAgent.status).toBe('active');
     });
 
-    it('should configure both agents with WhatsApp for User 3', async () => {
+    it('should configure both agents with multichannel combinations for User 3', async () => {
       const user = await connection
         .collection('users')
         .findOne({ email: 'user3@example.com' });
@@ -402,13 +418,22 @@ describe('Seeder (e2e)', () => {
       const whatsappChannel = await connection
         .collection('channels')
         .findOne({ name: 'WhatsApp' });
+      const tiktokChannel = await connection
+        .collection('channels')
+        .findOne({ name: 'TikTok' });
+      const instagramChannel = await connection
+        .collection('channels')
+        .findOne({ name: 'Instagram' });
 
-      clientAgents.forEach((ca) => {
-        expect(ca.channels).toHaveLength(1);
-        expect(ca.channels[0].channelId.toString()).toBe(
-          whatsappChannel._id.toString(),
-        );
-      });
+      const channelCounts = clientAgents.map((ca) => ca.channels.length).sort();
+      expect(channelCounts).toEqual([2, 3]);
+
+      const flattenedChannelIds = clientAgents.flatMap((ca) =>
+        ca.channels.map((c) => c.channelId.toString()),
+      );
+      expect(flattenedChannelIds).toContain(whatsappChannel._id.toString());
+      expect(flattenedChannelIds).toContain(tiktokChannel._id.toString());
+      expect(flattenedChannelIds).toContain(instagramChannel._id.toString());
     });
 
     it('should keep distinct WhatsApp phoneNumberId per hired agent for User 3', async () => {
@@ -436,11 +461,16 @@ describe('Seeder (e2e)', () => {
           agentId: salesAgent._id.toString(),
         });
 
-      expect(customerServiceHiring.channels[0].phoneNumberId).toBe('573332574068');
-      expect(salesHiring.channels[0].phoneNumberId).toBe('573332574069');
-      expect(customerServiceHiring.channels[0].phoneNumberId).not.toBe(
-        salesHiring.channels[0].phoneNumberId,
-      );
+      const customerServicePhone = customerServiceHiring.channels.find(
+        (channel) => channel.phoneNumberId,
+      )?.phoneNumberId;
+      const salesPhone = salesHiring.channels.find(
+        (channel) => channel.phoneNumberId,
+      )?.phoneNumberId;
+
+      expect(customerServicePhone).toBe('573332574068');
+      expect(salesPhone).toBe('573332574069');
+      expect(customerServicePhone).not.toBe(salesPhone);
     });
   });
 
@@ -517,7 +547,7 @@ describe('Seeder (e2e)', () => {
 
       // Each client should have their phone numbers
       expect(user1Phones.length).toBeGreaterThan(0);
-      expect(user2Phones.length).toBeGreaterThan(0);
+      expect(user2Phones.length).toBe(0);
 
       // Verify they can share the same phoneNumberId (different clients can use same number)
       // This is allowed by the schema

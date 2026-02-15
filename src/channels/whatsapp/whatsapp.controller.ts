@@ -1,8 +1,10 @@
-import { Controller, Get, Post, Query, Body, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Query, Body, HttpCode, Logger } from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
 
 @Controller('whatsapp')
 export class WhatsappController {
+  private readonly logger = new Logger(WhatsappController.name);
+
   constructor(private readonly whatsappService: WhatsappService) {}
 
   @Get('webhook')
@@ -17,7 +19,7 @@ export class WhatsappController {
   @Post('webhook')
   @HttpCode(200)
   async handleWebhook(@Body() payload: unknown): Promise<string> {
-    console.dir({ payload }, { depth: null });
+    this.logger.log(`Incoming WhatsApp webhook payload: ${JSON.stringify(payload)}`);
     await this.whatsappService.handleIncoming(payload);
     return 'ok';
   }

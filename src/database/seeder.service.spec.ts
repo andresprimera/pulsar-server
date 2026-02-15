@@ -56,6 +56,9 @@ describe('SeederService', () => {
   };
 
   beforeEach(async () => {
+    process.env.SECRET_ENCRYPTION_KEY =
+      '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+
     mockAgentModel = {
       findOne: jest.fn(),
       create: jest.fn(),
@@ -145,10 +148,35 @@ describe('SeederService', () => {
     loggerErrorSpy?.mockRestore();
     delete process.env.NODE_ENV;
     delete process.env.SEED_DB;
+    delete process.env.SECRET_ENCRYPTION_KEY;
   });
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  it('should seed only WhatsApp, TikTok, and Instagram with multichannel coverage', () => {
+    const channelNames = SEED_DATA.channels.map((channel) => channel.name);
+    expect(channelNames).toEqual(
+      expect.arrayContaining(['WhatsApp', 'TikTok', 'Instagram']),
+    );
+    expect(channelNames).not.toContain('Email');
+
+    const combos = new Set<string>();
+    for (const user of SEED_DATA.users) {
+      for (const hiring of user.agentHirings) {
+        const key = hiring.channels
+          .map((channel) => channel.channelName)
+          .sort()
+          .join('+');
+        combos.add(key);
+      }
+    }
+
+    expect(combos.has('Instagram+WhatsApp')).toBe(true);
+    expect(combos.has('Instagram+TikTok')).toBe(true);
+    expect(combos.has('TikTok+WhatsApp')).toBe(true);
+    expect(combos.has('Instagram+TikTok+WhatsApp')).toBe(true);
   });
 
   describe('onApplicationBootstrap', () => {
@@ -352,9 +380,9 @@ describe('SeederService', () => {
           supportedProviders: ['tiktok'],
         })
         .mockResolvedValueOnce({
-          _id: 'email-channel-id',
-          name: 'Email',
-          supportedProviders: ['smtp', 'sendgrid'],
+          _id: 'instagram-channel-id',
+          name: 'Instagram',
+          supportedProviders: ['instagram'],
         });
 
       await service.onApplicationBootstrap();
@@ -372,10 +400,10 @@ describe('SeederService', () => {
               }),
             }),
             expect.objectContaining({
-              channelId: 'email-channel-id',
-              provider: 'smtp',
+              channelId: 'instagram-channel-id',
+              provider: 'instagram',
               credentials: expect.objectContaining({
-                email: 'codingboxapp@gmail.com',
+                instagramAccountId: '17841400000000001',
               }),
             }),
           ]),
@@ -450,9 +478,9 @@ describe('SeederService', () => {
           supportedProviders: ['tiktok'],
         })
         .mockResolvedValueOnce({
-          _id: 'email-channel-id',
-          name: 'Email',
-          supportedProviders: ['smtp', 'sendgrid'],
+          _id: 'instagram-channel-id',
+          name: 'Instagram',
+          supportedProviders: ['instagram'],
         });
 
       const onboardingResultForUser3 = {
@@ -511,9 +539,9 @@ describe('SeederService', () => {
           supportedProviders: ['tiktok'],
         })
         .mockResolvedValueOnce({
-          _id: 'email-channel-id',
-          name: 'Email',
-          supportedProviders: ['smtp', 'sendgrid'],
+          _id: 'instagram-channel-id',
+          name: 'Instagram',
+          supportedProviders: ['instagram'],
         });
 
       mockOnboardingService.registerAndHire
@@ -561,9 +589,9 @@ describe('SeederService', () => {
           supportedProviders: ['tiktok'],
         })
         .mockResolvedValueOnce({
-          _id: 'email-channel-id',
-          name: 'Email',
-          supportedProviders: ['smtp', 'sendgrid'],
+          _id: 'instagram-channel-id',
+          name: 'Instagram',
+          supportedProviders: ['instagram'],
         });
 
       mockOnboardingService.registerAndHire.mockRejectedValue(transientError);
@@ -605,9 +633,9 @@ describe('SeederService', () => {
           supportedProviders: ['tiktok'],
         })
         .mockResolvedValueOnce({
-          _id: 'email-channel-id',
-          name: 'Email',
-          supportedProviders: ['smtp', 'sendgrid'],
+          _id: 'instagram-channel-id',
+          name: 'Instagram',
+          supportedProviders: ['instagram'],
         });
 
       try {

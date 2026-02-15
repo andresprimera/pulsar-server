@@ -23,9 +23,9 @@
       "supportedProviders": ["tiktok"]
     },
     {
-      "name": "Email",
-      "type": "email",
-      "supportedProviders": ["smtp", "sendgrid"]
+      "name": "Instagram",
+      "type": "instagram",
+      "supportedProviders": ["instagram"]
     }
   ],
   "users": [
@@ -56,16 +56,12 @@
               }
             },
             {
-              "channelName": "Email",
-              "provider": "smtp",
+              "channelName": "Instagram",
+              "provider": "instagram",
               "status": "active",
               "credentials": {
-                "email": "codingboxapp@gmail.com",
-                "password": "Coding.2022",
-                "smtpHost": "smtp.gmail.com",
-                "smtpPort": 587,
-                "imapHost": "imap.gmail.com",
-                "imapPort": 993
+                "instagramAccountId": "17841400000000001",
+                "accessToken": "__REPLACE_ME_INSTAGRAM_ACCESS_TOKEN__"
               },
               "llmConfig": {
                 "provider": "openai",
@@ -90,13 +86,26 @@
           "price": 100,
           "channels": [
             {
-              "channelName": "WhatsApp",
-              "provider": "meta",
+              "channelName": "TikTok",
+              "provider": "tiktok",
               "status": "active",
               "credentials": {
-                "phoneNumberId": "573332574067",
-                "accessToken": "__REPLACE_ME_ACCESS_TOKEN__",
-                "webhookVerifyToken": "__REPLACE_ME_VERIFY_TOKEN__"
+                "tiktokUserId": "tiktok-recipient-2001",
+                "accessToken": "__REPLACE_ME_TIKTOK_ACCESS_TOKEN__"
+              },
+              "llmConfig": {
+                "provider": "openai",
+                "apiKey": "__REPLACE_ME_API_KEY__",
+                "model": "gpt-4o"
+              }
+            },
+            {
+              "channelName": "Instagram",
+              "provider": "instagram",
+              "status": "active",
+              "credentials": {
+                "instagramAccountId": "17841400000000002",
+                "accessToken": "__REPLACE_ME_INSTAGRAM_ACCESS_TOKEN__"
               },
               "llmConfig": {
                 "provider": "openai",
@@ -134,6 +143,20 @@
                 "apiKey": "__REPLACE_ME_API_KEY__",
                 "model": "gpt-4o"
               }
+            },
+            {
+              "channelName": "TikTok",
+              "provider": "tiktok",
+              "status": "active",
+              "credentials": {
+                "tiktokUserId": "tiktok-recipient-3001",
+                "accessToken": "__REPLACE_ME_TIKTOK_ACCESS_TOKEN__"
+              },
+              "llmConfig": {
+                "provider": "openai",
+                "apiKey": "__REPLACE_ME_API_KEY__",
+                "model": "gpt-4o"
+              }
             }
           ]
         },
@@ -149,6 +172,34 @@
                 "phoneNumberId": "573332574069",
                 "accessToken": "__REPLACE_ME_ACCESS_TOKEN__",
                 "webhookVerifyToken": "__REPLACE_ME_VERIFY_TOKEN__"
+              },
+              "llmConfig": {
+                "provider": "openai",
+                "apiKey": "__REPLACE_ME_API_KEY__",
+                "model": "gpt-4o"
+              }
+            },
+            {
+              "channelName": "TikTok",
+              "provider": "tiktok",
+              "status": "active",
+              "credentials": {
+                "tiktokUserId": "tiktok-recipient-3002",
+                "accessToken": "__REPLACE_ME_TIKTOK_ACCESS_TOKEN__"
+              },
+              "llmConfig": {
+                "provider": "openai",
+                "apiKey": "__REPLACE_ME_API_KEY__",
+                "model": "gpt-4o"
+              }
+            },
+            {
+              "channelName": "Instagram",
+              "provider": "instagram",
+              "status": "active",
+              "credentials": {
+                "instagramAccountId": "17841400000000003",
+                "accessToken": "__REPLACE_ME_INSTAGRAM_ACCESS_TOKEN__"
               },
               "llmConfig": {
                 "provider": "openai",

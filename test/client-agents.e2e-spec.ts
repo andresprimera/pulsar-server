@@ -88,7 +88,7 @@ describe('ClientAgents (e2e)', () => {
 
   const provisionChannel = async (
     name: string,
-    type: 'whatsapp' | 'email' | 'web' | 'api' | 'tiktok',
+    type: 'whatsapp' | 'instagram' | 'web' | 'api' | 'tiktok',
     supportedProviders: string[],
   ): Promise<string> => {
     const channelId = new Types.ObjectId();
@@ -130,9 +130,9 @@ describe('ClientAgents (e2e)', () => {
     const clientId = await createActiveClient(`CA E2E Client ${suffix}`);
     const agentId = await createActiveAgent(`CA E2E Agent ${suffix}`);
     const channelId = await provisionChannel(
-      `CA E2E Email Channel ${suffix}`,
-      'email',
-      ['smtp'],
+      `CA E2E Instagram Channel ${suffix}`,
+      'instagram',
+      ['instagram'],
     );
 
     const response = await request(app.getHttpServer())
@@ -144,10 +144,10 @@ describe('ClientAgents (e2e)', () => {
         channels: [
           {
             channelId,
-            provider: 'smtp',
+            provider: 'instagram',
             credentials: {
-              email: `support-${suffix}@example.com`,
-              password: 'test-password',
+              instagramAccountId: `1784140000000${suffix}`,
+              accessToken: 'ig-token',
             },
             llmConfig: {
               provider: 'openai',
@@ -168,8 +168,8 @@ describe('ClientAgents (e2e)', () => {
     expect(saved).toBeDefined();
     expect(saved?.channels).toHaveLength(1);
     expect(saved?.channels[0].channelId.toString()).toBe(channelId);
-    expect(saved?.channels[0].provider).toBe('smtp');
-    expect(saved?.channels[0].email).toBe(`support-${suffix}@example.com`);
+    expect(saved?.channels[0].provider).toBe('instagram');
+    expect(saved?.channels[0].instagramAccountId).toBe(`1784140000000${suffix}`);
   });
 
   it('should return 400 when no channels are provided', async () => {
@@ -199,7 +199,7 @@ describe('ClientAgents (e2e)', () => {
     const channelId = await provisionChannel(
       `CA E2E Web Channel ${suffix}`,
       'web',
-      ['smtp'],
+      ['instagram'],
     );
 
     const response = await request(app.getHttpServer())
@@ -211,7 +211,7 @@ describe('ClientAgents (e2e)', () => {
         channels: [
           {
             channelId,
-            provider: 'smtp',
+            provider: 'instagram',
             credentials: {},
             llmConfig: {
               provider: 'openai',
@@ -221,7 +221,7 @@ describe('ClientAgents (e2e)', () => {
           },
           {
             channelId,
-            provider: 'smtp',
+            provider: 'instagram',
             credentials: {},
             llmConfig: {
               provider: 'openai',
@@ -241,9 +241,9 @@ describe('ClientAgents (e2e)', () => {
     const clientId = await createActiveClient(`CA E2E Client ${suffix}`);
     const agentId = await createActiveAgent(`CA E2E Agent ${suffix}`);
     const channelId = await provisionChannel(
-      `CA E2E Email Channel ${suffix}`,
-      'email',
-      ['sendgrid'],
+      `CA E2E Instagram Channel ${suffix}`,
+      'instagram',
+      ['meta'],
     );
 
     const response = await request(app.getHttpServer())
@@ -255,7 +255,7 @@ describe('ClientAgents (e2e)', () => {
         channels: [
           {
             channelId,
-            provider: 'smtp',
+            provider: 'instagram',
             credentials: {},
             llmConfig: {
               provider: 'openai',

@@ -75,9 +75,8 @@ describe('Onboarding (e2e)', () => {
   });
 
   async function provisionChannel(name: string, type: string) {
-    // For WhatsApp, we use 'meta'. For others (web/api), we use 'smtp' as a valid fallback
-    // since 'custom' is not in ChannelProvider enum.
-    const provider = type === 'whatsapp' ? 'meta' : 'smtp';
+    // For WhatsApp, use 'meta'. For all other test channel types, use 'instagram'.
+    const provider = type === 'whatsapp' ? 'meta' : 'instagram';
     const supportedProviders = [provider];
 
     const result = await connection.collection('channels').findOneAndUpdate(
@@ -164,14 +163,7 @@ describe('Onboarding (e2e)', () => {
         .collection('client_agents')
         .findOne({ _id: new Types.ObjectId(response.body.clientAgent._id) });
 
-      if (!savedClientAgent) {
-        const allAgents = await connection
-          .collection('client_agents')
-          .find()
-          .toArray();
-        console.error('All ClientAgents:', JSON.stringify(allAgents, null, 2));
-        console.error('Looking for ID:', response.body.clientAgent._id);
-      }
+      expect(savedClientAgent).toBeDefined();
 
       expect(savedClientAgent.channels).toHaveLength(1);
       expect(savedClientAgent.channels[0].channelId.toString()).toBe(channelId);
@@ -219,7 +211,7 @@ describe('Onboarding (e2e)', () => {
           channels: [
             {
               channelId,
-              provider: 'smtp',
+              provider: 'instagram',
               credentials: {},
               llmConfig: {
                 provider: 'anthropic',
@@ -228,11 +220,6 @@ describe('Onboarding (e2e)', () => {
               },
             },
           ],
-        })
-        .expect((res) => {
-          if (res.status !== 201) {
-            console.error('Explicit Client Name Test Failed:', res.body);
-          }
         })
         .expect(201);
 
@@ -265,7 +252,7 @@ describe('Onboarding (e2e)', () => {
           channels: [
             {
               channelId,
-              provider: 'smtp',
+              provider: 'instagram',
               credentials: {},
               llmConfig: {
                 provider: 'openai',
@@ -274,11 +261,6 @@ describe('Onboarding (e2e)', () => {
               },
             },
           ],
-        })
-        .expect((res) => {
-          if (res.status !== 201) {
-            console.error('Normalize Email Test Failed:', res.body);
-          }
         })
         .expect(201);
 
@@ -304,16 +286,11 @@ describe('Onboarding (e2e)', () => {
           channels: [
             {
               channelId: channelId1,
-              provider: 'smtp',
+              provider: 'instagram',
               credentials: {},
               llmConfig: { provider: 'openai', apiKey: 'key', model: 'gpt-4' },
             },
           ],
-        })
-        .expect((res) => {
-          if (res.status !== 201) {
-            console.error('Duplicate Email Test (First Reg) Failed:', res.body);
-          }
         })
         .expect(201);
 
@@ -330,7 +307,7 @@ describe('Onboarding (e2e)', () => {
           channels: [
             {
               channelId: channelId2,
-              provider: 'smtp',
+              provider: 'instagram',
               credentials: {},
               llmConfig: { provider: 'openai', apiKey: 'key', model: 'gpt-4' },
             },
@@ -370,11 +347,6 @@ describe('Onboarding (e2e)', () => {
               llmConfig: { provider: 'openai', apiKey: 'key', model: 'gpt-4' },
             },
           ],
-        })
-        .expect((res) => {
-          if (res.status !== 201) {
-            console.error('Duplicate Phone Test (First Reg) Failed:', res.body);
-          }
         })
         .expect(201);
 
@@ -442,7 +414,7 @@ describe('Onboarding (e2e)', () => {
           channels: [
             {
               channelId,
-              provider: 'smtp',
+              provider: 'instagram',
               credentials: {},
               llmConfig: { provider: 'openai', apiKey: 'key', model: 'gpt-4' },
             },
@@ -472,7 +444,7 @@ describe('Onboarding (e2e)', () => {
           channels: [
             {
               channelId,
-              provider: 'smtp',
+              provider: 'instagram',
               credentials: {},
               llmConfig: { provider: 'openai', apiKey: 'key', model: 'gpt-4' },
             },
@@ -499,7 +471,7 @@ describe('Onboarding (e2e)', () => {
           channels: [
             {
               channelId,
-              provider: 'smtp',
+              provider: 'instagram',
               credentials: {},
               llmConfig: { provider: 'openai', apiKey: 'key', model: 'gpt-4' },
             },
@@ -526,7 +498,7 @@ describe('Onboarding (e2e)', () => {
             channels: [
               {
                 channelId,
-                provider: 'smtp',
+                provider: 'instagram',
                 credentials: {},
                 llmConfig: {
                   provider: 'openai',
@@ -556,7 +528,7 @@ describe('Onboarding (e2e)', () => {
             channels: [
               {
                 channelId,
-                provider: 'smtp',
+                provider: 'instagram',
                 credentials: {},
                 llmConfig: {
                   provider: 'openai',
@@ -586,7 +558,7 @@ describe('Onboarding (e2e)', () => {
             channels: [
               {
                 channelId,
-                provider: 'smtp',
+                provider: 'instagram',
                 credentials: {},
                 llmConfig: {
                   provider: 'openai',
@@ -616,7 +588,7 @@ describe('Onboarding (e2e)', () => {
             channels: [
               {
                 channelId,
-                provider: 'smtp',
+                provider: 'instagram',
                 credentials: {},
                 llmConfig: {
                   provider: 'openai',
@@ -676,7 +648,7 @@ describe('Onboarding (e2e)', () => {
             channels: [
               {
                 channelId,
-                provider: 'smtp',
+                provider: 'instagram',
                 credentials: {},
                 llmConfig: {
                   provider: 'invalid-provider',
@@ -726,7 +698,7 @@ describe('Onboarding (e2e)', () => {
             channels: [
               {
                 channelId,
-                provider: 'smtp',
+                provider: 'instagram',
                 credentials: {},
                 llmConfig: {
                   provider: 'openai',
@@ -736,7 +708,7 @@ describe('Onboarding (e2e)', () => {
               },
               {
                 channelId, // Same ID
-                provider: 'smtp',
+                provider: 'instagram',
                 credentials: {},
                 llmConfig: {
                   provider: 'openai',

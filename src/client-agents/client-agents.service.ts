@@ -98,11 +98,6 @@ export class ClientAgentsService {
         );
       }
 
-      let email: string | undefined;
-      if (channelConfig.credentials && 'email' in channelConfig.credentials) {
-        email = channelConfig.credentials.email;
-      }
-
       let tiktokUserId: string | undefined;
       if (
         channelConfig.credentials &&
@@ -111,14 +106,22 @@ export class ClientAgentsService {
         tiktokUserId = channelConfig.credentials.tiktokUserId;
       }
 
+      let instagramAccountId: string | undefined;
+      if (
+        channelConfig.credentials &&
+        'instagramAccountId' in channelConfig.credentials
+      ) {
+        instagramAccountId = channelConfig.credentials.instagramAccountId;
+      }
+
       channels.push({
         channelId: new Types.ObjectId(channelConfig.channelId),
         provider: normalizedProvider,
         status: 'active',
         credentials: encryptRecord(channelConfig.credentials),
         phoneNumberId,
-        email,
         tiktokUserId,
+        instagramAccountId,
         llmConfig: {
           ...channelConfig.llmConfig,
           apiKey: encrypt(channelConfig.llmConfig.apiKey),
