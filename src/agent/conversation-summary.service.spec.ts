@@ -1,0 +1,223 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
+import { ConversationSummaryService } from './conversation-summary.service';
+import { MessageRepository } from '../database/repositories/message.repository';
+import { Types } from 'mongoose';
+import * as ai from 'ai';
+import * as llmFactory from './llm/llm.factory';
+
+jest.mock('ai', () => ({
+  generateText: jest.fn(),
+}));
+
+jest.mock('./llm/llm.factory', () => ({
+  createLLMModel: jest.fn(),
+}));
+
+describe('ConversationSummaryService', () => {
+  let service: ConversationSummaryService;
+  let messageRepository: jest.Mocked<MessageRepository>;
+  let configService: jest.Mocked<ConfigService>;
+
+  const mockChannelId = new Types.ObjectId('507f1f77bcf86cd799439011');
+  const mockUserId = new Types.ObjectId('507f1f77bcf86cd799439012');
+  const mockAgentId = new Types.ObjectId('507f1f77bcf86cd799439013');
+  const mockClientId = new Types.ObjectId('507f1f77bcf86cd799439014');
+
+  const mockContext = {
+    agentId: mockAgentId.toString(),
+    clientId: mockClientId.toString(),
+    channelId: mockChannelId.toString(),
+    systemPrompt: 'You are a helpful assistant',
+    llmConfig: {
+      provider: 'openai' as any,
+      apiKey: 'test-key',
+      model: 'gpt-4',
+    },
+  };
+
+  const mockMessages = [
+    {
+      _id: new Types.ObjectId(),
+      content: 'User message 1',
+      type: 'user' as const,
+      userId: mockUserId,
+      agentId: mockAgentId,
+      clientId: mockClientId,
+      channelId: mockChannelId,
+      status: 'active' as const,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+    {
+      _id: new Types.ObjectId(),
+      content: 'Agent response 1',
+      type: 'agent' as const,
+      userId: mockUserId,
+      agentId: mockAgentId,
+      clientId: mockClientId,
+      channelId: mockChannelId,
+      status: 'active' as const,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+  ];
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        ConversationSummaryService,
+        {
+          provide: MessageRepository,
+          useValue: {
+            countTokensInConversation: jest.fn(),
+            findConversationContext: jest.fn(),
+            create: jest.fn(),
+          },
+        },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn(),
+          },
+        },
+      ],
+    }).compile();
+
+    service = module.get<ConversationSummaryService>(ConversationSummaryService);
+    messageRepository = module.get(MessageRepository);
+    configService = module.get(ConfigService);
+
+    jest.clearAllMocks();
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+
+  describe('checkAndSummarizeIfNeeded', () => {
+    it('should not generate summary if token count is below threshold', async () => {
+      configService.get.mockReturnValue(2000);
+      messageRepository.countTokensInConversation.mockResolvedValue(1000);
+
+      await service.checkAndSummarizeIfNeeded(
+        mockChannelId,
+        mockUserId,
+        mockAgentId,
+        mockContext,
+      );
+
+      expect(messageRepository.countTokensInConversation).toHaveBeenCalledWith(
+        mockChannelId,
+        mockUserId,
+        mockAgentId,
+      );
+      expect(messageRepository.findConversationContext).not.toHaveBeenCalled();
+      expect(messageRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('should generate summary if token count exceeds threshold', async () => {
+      const mockModel = {};
+      configService.get.mockReturnValue(2000);
+      messageRepository.countTokensInConversation.mockResolvedValue(2500);
+      messageRepository.findConversationContext.mockResolvedValue(mockMessages as any);
+      (llmFactory.createLLMModel as jest.Mock).mockReturnValue(mockModel);
+      (ai.generateText as jest.Mock).mockResolvedValue({ text: 'This is a summary of the conversation' });
+      messageRepository.create.mockResolvedValue({} as any);
+
+      await service.checkAndSummarizeIfNeeded(
+        mockChannelId,
+        mockUserId,
+        mockAgentId,
+        mockContext,
+      );
+
+      expect(messageRepository.countTokensInConversation).toHaveBeenCalled();
+      expect(messageRepository.findConversationContext).toHaveBeenCalled();
+      expect(llmFactory.createLLMModel).toHaveBeenCalledWith(mockContext.llmConfig);
+      expect(ai.generateText).toHaveBeenCalled();
+      expect(messageRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'summary',
+          content: 'This is a summary of the conversation',
+          userId: mockUserId,
+          agentId: mockAgentId,
+          clientId: expect.any(Types.ObjectId),
+          channelId: mockChannelId,
+          status: 'active',
+        }),
+      );
+    });
+
+    it('should handle empty message list gracefully', async () => {
+      configService.get.mockReturnValue(2000);
+      messageRepository.countTokensInConversation.mockResolvedValue(2500);
+      messageRepository.findConversationContext.mockResolvedValue([]);
+
+      await service.checkAndSummarizeIfNeeded(
+        mockChannelId,
+        mockUserId,
+        mockAgentId,
+        mockContext,
+      );
+
+      expect(messageRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('should handle LLM errors gracefully', async () => {
+      configService.get.mockReturnValue(2000);
+      messageRepository.countTokensInConversation.mockResolvedValue(2500);
+      messageRepository.findConversationContext.mockResolvedValue(mockMessages as any);
+      (llmFactory.createLLMModel as jest.Mock).mockImplementation(() => {
+        throw new Error('LLM error');
+      });
+
+      // Should not throw
+      await expect(
+        service.checkAndSummarizeIfNeeded(
+          mockChannelId,
+          mockUserId,
+          mockAgentId,
+          mockContext,
+        ),
+      ).resolves.not.toThrow();
+    });
+
+    it('should use default threshold of 2000 if not configured', async () => {
+      configService.get.mockReturnValue(undefined);
+      messageRepository.countTokensInConversation.mockResolvedValue(1000);
+
+      await service.checkAndSummarizeIfNeeded(
+        mockChannelId,
+        mockUserId,
+        mockAgentId,
+        mockContext,
+      );
+
+      expect(configService.get).toHaveBeenCalledWith('CONVERSATION_TOKEN_THRESHOLD', 2000);
+    });
+
+    it('should handle empty/whitespace summary from LLM', async () => {
+      const mockModel = {};
+      configService.get.mockReturnValue(2000);
+      messageRepository.countTokensInConversation.mockResolvedValue(2500);
+      messageRepository.findConversationContext.mockResolvedValue(mockMessages as any);
+      (llmFactory.createLLMModel as jest.Mock).mockReturnValue(mockModel);
+      (ai.generateText as jest.Mock).mockResolvedValue({ text: '   ' });
+      messageRepository.create.mockResolvedValue({} as any);
+
+      await service.checkAndSummarizeIfNeeded(
+        mockChannelId,
+        mockUserId,
+        mockAgentId,
+        mockContext,
+      );
+
+      expect(messageRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: 'Unable to generate summary',
+        }),
+      );
+    });
+  });
+});

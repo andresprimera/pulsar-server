@@ -6,7 +6,7 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { UserRepository } from './repositories/user.repository';
 import { Agent } from './schemas/agent.schema';
 
@@ -14,9 +14,11 @@ import { ClientPhone } from './schemas/client-phone.schema';
 import { ClientAgent } from './schemas/client-agent.schema';
 import { OnboardingService } from '../onboarding/onboarding.service';
 import { ChannelRepository } from './repositories/channel.repository';
+import { ClientAgentRepository } from './repositories/client-agent.repository';
+import { ClientPhoneRepository } from './repositories/client-phone.repository';
+import { encryptRecord, encrypt } from './utils/crypto.util';
 import * as SEED_DATA from './data/seed-data.json';
 import { ClientRepository } from './repositories/client.repository';
-import { ClientAgentRepository } from './repositories/client-agent.repository';
 
 @Injectable()
 export class SeederService implements OnApplicationBootstrap {
@@ -33,6 +35,7 @@ export class SeederService implements OnApplicationBootstrap {
     private readonly channelRepository: ChannelRepository,
     private readonly clientRepository: ClientRepository,
     private readonly clientAgentRepository: ClientAgentRepository,
+    private readonly clientPhoneRepository: ClientPhoneRepository,
     @InjectModel(ClientAgent.name)
     private readonly clientAgentModel: Model<ClientAgent>,
   ) {}
@@ -62,9 +65,9 @@ export class SeederService implements OnApplicationBootstrap {
     this.logger.log('Starting database seed...');
 
     try {
-      // Idempotency check: if seed user exists, skip entire seeding
+      // Idempotency check: if first seed user exists, skip entire seeding
       const existingUser = await this.userRepository.findByEmail(
-        SEED_DATA.user.email,
+        SEED_DATA.users[0].email,
       );
       if (existingUser) {
         // Check for consistency: if user exists, Client and ClientAgent MUST exist
@@ -77,7 +80,7 @@ export class SeederService implements OnApplicationBootstrap {
 
         if (!client || clientAgents.length === 0) {
           this.logger.error(
-            `[Seeder] Inconsistent state detected: Seed user "${SEED_DATA.user.email}" exists, but Client or ClientAgent is missing.`,
+            `[Seeder] Inconsistent state detected: Seed user "${SEED_DATA.users[0].email}" exists, but Client or ClientAgent is missing.`,
           );
           throw new Error(
             `Database is in an inconsistent state. Seed user exists but Client/Agent data is missing. Please drop the database or remove the seed user manually to fix this.`,
@@ -85,37 +88,49 @@ export class SeederService implements OnApplicationBootstrap {
         }
 
         this.logger.log(
-          `Seed user "${SEED_DATA.user.email}" already exists. Skipping seeding.`,
+          `Seed user "${SEED_DATA.users[0].email}" already exists. Skipping seeding.`,
         );
         return;
       }
 
-      // 1. Ensure Agent exists (required for onboarding)
-      let agent = await this.agentModel
-        .findOne({ name: SEED_DATA.agent.name })
-        .exec();
-      if (!agent) {
-        this.logger.log(`Creating Agent: ${SEED_DATA.agent.name}`);
-        agent = await this.agentModel.create({
-          name: SEED_DATA.agent.name,
-          systemPrompt: SEED_DATA.agent.systemPrompt,
-          status: SEED_DATA.agent.status,
-          createdBySeeder: true,
-        });
-      } else {
-        this.logger.log(
-          `Agent "${SEED_DATA.agent.name}" already exists (${agent._id})`,
-        );
+      // 1. Ensure Agents exist (required for onboarding)
+      const agentsMap = new Map();
+      for (const agentSeed of SEED_DATA.agents) {
+        let agent = await this.agentModel
+          .findOne({ name: agentSeed.name })
+          .exec();
+        if (!agent) {
+          this.logger.log(`Creating Agent: ${agentSeed.name}`);
+          agent = await this.agentModel.create({
+            name: agentSeed.name,
+            systemPrompt: agentSeed.systemPrompt,
+            status: agentSeed.status,
+            createdBySeeder: true,
+          });
+        } else {
+          this.logger.log(
+            `Agent "${agentSeed.name}" already exists (${agent._id})`,
+          );
+        }
+        agentsMap.set(agentSeed.name, agent);
       }
 
       // 2. Ensure Channels exist (Infrastructure provisioning)
       this.logger.log('Provisioning channels...');
+      const channelsMap = new Map();
       for (const channelSeed of SEED_DATA.channels) {
-        await this.channelRepository.findOrCreateByName(channelSeed.name, {
-          type: channelSeed.type as any,
-          supportedProviders: channelSeed.supportedProviders.map((p) =>
-            p.toLowerCase(),
-          ),
+        const channel = await this.channelRepository.findOrCreateByName(
+          channelSeed.name,
+          {
+            type: channelSeed.type as any,
+            supportedProviders: channelSeed.supportedProviders.map((p) =>
+              p.toLowerCase(),
+            ),
+          },
+        );
+        channelsMap.set(channelSeed.name, {
+          channel,
+          config: channelSeed.agentChannelConfig,
         });
       }
 
@@ -126,53 +141,174 @@ export class SeederService implements OnApplicationBootstrap {
         this.clientAgentModel.createIndexes(),
       ]);
 
-      // 3. Map Seed Data to HireChannelConfigDto (Resolve Channel IDs)
-      const channelsDto = [];
-      for (const channelSeed of SEED_DATA.channels) {
-        const channelDoc = await this.channelRepository.findByNameOrFail(
-          channelSeed.name,
+      // 3. Process each user
+      for (const userSeed of SEED_DATA.users) {
+        this.logger.log(
+          `Processing user: ${userSeed.email} (${userSeed.name})`,
         );
-        // Use provider from existing config/structure or robust default
-        // Assuming seed data might have a preferred provider logic, otherwise default to first supported
-        // Ideally seed data should specify the provider to use for the agent
-        const provider =
-          (channelSeed as any).defaultProvider ||
-          channelSeed.supportedProviders[0];
 
-        channelsDto.push({
-          channelId: channelDoc._id.toString(),
-          provider: provider,
-          status: 'active',
-          credentials: channelSeed.agentChannelConfig.channelConfig,
-          // Note: OnboardingService automatically extracts phoneNumberId/email
-          // from credentials and populates the unencrypted fields.
-          llmConfig: channelSeed.agentChannelConfig.llmConfig,
+        // Check if user already exists
+        const existingUserCheck = await this.userRepository.findByEmail(
+          userSeed.email,
+        );
+        if (existingUserCheck) {
+          this.logger.log(
+            `User "${userSeed.email}" already exists. Skipping.`,
+          );
+          continue;
+        }
+
+        // If user has no agent hirings, skip (for now, as onboarding requires an agent)
+        if (!userSeed.agentHirings || userSeed.agentHirings.length === 0) {
+          this.logger.log(
+            `User "${userSeed.email}" has no agents to hire. Skipping for now.`,
+          );
+          continue;
+        }
+
+        // Process first agent hiring using onboarding service
+        const firstAgentHiring = userSeed.agentHirings[0];
+        const firstAgent = agentsMap.get(firstAgentHiring.agentName);
+        if (!firstAgent) {
+          this.logger.warn(
+            `Agent "${firstAgentHiring.agentName}" not found for user "${userSeed.email}". Skipping user.`,
+          );
+          continue;
+        }
+
+        // Build channels DTO based on user's channel names
+        const channelsDto = [];
+        for (const channelName of userSeed.channelNames) {
+          const channelInfo = channelsMap.get(channelName);
+          if (!channelInfo) {
+            this.logger.warn(
+              `Channel "${channelName}" not found for user "${userSeed.email}". Skipping.`,
+            );
+            continue;
+          }
+
+          const provider =
+            (channelInfo.config as any).defaultProvider ||
+            channelInfo.channel.supportedProviders[0];
+
+          channelsDto.push({
+            channelId: channelInfo.channel._id.toString(),
+            provider: provider,
+            status: 'active',
+            credentials: channelInfo.config.channelConfig,
+            llmConfig: channelInfo.config.llmConfig,
+          });
+        }
+
+        if (channelsDto.length === 0) {
+          this.logger.warn(
+            `No valid channels for user "${userSeed.email}". Skipping.`,
+          );
+          continue;
+        }
+
+        // Use OnboardingService to create User, Client, and first ClientAgent
+        this.logger.log(
+          `Running onboarding flow for user "${userSeed.email}" with agent "${firstAgentHiring.agentName}"...`,
+        );
+        const result = await this.onboardingService.registerAndHire({
+          user: {
+            email: userSeed.email,
+            name: userSeed.name,
+          },
+          client: {
+            type: userSeed.client.type as any,
+          },
+          agentHiring: {
+            agentId: firstAgent._id.toString(),
+            price: firstAgentHiring.price,
+          },
+          channels: channelsDto as any,
         });
+
+        this.logger.log(`User onboarded successfully:`);
+        this.logger.log(`  - User: ${result.user._id} (${result.user.email})`);
+        this.logger.log(
+          `  - Client: ${result.client._id} (${result.client.name})`,
+        );
+        this.logger.log(`  - ClientAgent: ${result.clientAgent._id}`);
+
+        // Process additional agent hirings if any
+        if (userSeed.agentHirings.length > 1) {
+          for (let i = 1; i < userSeed.agentHirings.length; i++) {
+            const additionalHiring = userSeed.agentHirings[i];
+            const additionalAgent = agentsMap.get(additionalHiring.agentName);
+            if (!additionalAgent) {
+              this.logger.warn(
+                `Agent "${additionalHiring.agentName}" not found for additional hiring. Skipping.`,
+              );
+              continue;
+            }
+
+            // Prepare channels for additional agent
+            const additionalChannels = [];
+            for (const channelName of userSeed.channelNames) {
+              const channelInfo = channelsMap.get(channelName);
+              if (!channelInfo) {
+                continue;
+              }
+
+              const provider =
+                (channelInfo.config as any).defaultProvider ||
+                channelInfo.channel.supportedProviders[0];
+
+              // Handle phone number for WhatsApp channels
+              let phoneNumberId: string | undefined;
+              if (
+                channelInfo.config.channelConfig &&
+                'phoneNumberId' in channelInfo.config.channelConfig
+              ) {
+                phoneNumberId = channelInfo.config.channelConfig.phoneNumberId;
+              }
+
+              if (phoneNumberId) {
+                // Ensure ClientPhone exists for this phone number
+                await this.clientPhoneRepository.resolveOrCreate(
+                  new Types.ObjectId(result.client._id),
+                  phoneNumberId,
+                  {
+                    provider: provider.toLowerCase() as any,
+                  },
+                );
+              }
+
+              additionalChannels.push({
+                channelId: channelInfo.channel._id as Types.ObjectId,
+                provider: provider.toLowerCase(),
+                status: 'active',
+                credentials: encryptRecord(channelInfo.config.channelConfig),
+                llmConfig: {
+                  ...channelInfo.config.llmConfig,
+                  apiKey: encrypt(channelInfo.config.llmConfig.apiKey),
+                },
+              });
+            }
+
+            // Create additional ClientAgent
+            this.logger.log(
+              `Hiring additional agent "${additionalHiring.agentName}" for client "${result.client._id}"...`,
+            );
+            const additionalClientAgent = await this.clientAgentRepository.create({
+              clientId: result.client._id,
+              agentId: additionalAgent._id.toString(),
+              price: additionalHiring.price,
+              status: 'active',
+              channels: additionalChannels,
+            });
+
+            this.logger.log(
+              `  - Additional ClientAgent: ${additionalClientAgent._id}`,
+            );
+          }
+        }
       }
 
-      // 4. Use OnboardingService to create User, Client, ClientAgent, and ClientPhone
-      this.logger.log('Running onboarding flow for seed user...');
-      const result = await this.onboardingService.registerAndHire({
-        user: {
-          email: SEED_DATA.user.email,
-          name: SEED_DATA.user.name,
-        },
-        client: {
-          type: SEED_DATA.client.type as any,
-        },
-        agentHiring: {
-          agentId: agent._id.toString(),
-          price: SEED_DATA.agentHiring.price,
-        },
-        channels: channelsDto as any,
-      });
-
-      this.logger.log(`Seeding complete via onboarding:`);
-      this.logger.log(`  - User: ${result.user._id} (${result.user.email})`);
-      this.logger.log(
-        `  - Client: ${result.client._id} (${result.client.name})`,
-      );
-      this.logger.log(`  - ClientAgent: ${result.clientAgent._id}`);
+      this.logger.log('Seeding complete!');
     } catch (error) {
       this.logger.error('Seeding failed', error);
       // Re-throw if it's our specific consistency error, otherwise log and continue

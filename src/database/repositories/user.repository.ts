@@ -47,4 +47,44 @@ export class UserRepository {
   async findActiveByClient(clientId: Types.ObjectId): Promise<User[]> {
     return this.model.find({ clientId, status: 'active' }).exec();
   }
+
+  async findByExternalUserId(
+    externalUserId: string,
+    clientId: Types.ObjectId,
+  ): Promise<User | null> {
+    return this.model.findOne({ externalUserId, clientId }).exec();
+  }
+
+  async findOrCreateByExternalUserId(
+    externalUserId: string,
+    clientId: Types.ObjectId,
+    name: string,
+    session?: ClientSession,
+  ): Promise<User> {
+    const existing = await this.model
+      .findOne({ externalUserId, clientId })
+      .session(session)
+      .exec();
+
+    if (existing) {
+      return existing;
+    }
+
+    // Generate a unique email for external users
+    const email = `${externalUserId}@external.user`;
+    const [user] = await this.model.create(
+      [
+        {
+          externalUserId,
+          clientId,
+          email,
+          name,
+          status: 'active',
+        },
+      ],
+      { session },
+    );
+
+    return user;
+  }
 }

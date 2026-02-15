@@ -131,6 +131,7 @@ export class WhatsappService {
     const context: AgentContext = {
       agentId: clientAgent.agentId,
       clientId: clientAgent.clientId,
+      channelId: channelConfig.channelId.toString(),
       systemPrompt: agent.systemPrompt,
       llmConfig: {
         ...channelConfig.llmConfig,

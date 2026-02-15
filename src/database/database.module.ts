@@ -16,6 +16,8 @@ import { ClientPhoneRepository } from './repositories/client-phone.repository';
 import { SeederService } from './seeder.service';
 import { User, UserSchema } from './schemas/user.schema';
 import { UserRepository } from './repositories/user.repository';
+import { Message, MessageSchema } from './schemas/message.schema';
+import { MessageRepository } from './repositories/message.repository';
 import { OnboardingModule } from '../onboarding/onboarding.module';
 
 const repositories = [
@@ -26,6 +28,7 @@ const repositories = [
 
   ClientPhoneRepository,
   UserRepository,
+  MessageRepository,
 ];
 
 @Global()
@@ -48,6 +51,7 @@ const repositories = [
 
       { name: ClientPhone.name, schema: ClientPhoneSchema },
       { name: User.name, schema: UserSchema },
+      { name: Message.name, schema: MessageSchema },
     ]),
     forwardRef(() => OnboardingModule),
   ],

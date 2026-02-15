@@ -9,6 +9,7 @@ import { UserRepository } from './repositories/user.repository';
 import { ChannelRepository } from './repositories/channel.repository';
 import { ClientRepository } from './repositories/client.repository';
 import { ClientAgentRepository } from './repositories/client-agent.repository';
+import { ClientPhoneRepository } from './repositories/client-phone.repository';
 import { OnboardingService } from '../onboarding/onboarding.service';
 import { Logger } from '@nestjs/common';
 import * as SEED_DATA from './data/seed-data.json';
@@ -23,6 +24,7 @@ describe('SeederService', () => {
   let mockChannelRepository: any;
   let mockClientRepository: any;
   let mockClientAgentRepository: any;
+  let mockClientPhoneRepository: any;
   let loggerSpy: jest.SpyInstance;
 
   const mockAgentId = new Types.ObjectId('aaaaaaaaaaaaaaaaaaaaaaaa');
@@ -30,15 +32,15 @@ describe('SeederService', () => {
   const mockOnboardingResult = {
     user: {
       _id: 'user-id',
-      email: SEED_DATA.user.email,
-      name: SEED_DATA.user.name,
+      email: SEED_DATA.users[0].email,
+      name: SEED_DATA.users[0].name,
       clientId: 'client-id',
       status: 'active',
     },
     client: {
       _id: 'client-id',
-      type: SEED_DATA.client.type,
-      name: SEED_DATA.user.name,
+      type: SEED_DATA.users[0].client.type,
+      name: SEED_DATA.users[0].name,
       ownerUserId: 'user-id',
       status: 'active',
     },
@@ -46,7 +48,7 @@ describe('SeederService', () => {
       _id: 'client-agent-id',
       clientId: 'client-id',
       agentId: mockAgentId.toString(),
-      price: SEED_DATA.agentHiring.price,
+      price: SEED_DATA.users[0].agentHirings[0].price,
       status: 'active',
     },
   };
@@ -80,6 +82,11 @@ describe('SeederService', () => {
 
     mockClientAgentRepository = {
       findByClient: jest.fn(),
+      create: jest.fn(),
+    };
+
+    mockClientPhoneRepository = {
+      resolveOrCreate: jest.fn(),
     };
 
     mockClientAgentModel = {
@@ -106,6 +113,10 @@ describe('SeederService', () => {
         { provide: ChannelRepository, useValue: mockChannelRepository },
         { provide: ClientRepository, useValue: mockClientRepository },
         { provide: ClientAgentRepository, useValue: mockClientAgentRepository },
+        {
+          provide: ClientPhoneRepository,
+          useValue: mockClientPhoneRepository,
+        },
       ],
     }).compile();
 
@@ -142,23 +153,20 @@ describe('SeederService', () => {
 
       // No existing user
       mockUserRepository.findByEmail.mockResolvedValue(null);
-      // No existing agent
+      // No existing agents
       mockAgentModel.findOne.mockReturnValue({
         exec: jest.fn().mockResolvedValue(null),
       });
       mockAgentModel.create.mockResolvedValue({
         _id: mockAgentId,
-        name: SEED_DATA.agent.name,
+        name: SEED_DATA.agents[0].name,
       });
 
       // Mock Channel resolutions
       mockChannelRepository.findOrCreateByName.mockResolvedValue({
         _id: 'channel-id',
         name: 'WhatsApp',
-      });
-      mockChannelRepository.findByNameOrFail.mockResolvedValue({
-        _id: 'channel-id',
-        name: 'WhatsApp',
+        supportedProviders: ['meta', 'twilio'],
       });
 
       await service.onApplicationBootstrap();
@@ -172,32 +180,38 @@ describe('SeederService', () => {
 
       // No existing user
       mockUserRepository.findByEmail.mockResolvedValue(null);
-      // No existing agent
+      // No existing agents
       mockAgentModel.findOne.mockReturnValue({
         exec: jest.fn().mockResolvedValue(null),
       });
       mockAgentModel.create.mockResolvedValue({
         _id: mockAgentId,
-        name: SEED_DATA.agent.name,
+        name: SEED_DATA.agents[0].name,
       });
 
       // Mock Channel resolutions
       mockChannelRepository.findOrCreateByName.mockResolvedValue({
         _id: 'channel-id',
         name: 'WhatsApp',
-      });
-      mockChannelRepository.findByNameOrFail.mockResolvedValue({
-        _id: 'channel-id',
-        name: 'WhatsApp',
+        supportedProviders: ['meta', 'twilio'],
       });
 
       await service.onApplicationBootstrap();
 
-      // Verify agent creation
+      // Verify agents creation (both agents should be created)
+      expect(mockAgentModel.create).toHaveBeenCalledTimes(SEED_DATA.agents.length);
       expect(mockAgentModel.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          name: SEED_DATA.agent.name,
-          systemPrompt: SEED_DATA.agent.systemPrompt,
+          name: SEED_DATA.agents[0].name,
+          systemPrompt: SEED_DATA.agents[0].systemPrompt,
+          status: 'active',
+          createdBySeeder: true,
+        }),
+      );
+      expect(mockAgentModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: SEED_DATA.agents[1].name,
+          systemPrompt: SEED_DATA.agents[1].systemPrompt,
           status: 'active',
           createdBySeeder: true,
         }),
@@ -209,7 +223,7 @@ describe('SeederService', () => {
       // Verify onboarding was called with correct DTO structure (ClientAgent with channels)
       expect(mockOnboardingService.registerAndHire).toHaveBeenCalledWith(
         expect.objectContaining({
-          user: expect.objectContaining({ email: SEED_DATA.user.email }),
+          user: expect.objectContaining({ email: SEED_DATA.users[0].email }),
           channels: expect.arrayContaining([
             expect.objectContaining({
               channelId: 'channel-id',
@@ -243,7 +257,7 @@ describe('SeederService', () => {
       // Existing user found
       mockUserRepository.findByEmail.mockResolvedValue({
         _id: 'existing-user-id',
-        email: SEED_DATA.user.email,
+        email: SEED_DATA.users[0].email,
         clientId: 'existing-client-id',
       });
 
@@ -269,21 +283,18 @@ describe('SeederService', () => {
 
       // No existing user
       mockUserRepository.findByEmail.mockResolvedValue(null);
-      // Existing agent found
+      // Existing agents found
       mockAgentModel.findOne.mockReturnValue({
         exec: jest
           .fn()
-          .mockResolvedValue({ _id: mockAgentId, name: SEED_DATA.agent.name }),
+          .mockResolvedValue({ _id: mockAgentId, name: SEED_DATA.agents[0].name }),
       });
 
       // Mock Channel resolutions
       mockChannelRepository.findOrCreateByName.mockResolvedValue({
         _id: 'channel-id',
         name: 'WhatsApp',
-      });
-      mockChannelRepository.findByNameOrFail.mockResolvedValue({
-        _id: 'channel-id',
-        name: 'WhatsApp',
+        supportedProviders: ['meta', 'twilio'],
       });
 
       await service.onApplicationBootstrap();
