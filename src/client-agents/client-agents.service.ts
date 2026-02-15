@@ -5,7 +5,11 @@ import {
   ConflictException,
   Logger,
 } from '@nestjs/common';
+import { Types } from 'mongoose';
 import { ClientAgentRepository } from '../database/repositories/client-agent.repository';
+import { ChannelRepository } from '../database/repositories/channel.repository';
+import { ClientPhoneRepository } from '../database/repositories/client-phone.repository';
+import { encrypt, encryptRecord } from '../database/utils/crypto.util';
 
 import { CreateClientAgentDto } from './dto/create-client-agent.dto';
 import { UpdateClientAgentDto } from './dto/update-client-agent.dto';
@@ -22,9 +26,15 @@ export class ClientAgentsService {
     private readonly clientAgentRepository: ClientAgentRepository,
     private readonly clientsService: ClientsService,
     private readonly agentsService: AgentsService,
+    private readonly channelRepository: ChannelRepository,
+    private readonly clientPhoneRepository: ClientPhoneRepository,
   ) {}
 
   async create(data: CreateClientAgentDto): Promise<ClientAgent> {
+    if (!Array.isArray(data.channels) || data.channels.length === 0) {
+      throw new BadRequestException('At least one channel is required');
+    }
+
     const client = await this.clientsService.findById(data.clientId);
     if (!client || client.status !== 'active') {
       throw new BadRequestException('Client not found or not active');
@@ -44,10 +54,85 @@ export class ClientAgentsService {
       throw new ConflictException('Agent already hired by this client');
     }
 
+    const processedChannelIds = new Set<string>();
+    const channels = [];
+
+    for (const channelConfig of data.channels) {
+      if (processedChannelIds.has(channelConfig.channelId)) {
+        throw new BadRequestException(
+          `Duplicate channelId in request: ${channelConfig.channelId}`,
+        );
+      }
+      processedChannelIds.add(channelConfig.channelId);
+
+      const channel = await this.channelRepository.findByIdOrFail(
+        channelConfig.channelId,
+      );
+
+      const normalizedProvider = channelConfig.provider.toLowerCase().trim();
+      if (!channel.supportedProviders.includes(normalizedProvider)) {
+        throw new BadRequestException(
+          `Provider "${
+            channelConfig.provider
+          }" is not supported by channel "${
+            channel.name
+          }". Supported: ${channel.supportedProviders.join(', ')}`,
+        );
+      }
+
+      let phoneNumberId: string | undefined;
+      if (
+        channelConfig.credentials &&
+        'phoneNumberId' in channelConfig.credentials
+      ) {
+        phoneNumberId = channelConfig.credentials.phoneNumberId;
+      }
+
+      if (phoneNumberId) {
+        await this.clientPhoneRepository.resolveOrCreate(
+          data.clientId,
+          phoneNumberId,
+          {
+            provider: normalizedProvider as any,
+          },
+        );
+      }
+
+      let email: string | undefined;
+      if (channelConfig.credentials && 'email' in channelConfig.credentials) {
+        email = channelConfig.credentials.email;
+      }
+
+      let tiktokUserId: string | undefined;
+      if (
+        channelConfig.credentials &&
+        'tiktokUserId' in channelConfig.credentials
+      ) {
+        tiktokUserId = channelConfig.credentials.tiktokUserId;
+      }
+
+      channels.push({
+        channelId: new Types.ObjectId(channelConfig.channelId),
+        provider: normalizedProvider,
+        status: 'active',
+        credentials: encryptRecord(channelConfig.credentials),
+        phoneNumberId,
+        email,
+        tiktokUserId,
+        llmConfig: {
+          ...channelConfig.llmConfig,
+          apiKey: encrypt(channelConfig.llmConfig.apiKey),
+        },
+      });
+    }
+
     try {
       return await this.clientAgentRepository.create({
-        ...data,
+        clientId: data.clientId,
+        agentId: data.agentId,
+        price: data.price,
         status: 'active',
+        channels,
       });
     } catch (error: any) {
       // Handle MongoDB duplicate key error (race condition fallback)

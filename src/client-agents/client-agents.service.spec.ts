@@ -8,12 +8,16 @@ import { ClientAgentsService } from './client-agents.service';
 import { ClientAgentRepository } from '../database/repositories/client-agent.repository';
 import { ClientsService } from '../clients/clients.service';
 import { AgentsService } from '../agents/agents.service';
+import { ChannelRepository } from '../database/repositories/channel.repository';
+import { ClientPhoneRepository } from '../database/repositories/client-phone.repository';
 
 describe('ClientAgentsService', () => {
   let service: ClientAgentsService;
   let mockClientAgentRepository: any;
   let mockClientsService: any;
   let mockAgentsService: any;
+  let mockChannelRepository: any;
+  let mockClientPhoneRepository: any;
 
   const mockClientAgent = {
     id: 'ca-1',
@@ -51,6 +55,14 @@ describe('ClientAgentsService', () => {
       findOne: jest.fn(),
     };
 
+    mockChannelRepository = {
+      findByIdOrFail: jest.fn(),
+    };
+
+    mockClientPhoneRepository = {
+      resolveOrCreate: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ClientAgentsService,
@@ -66,6 +78,14 @@ describe('ClientAgentsService', () => {
           provide: AgentsService,
           useValue: mockAgentsService,
         },
+        {
+          provide: ChannelRepository,
+          useValue: mockChannelRepository,
+        },
+        {
+          provide: ClientPhoneRepository,
+          useValue: mockClientPhoneRepository,
+        },
       ],
     }).compile();
 
@@ -77,31 +97,72 @@ describe('ClientAgentsService', () => {
   });
 
   describe('create', () => {
+    const baseDto: any = {
+      clientId: '507f1f77bcf86cd799439011',
+      agentId: '507f1f77bcf86cd799439012',
+      price: 100,
+      channels: [
+        {
+          channelId: '507f1f77bcf86cd799439013',
+          provider: 'smtp',
+          credentials: { email: 'support@example.com' },
+          llmConfig: {
+            provider: 'openai',
+            apiKey: 'test-key',
+            model: 'gpt-4o',
+          },
+        },
+      ],
+    };
+
     it('should create client agent if client and agent are active', async () => {
       mockClientsService.findById.mockResolvedValue(mockClient);
       mockAgentsService.findOne.mockResolvedValue(mockAgent);
       mockClientAgentRepository.findByClientAndAgent.mockResolvedValue(null);
+      mockChannelRepository.findByIdOrFail.mockResolvedValue({
+        _id: '507f1f77bcf86cd799439013',
+        name: 'Email',
+        supportedProviders: ['smtp'],
+      });
       mockClientAgentRepository.create.mockResolvedValue(mockClientAgent);
 
-      const dto = { clientId: 'client-1', agentId: 'agent-1', price: 100 };
-      const result = await service.create(dto);
+      const result = await service.create(baseDto as any);
 
-      expect(mockClientsService.findById).toHaveBeenCalledWith('client-1');
-      expect(mockAgentsService.findOne).toHaveBeenCalledWith('agent-1');
+      expect(mockClientsService.findById).toHaveBeenCalledWith(baseDto.clientId);
+      expect(mockAgentsService.findOne).toHaveBeenCalledWith(baseDto.agentId);
       expect(
         mockClientAgentRepository.findByClientAndAgent,
-      ).toHaveBeenCalledWith('client-1', 'agent-1');
-      expect(mockClientAgentRepository.create).toHaveBeenCalledWith({
-        ...dto,
-        status: 'active',
-      });
+      ).toHaveBeenCalledWith(baseDto.clientId, baseDto.agentId);
+      expect(mockClientAgentRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          clientId: baseDto.clientId,
+          agentId: baseDto.agentId,
+          price: baseDto.price,
+          status: 'active',
+          channels: expect.arrayContaining([
+            expect.objectContaining({
+              email: 'support@example.com',
+              provider: 'smtp',
+            }),
+          ]),
+        }),
+      );
       expect(result).toEqual(mockClientAgent);
+    });
+
+    it('should throw BadRequestException when no channels are provided', async () => {
+      await expect(
+        service.create({ ...baseDto, channels: [] } as any),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.create({ ...baseDto, channels: [] } as any),
+      ).rejects.toThrow('At least one channel is required');
     });
 
     it('should throw BadRequestException if client is not found', async () => {
       mockClientsService.findById.mockResolvedValue(null);
 
-      const dto = { clientId: 'unknown', agentId: 'agent-1', price: 100 };
+      const dto = { ...baseDto, clientId: 'unknown' };
       await expect(service.create(dto)).rejects.toThrow(BadRequestException);
       await expect(service.create(dto)).rejects.toThrow(
         'Client not found or not active',
@@ -114,7 +175,7 @@ describe('ClientAgentsService', () => {
         status: 'archived',
       });
 
-      const dto = { clientId: 'client-1', agentId: 'agent-1', price: 100 };
+      const dto = { ...baseDto };
       await expect(service.create(dto)).rejects.toThrow(BadRequestException);
     });
 
@@ -124,7 +185,7 @@ describe('ClientAgentsService', () => {
         status: 'inactive',
       });
 
-      const dto = { clientId: 'client-1', agentId: 'agent-1', price: 100 };
+      const dto = { ...baseDto };
       await expect(service.create(dto)).rejects.toThrow(BadRequestException);
     });
 
@@ -132,7 +193,7 @@ describe('ClientAgentsService', () => {
       mockClientsService.findById.mockResolvedValue(mockClient);
       mockAgentsService.findOne.mockResolvedValue(null);
 
-      const dto = { clientId: 'client-1', agentId: 'unknown', price: 100 };
+      const dto = { ...baseDto, agentId: 'unknown' };
       await expect(service.create(dto)).rejects.toThrow(BadRequestException);
       await expect(service.create(dto)).rejects.toThrow(
         'Agent not found or not active',
@@ -146,7 +207,7 @@ describe('ClientAgentsService', () => {
         status: 'archived',
       });
 
-      const dto = { clientId: 'client-1', agentId: 'agent-1', price: 100 };
+      const dto = { ...baseDto };
       await expect(service.create(dto)).rejects.toThrow(BadRequestException);
     });
 
@@ -157,31 +218,118 @@ describe('ClientAgentsService', () => {
         status: 'inactive',
       });
 
-      const dto = { clientId: 'client-1', agentId: 'agent-1', price: 100 };
+      const dto = { ...baseDto };
       await expect(service.create(dto)).rejects.toThrow(BadRequestException);
     });
 
     it('should throw ConflictException if agent already hired by client', async () => {
       mockClientsService.findById.mockResolvedValue(mockClient);
       mockAgentsService.findOne.mockResolvedValue(mockAgent);
+      mockChannelRepository.findByIdOrFail.mockResolvedValue({
+        _id: '507f1f77bcf86cd799439013',
+        name: 'Email',
+        supportedProviders: ['smtp'],
+      });
       mockClientAgentRepository.findByClientAndAgent.mockResolvedValue(
         mockClientAgent,
       );
 
-      const dto = { clientId: 'client-1', agentId: 'agent-1', price: 100 };
+      const dto = { ...baseDto };
       await expect(service.create(dto)).rejects.toThrow(ConflictException);
+    });
+
+    it('should throw BadRequestException for duplicate channel IDs', async () => {
+      mockClientsService.findById.mockResolvedValue(mockClient);
+      mockAgentsService.findOne.mockResolvedValue(mockAgent);
+      mockClientAgentRepository.findByClientAndAgent.mockResolvedValue(null);
+      mockChannelRepository.findByIdOrFail.mockResolvedValue({
+        _id: '507f1f77bcf86cd799439013',
+        name: 'Email',
+        supportedProviders: ['smtp'],
+      });
+
+      const dto = {
+        ...baseDto,
+        channels: [
+          { ...baseDto.channels[0] },
+          { ...baseDto.channels[0] },
+        ],
+      };
+
+      const createPromise = service.create(dto as any);
+      await expect(createPromise).rejects.toThrow(BadRequestException);
+      await expect(createPromise).rejects.toThrow(
+        'Duplicate channelId in request',
+      );
+    });
+
+    it('should throw BadRequestException for unsupported provider', async () => {
+      mockClientsService.findById.mockResolvedValue(mockClient);
+      mockAgentsService.findOne.mockResolvedValue(mockAgent);
+      mockClientAgentRepository.findByClientAndAgent.mockResolvedValue(null);
+      mockChannelRepository.findByIdOrFail.mockResolvedValue({
+        _id: '507f1f77bcf86cd799439013',
+        name: 'Email',
+        supportedProviders: ['sendgrid'],
+      });
+
+      await expect(service.create(baseDto as any)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.create(baseDto as any)).rejects.toThrow(
+        'Provider "smtp" is not supported by channel "Email"',
+      );
+    });
+
+    it('should enforce phone ownership for phoneNumberId channels', async () => {
+      mockClientsService.findById.mockResolvedValue(mockClient);
+      mockAgentsService.findOne.mockResolvedValue(mockAgent);
+      mockClientAgentRepository.findByClientAndAgent.mockResolvedValue(null);
+      mockChannelRepository.findByIdOrFail.mockResolvedValue({
+        _id: '507f1f77bcf86cd799439013',
+        name: 'WhatsApp',
+        supportedProviders: ['meta'],
+      });
+
+      const conflict = new ConflictException(
+        'Phone number phone-1 is already owned by another client',
+      );
+      mockClientPhoneRepository.resolveOrCreate.mockRejectedValue(conflict);
+
+      const dto = {
+        ...baseDto,
+        channels: [
+          {
+            ...baseDto.channels[0],
+            provider: 'meta',
+            credentials: { phoneNumberId: 'phone-1' },
+          },
+        ],
+      };
+
+      await expect(service.create(dto as any)).rejects.toThrow(ConflictException);
+      expect(mockClientPhoneRepository.resolveOrCreate).toHaveBeenCalledWith(
+        baseDto.clientId,
+        'phone-1',
+        { provider: 'meta' },
+      );
     });
 
     it('should allow re-hiring archived agent relationship', async () => {
       mockClientsService.findById.mockResolvedValue(mockClient);
       mockAgentsService.findOne.mockResolvedValue(mockAgent);
+      mockChannelRepository.findByIdOrFail.mockResolvedValue({
+        _id: '507f1f77bcf86cd799439013',
+        name: 'Email',
+        supportedProviders: ['smtp'],
+      });
       mockClientAgentRepository.findByClientAndAgent.mockResolvedValue({
         ...mockClientAgent,
         status: 'archived',
       });
       mockClientAgentRepository.create.mockResolvedValue(mockClientAgent);
 
-      const dto = { clientId: 'client-1', agentId: 'agent-1', price: 100 };
+      const dto = { ...baseDto };
       const result = await service.create(dto);
 
       expect(result).toEqual(mockClientAgent);
