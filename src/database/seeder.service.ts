@@ -268,13 +268,33 @@ export class SeederService implements OnApplicationBootstrap {
 
               if (phoneNumberId) {
                 // Ensure ClientPhone exists for this phone number
-                await this.clientPhoneRepository.resolveOrCreate(
-                  new Types.ObjectId(result.client._id),
-                  phoneNumberId,
-                  {
-                    provider: provider.toLowerCase() as any,
-                  },
-                );
+                try {
+                  const clientId = result.client._id;
+                  if (!Types.ObjectId.isValid(clientId)) {
+                    this.logger.warn(
+                      `Skipping ClientPhone creation for invalid clientId "${clientId}" during seeding.`,
+                    );
+                    continue;
+                  }
+
+                  await this.clientPhoneRepository.resolveOrCreate(
+                    clientId,
+                    phoneNumberId,
+                    {
+                      provider: provider.toLowerCase() as any,
+                    },
+                  );
+                } catch (error) {
+                  // Phone may already be owned by another client from a previous seed user
+                  // This is expected when multiple seed users share the same channel config
+                  if (error.status === 409) {
+                    this.logger.warn(
+                      `Phone ${phoneNumberId} already owned by another client. Skipping for additional agent.`,
+                    );
+                  } else {
+                    throw error;
+                  }
+                }
               }
 
               // Handle tiktokUserId for TikTok channels
