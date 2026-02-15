@@ -5,6 +5,7 @@ import { AgentContext } from '../../agent/contracts/agent-context';
 import { AgentRepository } from '../../database/repositories/agent.repository';
 import { ClientAgentRepository } from '../../database/repositories/client-agent.repository';
 import { decryptRecord, decrypt } from '../../database/utils/crypto.util';
+import { TIKTOK_API_BASE_URL } from './tiktok.config';
 
 @Injectable()
 export class TiktokService {
@@ -119,8 +120,53 @@ export class TiktokService {
 
     if (output.reply) {
       this.logger.log(
-        `[TikTok] Reply generated for sender=${data.sender.user_id} (response sending not yet implemented).`,
+        `[TikTok] Sending reply to sender=${data.sender.user_id}`,
       );
+      const decryptedCredentials = decryptRecord(channelConfig.credentials);
+      
+      try {
+        await this.sendMessage({
+          recipientId: data.sender.user_id,
+          conversationId: data.conversation_id,
+          text: output.reply.text,
+          accessToken: decryptedCredentials.accessToken,
+        });
+        this.logger.log(`[TikTok] Reply sent successfully.`);
+      } catch (error) {
+        this.logger.error(`[TikTok] Failed to send reply: ${error.message}`);
+      }
+    }
+  }
+
+  private async sendMessage(params: {
+    recipientId: string;
+    conversationId: string;
+    text: string;
+    accessToken: string;
+  }): Promise<void> {
+    const { recipientId, conversationId, text, accessToken } = params;
+    
+    const url = `${TIKTOK_API_BASE_URL}/message/send/`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        recipient_id: recipientId,
+        conversation_id: conversationId,
+        message_type: 'text',
+        text: {
+          content: text,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`TikTok API error: ${response.status} ${errorText}`);
     }
   }
 }

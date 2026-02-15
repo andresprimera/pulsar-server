@@ -42,7 +42,7 @@ describe('ClientAgentsController', () => {
 
   describe('create', () => {
     it('should call service.create', async () => {
-      const dto = {
+      const dto: any = {
         clientId: 'client-1',
         agentId: 'agent-1',
         price: 100,
