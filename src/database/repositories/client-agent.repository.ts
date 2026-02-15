@@ -64,13 +64,21 @@ export class ClientAgentRepository {
   async findOneByPhoneNumberId(
     phoneNumberId: string,
   ): Promise<ClientAgent | null> {
+    const matches = await this.findActiveByPhoneNumberId(phoneNumberId);
+    return matches[0] ?? null;
+  }
+
+  /**
+   * Find all active ClientAgents by WhatsApp phoneNumberId within embedded channels.
+   */
+  async findActiveByPhoneNumberId(phoneNumberId: string): Promise<ClientAgent[]> {
     return this.model
-      .findOne({
+      .find({
         status: 'active',
         channels: {
           $elemMatch: {
             status: 'active',
-            phoneNumberId: phoneNumberId,
+            phoneNumberId,
           },
         },
       })
