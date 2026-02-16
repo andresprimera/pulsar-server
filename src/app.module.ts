@@ -3,8 +3,8 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { DatabaseModule } from './database/database.module';
 import { WhatsappModule } from './channels/whatsapp/whatsapp.module';
-import { EmailModule } from './channels/email/email.module';
 import { TiktokModule } from './channels/tiktok/tiktok.module';
+import { InstagramModule } from './channels/instagram/instagram.module';
 import { AgentsModule } from './agents/agents.module';
 import { UsersModule } from './users/users.module';
 import { ClientsModule } from './clients/clients.module';
@@ -17,8 +17,8 @@ import { OnboardingModule } from './onboarding/onboarding.module';
     ConfigModule.forRoot({ isGlobal: true }),
     DatabaseModule,
     WhatsappModule,
-    EmailModule,
     TiktokModule,
+    InstagramModule,
     AgentsModule,
     UsersModule,
     ClientsModule,

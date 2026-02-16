@@ -51,8 +51,8 @@ describe('AgentRoutingService', () => {
           provide: ClientAgentRepository,
           useValue: { 
             findActiveByPhoneNumberId: jest.fn(),
-            findActiveByEmail: jest.fn(),
             findActiveByTiktokUserId: jest.fn(),
+            findActiveByInstagramAccountId: jest.fn(),
           },
         },
         {

@@ -334,13 +334,13 @@ export class SeederService implements OnApplicationBootstrap {
                 tiktokUserId = channelSeed.credentials.tiktokUserId;
               }
 
-              // Handle email for Email channels
-              let email: string | undefined;
+              // Handle instagramAccountId for Instagram channels
+              let instagramAccountId: string | undefined;
               if (
                 channelSeed.credentials &&
-                'email' in channelSeed.credentials
+                'instagramAccountId' in channelSeed.credentials
               ) {
-                email = channelSeed.credentials.email;
+                instagramAccountId = channelSeed.credentials.instagramAccountId;
               }
 
               additionalChannels.push({
@@ -349,8 +349,8 @@ export class SeederService implements OnApplicationBootstrap {
                 status: channelSeed.status || 'active',
                 credentials: encryptRecord(channelSeed.credentials),
                 phoneNumberId,
-                email,
                 tiktokUserId,
+                instagramAccountId,
                 llmConfig: {
                   ...channelSeed.llmConfig,
                   apiKey: encrypt(channelSeed.llmConfig.apiKey),

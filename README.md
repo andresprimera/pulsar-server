@@ -58,6 +58,32 @@ $ pnpm run test:e2e
 $ pnpm run test:cov
 ```
 
+## Seed Data Strategy
+
+We use seed data from `src/database/data/seed-data.json` to bootstrap local/demo environments.
+
+### Active channels in seed data
+
+- WhatsApp
+- TikTok
+- Instagram
+
+Email is intentionally **not** seeded (it is being deprecated).
+
+### Why multichannel combinations look this way
+
+For 3 channels, full combination coverage would be $2^3 - 1 = 7$ non-empty combinations.
+Instead of seeding all 7, we use a lean set that still provides strong interaction coverage:
+
+- Pairwise combinations:
+  - WhatsApp + TikTok
+  - WhatsApp + Instagram
+  - TikTok + Instagram
+- One full combination:
+  - WhatsApp + TikTok + Instagram
+
+This gives confidence in routing/matching behavior across channels while keeping seed fixtures small and maintainable.
+
 ## Support
 
 Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).

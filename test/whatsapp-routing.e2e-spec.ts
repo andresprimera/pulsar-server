@@ -253,7 +253,6 @@ describe('WhatsApp Message Routing (e2e)', () => {
   describe('Basic Message Handling', () => {
     it('should route message to User 1 Customer Service Agent', async () => {
       if (!user1PhoneNumberId) {
-        console.warn('User 1 phone number ID not found, skipping test');
         return;
       }
 
@@ -273,7 +272,6 @@ describe('WhatsApp Message Routing (e2e)', () => {
 
     it('should route message to User 2 Sales Agent', async () => {
       if (!user2PhoneNumberId) {
-        console.warn('User 2 phone number ID not found, skipping test');
         return;
       }
 
@@ -293,7 +291,6 @@ describe('WhatsApp Message Routing (e2e)', () => {
 
     it('should route message to User 3 first agent (Customer Service)', async () => {
       if (!user3Agent1PhoneNumberId) {
-        console.warn('User 3 Agent 1 phone number ID not found, skipping test');
         return;
       }
 
@@ -313,7 +310,6 @@ describe('WhatsApp Message Routing (e2e)', () => {
 
     it('should route message to User 3 second agent (Sales)', async () => {
       if (!user3Agent2PhoneNumberId) {
-        console.warn('User 3 Agent 2 phone number ID not found, skipping test');
         return;
       }
 
@@ -421,7 +417,6 @@ describe('WhatsApp Message Routing (e2e)', () => {
 
     it('should ignore non-text message types', async () => {
       if (!user1PhoneNumberId) {
-        console.warn('User 1 phone number ID not found, skipping test');
         return;
       }
 
@@ -480,7 +475,6 @@ describe('WhatsApp Message Routing (e2e)', () => {
       // User 1 and User 3 both have Customer Service Agent
       // Messages should be isolated per client
       if (!user1PhoneNumberId || !user3Agent1PhoneNumberId) {
-        console.warn('Phone numbers not found, skipping test');
         return;
       }
 
@@ -516,7 +510,6 @@ describe('WhatsApp Message Routing (e2e)', () => {
 
     it('should maintain separate conversations for same external user ID across different clients', async () => {
       if (!user1PhoneNumberId || !user2PhoneNumberId) {
-        console.warn('Phone numbers not found, skipping test');
         return;
       }
 
@@ -554,7 +547,6 @@ describe('WhatsApp Message Routing (e2e)', () => {
   describe('Multi-Agent User Tests (User 3)', () => {
     it('should handle messages to User 3 first agent independently', async () => {
       if (!user3Agent1PhoneNumberId) {
-        console.warn('User 3 Agent 1 phone number ID not found, skipping test');
         return;
       }
 
@@ -589,7 +581,6 @@ describe('WhatsApp Message Routing (e2e)', () => {
 
     it('should handle messages to User 3 second agent independently', async () => {
       if (!user3Agent2PhoneNumberId) {
-        console.warn('User 3 Agent 2 phone number ID not found, skipping test');
         return;
       }
 
@@ -624,7 +615,6 @@ describe('WhatsApp Message Routing (e2e)', () => {
 
     it('should not mix conversations between User 3 agents', async () => {
       if (!user3Agent1PhoneNumberId || !user3Agent2PhoneNumberId) {
-        console.warn('User 3 phone numbers not found, skipping test');
         return;
       }
 
@@ -662,7 +652,6 @@ describe('WhatsApp Message Routing (e2e)', () => {
   describe('Channel Configuration', () => {
     it('should verify User 2 WhatsApp-only configuration works', async () => {
       if (!user2PhoneNumberId) {
-        console.warn('User 2 phone number ID not found, skipping test');
         return;
       }
 
@@ -682,7 +671,6 @@ describe('WhatsApp Message Routing (e2e)', () => {
 
     it('should verify User 1 multi-channel configuration works for WhatsApp', async () => {
       if (!user1PhoneNumberId) {
-        console.warn('User 1 phone number ID not found, skipping test');
         return;
       }
 

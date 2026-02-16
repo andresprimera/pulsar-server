@@ -104,8 +104,8 @@ describe('ClientAgentsService', () => {
       channels: [
         {
           channelId: '507f1f77bcf86cd799439013',
-          provider: 'smtp',
-          credentials: { email: 'support@example.com' },
+          provider: 'instagram',
+          credentials: { instagramAccountId: '17841400000000009' },
           llmConfig: {
             provider: 'openai',
             apiKey: 'test-key',
@@ -121,8 +121,8 @@ describe('ClientAgentsService', () => {
       mockClientAgentRepository.findByClientAndAgent.mockResolvedValue(null);
       mockChannelRepository.findByIdOrFail.mockResolvedValue({
         _id: '507f1f77bcf86cd799439013',
-        name: 'Email',
-        supportedProviders: ['smtp'],
+        name: 'Instagram',
+        supportedProviders: ['instagram'],
       });
       mockClientAgentRepository.create.mockResolvedValue(mockClientAgent);
 
@@ -141,8 +141,8 @@ describe('ClientAgentsService', () => {
           status: 'active',
           channels: expect.arrayContaining([
             expect.objectContaining({
-              email: 'support@example.com',
-              provider: 'smtp',
+              instagramAccountId: '17841400000000009',
+              provider: 'instagram',
             }),
           ]),
         }),
@@ -227,8 +227,8 @@ describe('ClientAgentsService', () => {
       mockAgentsService.findOne.mockResolvedValue(mockAgent);
       mockChannelRepository.findByIdOrFail.mockResolvedValue({
         _id: '507f1f77bcf86cd799439013',
-        name: 'Email',
-        supportedProviders: ['smtp'],
+        name: 'Instagram',
+        supportedProviders: ['instagram'],
       });
       mockClientAgentRepository.findByClientAndAgent.mockResolvedValue(
         mockClientAgent,
@@ -244,8 +244,8 @@ describe('ClientAgentsService', () => {
       mockClientAgentRepository.findByClientAndAgent.mockResolvedValue(null);
       mockChannelRepository.findByIdOrFail.mockResolvedValue({
         _id: '507f1f77bcf86cd799439013',
-        name: 'Email',
-        supportedProviders: ['smtp'],
+        name: 'Instagram',
+        supportedProviders: ['instagram'],
       });
 
       const dto = {
@@ -269,15 +269,15 @@ describe('ClientAgentsService', () => {
       mockClientAgentRepository.findByClientAndAgent.mockResolvedValue(null);
       mockChannelRepository.findByIdOrFail.mockResolvedValue({
         _id: '507f1f77bcf86cd799439013',
-        name: 'Email',
-        supportedProviders: ['sendgrid'],
+        name: 'Instagram',
+        supportedProviders: ['meta'],
       });
 
       await expect(service.create(baseDto as any)).rejects.toThrow(
         BadRequestException,
       );
       await expect(service.create(baseDto as any)).rejects.toThrow(
-        'Provider "smtp" is not supported by channel "Email"',
+        'Provider "instagram" is not supported by channel "Instagram"',
       );
     });
 
@@ -320,8 +320,8 @@ describe('ClientAgentsService', () => {
       mockAgentsService.findOne.mockResolvedValue(mockAgent);
       mockChannelRepository.findByIdOrFail.mockResolvedValue({
         _id: '507f1f77bcf86cd799439013',
-        name: 'Email',
-        supportedProviders: ['smtp'],
+        name: 'Instagram',
+        supportedProviders: ['instagram'],
       });
       mockClientAgentRepository.findByClientAndAgent.mockResolvedValue({
         ...mockClientAgent,

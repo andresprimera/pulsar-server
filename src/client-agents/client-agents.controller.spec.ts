@@ -49,8 +49,8 @@ describe('ClientAgentsController', () => {
         channels: [
           {
             channelId: '507f1f77bcf86cd799439011',
-            provider: 'smtp',
-            credentials: { email: 'support@example.com' },
+            provider: 'instagram',
+            credentials: { instagramAccountId: '17841400000000000' },
             llmConfig: {
               provider: 'openai',
               apiKey: 'test-key',

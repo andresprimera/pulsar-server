@@ -63,9 +63,15 @@ describe('TikTok Channel (e2e)', () => {
 
     // 4. Seed Database
     if (connection) {
-      await connection.collection('clients').deleteMany({});
-      await connection.collection('agents').deleteMany({});
-      await connection.collection('client_agents').deleteMany({});
+      await connection
+        .collection('client_agents')
+        .deleteMany({ _id: { $in: [clientAgentIdObj] } });
+      await connection
+        .collection('clients')
+        .deleteMany({ _id: { $in: [clientIdObj] } });
+      await connection
+        .collection('agents')
+        .deleteMany({ _id: { $in: [agentIdObj] } });
       await connection.collection('channels').deleteMany({ _id: { $in: [tiktokChannelIdObj] } });
     }
 
@@ -117,9 +123,15 @@ describe('TikTok Channel (e2e)', () => {
 
   afterAll(async () => {
     if (connection) {
-        await connection.collection('clients').deleteMany({});
-        await connection.collection('agents').deleteMany({});
-        await connection.collection('client_agents').deleteMany({});
+        await connection
+          .collection('client_agents')
+          .deleteMany({ _id: { $in: [clientAgentIdObj] } });
+        await connection
+          .collection('clients')
+          .deleteMany({ _id: { $in: [clientIdObj] } });
+        await connection
+          .collection('agents')
+          .deleteMany({ _id: { $in: [agentIdObj] } });
         await connection.collection('channels').deleteMany({ _id: { $in: [tiktokChannelIdObj] } });
     }
     await app.close();

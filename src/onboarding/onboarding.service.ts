@@ -168,15 +168,6 @@ export class OnboardingService {
           );
         }
 
-        // Extract email for unencrypted storage/lookup
-        let email: string | undefined;
-        if (
-          channelConfig.credentials &&
-          'email' in channelConfig.credentials
-        ) {
-          email = channelConfig.credentials.email;
-        }
-
         // Extract tiktokUserId for unencrypted storage/lookup
         let tiktokUserId: string | undefined;
         if (
@@ -186,6 +177,15 @@ export class OnboardingService {
           tiktokUserId = channelConfig.credentials.tiktokUserId;
         }
 
+        // Extract instagramAccountId for unencrypted storage/lookup
+        let instagramAccountId: string | undefined;
+        if (
+          channelConfig.credentials &&
+          'instagramAccountId' in channelConfig.credentials
+        ) {
+          instagramAccountId = channelConfig.credentials.instagramAccountId;
+        }
+
         hireChannels.push({
           channelId: new Types.ObjectId(channelConfig.channelId),
           provider: normalizedProvider,
@@ -193,8 +193,8 @@ export class OnboardingService {
           credentials: encryptRecord(channelConfig.credentials),
           // Store unencrypted keys for fast lookup
           phoneNumberId,
-          email,
           tiktokUserId,
+          instagramAccountId,
           llmConfig: {
             ...channelConfig.llmConfig,
             apiKey: encrypt(channelConfig.llmConfig.apiKey),

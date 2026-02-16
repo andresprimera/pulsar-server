@@ -87,33 +87,6 @@ export class ClientAgentRepository {
   }
 
   /**
-   * Find ClientAgent by email address within embedded channels.
-   * Checks for active status and matching credentials.
-   */
-  async findOneByEmail(email: string): Promise<ClientAgent | null> {
-    const matches = await this.findActiveByEmail(email);
-    return matches[0] ?? null;
-  }
-
-  /**
-   * Find all active ClientAgents by email within embedded channels.
-   */
-  async findActiveByEmail(email: string): Promise<ClientAgent[]> {
-    return this.model
-      .find({
-        status: 'active',
-        channels: {
-          $elemMatch: {
-            status: 'active',
-            email,
-          },
-        },
-      })
-      .select('+channels.credentials +channels.llmConfig.apiKey')
-      .exec();
-  }
-
-  /**
    * Find ClientAgent by TikTok user ID within embedded channels.
    * Checks for active status and matching tiktokUserId.
    */
@@ -143,21 +116,34 @@ export class ClientAgentRepository {
   }
 
   /**
-   * Find all ClientAgents with active email channels.
-   * Used for IMAP polling.
+   * Find ClientAgent by Instagram account ID within embedded channels.
+   * Checks for active status and matching instagramAccountId.
    */
-  async findAllWithActiveEmailChannels(): Promise<ClientAgent[]> {
+  async findOneByInstagramAccountId(
+    instagramAccountId: string,
+  ): Promise<ClientAgent | null> {
+    const matches = await this.findActiveByInstagramAccountId(instagramAccountId);
+    return matches[0] ?? null;
+  }
+
+  /**
+   * Find all active ClientAgents by Instagram account ID within embedded channels.
+   */
+  async findActiveByInstagramAccountId(
+    instagramAccountId: string,
+  ): Promise<ClientAgent[]> {
     return this.model
       .find({
         status: 'active',
         channels: {
           $elemMatch: {
             status: 'active',
-            email: { $exists: true, $ne: null },
+            instagramAccountId,
           },
         },
       })
       .select('+channels.credentials +channels.llmConfig.apiKey')
       .exec();
   }
+
 }

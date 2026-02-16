@@ -34,14 +34,14 @@ export type AgentRouteDecision =
  * Channel-specific routing context
  */
 export interface ChannelRoutingContext {
-  /** Channel identifier (phoneNumberId, email, tiktokUserId, etc.) */
+  /** Channel identifier (phoneNumberId, tiktokUserId, instagramAccountId, etc.) */
   channelIdentifier: string;
   /** External user identifier (phone, email, userId) */
   externalUserId: string;
   /** Incoming message text */
   incomingText: string;
   /** Channel type for logging */
-  channelType: 'whatsapp' | 'email' | 'tiktok';
+  channelType: 'whatsapp' | 'tiktok' | 'instagram';
 }
 
 @Injectable()
@@ -130,16 +130,16 @@ export class AgentRoutingService {
    * Find candidate ClientAgents based on channel type.
    */
   private async findCandidatesByChannel(
-    channelType: 'whatsapp' | 'email' | 'tiktok',
+    channelType: 'whatsapp' | 'tiktok' | 'instagram',
     identifier: string,
   ): Promise<ClientAgent[]> {
     switch (channelType) {
       case 'whatsapp':
         return this.clientAgentRepository.findActiveByPhoneNumberId(identifier);
-      case 'email':
-        return this.clientAgentRepository.findActiveByEmail(identifier);
       case 'tiktok':
         return this.clientAgentRepository.findActiveByTiktokUserId(identifier);
+      case 'instagram':
+        return this.clientAgentRepository.findActiveByInstagramAccountId(identifier);
     }
   }
 
@@ -149,7 +149,7 @@ export class AgentRoutingService {
   private async buildCandidates(
     clientAgents: ClientAgent[],
     identifier: string,
-    channelType: 'whatsapp' | 'email' | 'tiktok',
+    channelType: 'whatsapp' | 'tiktok' | 'instagram',
   ): Promise<RouteCandidate[]> {
     const unresolved = clientAgents
       .map((clientAgent) => {
@@ -159,10 +159,10 @@ export class AgentRoutingService {
           switch (channelType) {
             case 'whatsapp':
               return channel.phoneNumberId === identifier;
-            case 'email':
-              return channel.email === identifier;
             case 'tiktok':
               return channel.tiktokUserId === identifier;
+            case 'instagram':
+              return channel.instagramAccountId === identifier;
           }
         });
 
