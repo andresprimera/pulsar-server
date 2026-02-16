@@ -18,6 +18,10 @@ export class TiktokService {
   ) {}
 
   async handleIncoming(payload: any): Promise<void> {
+    this.logger.log(
+      `[TikTok] Incoming payload: ${JSON.stringify(payload)}`,
+    );
+
     if (payload?.event !== 'message.received') {
       return;
     }
