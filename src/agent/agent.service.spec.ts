@@ -41,10 +41,11 @@ describe('AgentService', () => {
     },
   };
 
-  const mockUser = {
-    _id: 'user-1',
+  const mockContact = {
+    _id: 'contact-1',
     externalUserId: '1234567890',
     clientId: 'client-1',
+    channelType: 'whatsapp',
   };
 
   beforeEach(async () => {
@@ -83,11 +84,11 @@ describe('AgentService', () => {
       const conversationHistory = [
         { role: 'user' as const, content: 'Previous message' },
       ];
-      
+
       (llmFactory.createLLMModel as jest.Mock).mockReturnValue(mockModel);
       (ai.generateText as jest.Mock).mockResolvedValue({ text: 'AI response' });
       messagePersistenceService.handleIncomingMessage.mockResolvedValue({
-        user: mockUser,
+        contact: mockContact,
         conversationHistory,
       });
       messagePersistenceService.handleOutgoingMessage.mockResolvedValue();
@@ -101,6 +102,7 @@ describe('AgentService', () => {
           agentId: 'agent-1',
           clientId: 'client-1',
           externalUserId: '1234567890',
+          channelType: 'whatsapp',
           userName: '1234567890',
         },
       );
@@ -127,9 +129,10 @@ describe('AgentService', () => {
           agentId: 'agent-1',
           clientId: 'client-1',
           externalUserId: '1234567890',
+          channelType: 'whatsapp',
           userName: '1234567890',
         },
-        'user-1',
+        'contact-1',
         mockContext,
       );
 
@@ -143,7 +146,7 @@ describe('AgentService', () => {
       (llmFactory.createLLMModel as jest.Mock).mockReturnValue(mockModel);
       (ai.generateText as jest.Mock).mockResolvedValue({ text: '   ' });
       messagePersistenceService.handleIncomingMessage.mockResolvedValue({
-        user: mockUser,
+        contact: mockContact,
         conversationHistory: [],
       });
       messagePersistenceService.handleOutgoingMessage.mockResolvedValue();
@@ -163,7 +166,7 @@ describe('AgentService', () => {
         throw new Error('API error');
       });
       messagePersistenceService.handleIncomingMessage.mockResolvedValue({
-        user: mockUser,
+        contact: mockContact,
         conversationHistory: [],
       });
 
@@ -183,7 +186,7 @@ describe('AgentService', () => {
       (llmFactory.createLLMModel as jest.Mock).mockReturnValue(mockModel);
       (ai.generateText as jest.Mock).mockResolvedValue({ text: 'response' });
       messagePersistenceService.handleIncomingMessage.mockResolvedValue({
-        user: mockUser,
+        contact: mockContact,
         conversationHistory: [],
       });
       messagePersistenceService.handleOutgoingMessage.mockResolvedValue();

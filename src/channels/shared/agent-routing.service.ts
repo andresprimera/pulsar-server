@@ -4,7 +4,7 @@ import { generateText } from 'ai';
 import { AgentRepository } from '../../database/repositories/agent.repository';
 import { ClientAgentRepository } from '../../database/repositories/client-agent.repository';
 import { MessageRepository } from '../../database/repositories/message.repository';
-import { UserRepository } from '../../database/repositories/user.repository';
+import { ContactRepository } from '../../database/repositories/contact.repository';
 import { ClientAgent, HireChannelConfig } from '../../database/schemas/client-agent.schema';
 import { createLLMModel } from '../../agent/llm/llm.factory';
 import { LlmProvider } from '../../agent/llm/provider.enum';
@@ -51,7 +51,7 @@ export class AgentRoutingService {
 
   constructor(
     private readonly clientAgentRepository: ClientAgentRepository,
-    private readonly userRepository: UserRepository,
+    private readonly contactRepository: ContactRepository,
     private readonly messageRepository: MessageRepository,
     private readonly agentRepository: AgentRepository,
   ) {
@@ -249,12 +249,12 @@ export class AgentRoutingService {
         continue;
       }
 
-      const user = await this.userRepository.findByExternalUserId(
+      const contact = await this.contactRepository.findByExternalUserId(
         externalUserId,
         new Types.ObjectId(clientId),
       );
 
-      if (!user) {
+      if (!contact) {
         continue;
       }
 
@@ -273,8 +273,8 @@ export class AgentRoutingService {
         continue;
       }
 
-      const latestMessage = await this.messageRepository.findLatestByUserAndAgents(
-        user._id as Types.ObjectId,
+      const latestMessage = await this.messageRepository.findLatestByContactAndAgents(
+        contact._id as Types.ObjectId,
         agentIds,
         channelIds,
       );

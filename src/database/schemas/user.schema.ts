@@ -18,13 +18,6 @@ export class User extends Document {
   clientId: Types.ObjectId;
 
   @Prop({
-    type: String,
-    index: true,
-    sparse: true,
-  })
-  externalUserId?: string;
-
-  @Prop({
     required: true,
     enum: ['active', 'inactive', 'archived'],
     default: 'active',
@@ -35,5 +28,3 @@ export class User extends Document {
 
 export const UserSchema = SchemaFactory.createForClass(User);
 
-// Compound index for efficient lookup by externalUserId and clientId
-UserSchema.index({ externalUserId: 1, clientId: 1 });

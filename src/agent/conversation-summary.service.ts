@@ -21,7 +21,7 @@ export class ConversationSummaryService {
    */
   async checkAndSummarizeIfNeeded(
     channelId: Types.ObjectId,
-    userId: Types.ObjectId,
+    contactId: Types.ObjectId,
     agentId: Types.ObjectId,
     context: AgentContext,
   ): Promise<void> {
@@ -39,16 +39,16 @@ export class ConversationSummaryService {
       // Count tokens in current conversation
       const tokenCount = await this.messageRepository.countTokensInConversation(
         channelId,
-        userId,
+        contactId,
         agentId,
       );
 
       this.logger.log(
-        `Conversation tokens: ${tokenCount}/${threshold} for user ${userId} agent ${agentId}`,
+        `Conversation tokens: ${tokenCount}/${threshold} for user ${contactId} agent ${agentId}`,
       );
 
       if (tokenCount >= threshold) {
-        await this.generateSummary(channelId, userId, agentId, context);
+        await this.generateSummary(channelId, contactId, agentId, context);
       }
     } catch (error) {
       // Log error but don't throw - this is async background processing
@@ -60,7 +60,7 @@ export class ConversationSummaryService {
 
   private async generateSummary(
     channelId: Types.ObjectId,
-    userId: Types.ObjectId,
+    contactId: Types.ObjectId,
     agentId: Types.ObjectId,
     context: AgentContext,
   ): Promise<void> {
@@ -68,7 +68,7 @@ export class ConversationSummaryService {
       // Fetch conversation messages
       const messages = await this.messageRepository.findConversationContext(
         channelId,
-        userId,
+        contactId,
         agentId,
       );
 
@@ -96,7 +96,7 @@ export class ConversationSummaryService {
 
       if (!text?.trim()) {
         this.logger.warn(
-          `LLM returned empty summary for user ${userId} agent ${agentId}`,
+          `LLM returned empty summary for user ${contactId} agent ${agentId}`,
         );
       }
 
@@ -104,7 +104,7 @@ export class ConversationSummaryService {
       await this.messageRepository.create({
         content: summary,
         type: 'summary',
-        userId,
+        contactId,
         agentId,
         clientId: new Types.ObjectId(context.clientId),
         channelId,
@@ -112,7 +112,7 @@ export class ConversationSummaryService {
       });
 
       this.logger.log(
-        `Summary generated and saved for user ${userId} agent ${agentId} client ${context.clientId}`,
+        `Summary generated and saved for contact ${contactId} agent ${agentId} client ${context.clientId}`,
       );
     } catch (error) {
       this.logger.error(

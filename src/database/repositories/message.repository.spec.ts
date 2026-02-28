@@ -9,7 +9,7 @@ describe('MessageRepository', () => {
   let mockModel: any;
 
   const mockChannelId = new Types.ObjectId('507f1f77bcf86cd799439011');
-  const mockUserId = new Types.ObjectId('507f1f77bcf86cd799439012');
+  const mockContactId = new Types.ObjectId('507f1f77bcf86cd799439012');
   const mockAgentId = new Types.ObjectId('507f1f77bcf86cd799439013');
   const mockClientId = new Types.ObjectId('507f1f77bcf86cd799439014');
 
@@ -17,7 +17,7 @@ describe('MessageRepository', () => {
     _id: new Types.ObjectId(),
     content: 'Hello, this is a test message',
     type: 'user' as const,
-    userId: mockUserId,
+    contactId: mockContactId,
     clientId: mockClientId,
     channelId: mockChannelId,
     status: 'active' as const,
@@ -169,17 +169,17 @@ describe('MessageRepository', () => {
     });
   });
 
-  describe('findByUser', () => {
-    it('should return messages for a user sorted by creation date', async () => {
+  describe('findByContact', () => {
+    it('should return messages for a contact sorted by creation date', async () => {
       mockModel.find.mockReturnValue({
         sort: jest.fn().mockReturnValue({
           exec: jest.fn().mockResolvedValue([mockUserMessage]),
         }),
       });
 
-      const result = await repository.findByUser(mockUserId);
+      const result = await repository.findByContact(mockContactId);
 
-      expect(mockModel.find).toHaveBeenCalledWith({ userId: mockUserId });
+      expect(mockModel.find).toHaveBeenCalledWith({ contactId: mockContactId });
       expect(result).toEqual([mockUserMessage]);
     });
   });
@@ -199,22 +199,22 @@ describe('MessageRepository', () => {
     });
   });
 
-  describe('findByChannelAndUser', () => {
-    it('should return conversation history for a channel and user', async () => {
+  describe('findByChannelAndContact', () => {
+    it('should return conversation history for a channel and contact', async () => {
       mockModel.find.mockReturnValue({
         sort: jest.fn().mockReturnValue({
           exec: jest.fn().mockResolvedValue([mockUserMessage]),
         }),
       });
 
-      const result = await repository.findByChannelAndUser(
+      const result = await repository.findByChannelAndContact(
         mockChannelId,
-        mockUserId,
+        mockContactId,
       );
 
       expect(mockModel.find).toHaveBeenCalledWith({
         channelId: mockChannelId,
-        userId: mockUserId,
+        contactId: mockContactId,
       });
       expect(result).toEqual([mockUserMessage]);
     });
@@ -329,7 +329,7 @@ describe('MessageRepository', () => {
 
       const result = await repository.findConversationContext(
         mockChannelId,
-        mockUserId,
+        mockContactId,
         mockAgentId,
       );
 
@@ -355,7 +355,7 @@ describe('MessageRepository', () => {
 
       const result = await repository.findConversationContext(
         mockChannelId,
-        mockUserId,
+        mockContactId,
         mockAgentId,
       );
 
@@ -374,7 +374,7 @@ describe('MessageRepository', () => {
 
       const result = await repository.countTokensInConversation(
         mockChannelId,
-        mockUserId,
+        mockContactId,
         mockAgentId,
       );
 
@@ -387,7 +387,7 @@ describe('MessageRepository', () => {
 
       const result = await repository.countTokensInConversation(
         mockChannelId,
-        mockUserId,
+        mockContactId,
         mockAgentId,
       );
 

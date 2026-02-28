@@ -3,13 +3,13 @@ import { Types } from 'mongoose';
 import { AgentRepository } from '../../database/repositories/agent.repository';
 import { ClientAgentRepository } from '../../database/repositories/client-agent.repository';
 import { MessageRepository } from '../../database/repositories/message.repository';
-import { UserRepository } from '../../database/repositories/user.repository';
+import { ContactRepository } from '../../database/repositories/contact.repository';
 import { AgentRoutingService } from './agent-routing.service';
 
 describe('AgentRoutingService', () => {
   let service: AgentRoutingService;
   let clientAgentRepository: jest.Mocked<ClientAgentRepository>;
-  let userRepository: jest.Mocked<UserRepository>;
+  let contactRepository: jest.Mocked<ContactRepository>;
   let messageRepository: jest.Mocked<MessageRepository>;
   let agentRepository: jest.Mocked<AgentRepository>;
 
@@ -49,19 +49,19 @@ describe('AgentRoutingService', () => {
         AgentRoutingService,
         {
           provide: ClientAgentRepository,
-          useValue: { 
+          useValue: {
             findActiveByPhoneNumberId: jest.fn(),
             findActiveByTiktokUserId: jest.fn(),
             findActiveByInstagramAccountId: jest.fn(),
           },
         },
         {
-          provide: UserRepository,
+          provide: ContactRepository,
           useValue: { findByExternalUserId: jest.fn() },
         },
         {
           provide: MessageRepository,
-          useValue: { findLatestByUserAndAgents: jest.fn() },
+          useValue: { findLatestByContactAndAgents: jest.fn() },
         },
         {
           provide: AgentRepository,
@@ -72,7 +72,7 @@ describe('AgentRoutingService', () => {
 
     service = module.get(AgentRoutingService);
     clientAgentRepository = module.get(ClientAgentRepository);
-    userRepository = module.get(UserRepository);
+    contactRepository = module.get(ContactRepository);
     messageRepository = module.get(MessageRepository);
     agentRepository = module.get(AgentRepository);
   });
@@ -154,8 +154,8 @@ describe('AgentRoutingService', () => {
         status: 'active',
       } as any);
 
-    userRepository.findByExternalUserId.mockResolvedValue(null);
-    messageRepository.findLatestByUserAndAgents.mockResolvedValue(null);
+    contactRepository.findByExternalUserId.mockResolvedValue(null);
+    messageRepository.findLatestByContactAndAgents.mockResolvedValue(null);
 
     const result = await service.resolveRoute({
       channelIdentifier: 'phone-1',

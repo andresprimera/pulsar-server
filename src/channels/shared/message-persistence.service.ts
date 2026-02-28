@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { MessageRepository } from '../../database/repositories/message.repository';
-import { UserRepository } from '../../database/repositories/user.repository';
+import { ContactRepository } from '../../database/repositories/contact.repository';
 import { ConversationSummaryService } from '../../agent/conversation-summary.service';
 import { AgentContext } from '../../agent/contracts/agent-context';
 
@@ -10,6 +10,7 @@ export interface MessagePersistenceContext {
   agentId: Types.ObjectId | string;
   clientId: Types.ObjectId | string;
   externalUserId: string;
+  channelType: 'whatsapp' | 'tiktok' | 'instagram';
   userName: string;
 }
 
@@ -19,21 +20,23 @@ export class MessagePersistenceService {
 
   constructor(
     private readonly messageRepository: MessageRepository,
-    private readonly userRepository: UserRepository,
+    private readonly contactRepository: ContactRepository,
     private readonly conversationSummaryService: ConversationSummaryService,
   ) {}
 
   /**
-   * Finds or creates a user by external ID (e.g., phone number, email address)
+   * Finds or creates a contact by external ID (e.g., phone number, TikTok user ID)
    */
-  async findOrCreateUser(
+  async findOrCreateContact(
     externalUserId: string,
     clientId: Types.ObjectId | string,
+    channelType: 'whatsapp' | 'tiktok' | 'instagram',
     name: string,
   ): Promise<any> {
-    return this.userRepository.findOrCreateByExternalUserId(
+    return this.contactRepository.findOrCreate(
       externalUserId,
       new Types.ObjectId(clientId),
+      channelType,
       name,
     );
   }
@@ -44,12 +47,12 @@ export class MessagePersistenceService {
   async saveUserMessage(
     content: string,
     context: MessagePersistenceContext,
-    userId: Types.ObjectId,
+    contactId: Types.ObjectId,
   ): Promise<void> {
     await this.messageRepository.create({
       content,
       type: 'user',
-      userId,
+      contactId,
       agentId: new Types.ObjectId(context.agentId),
       clientId: new Types.ObjectId(context.clientId),
       channelId: new Types.ObjectId(context.channelId),
@@ -57,7 +60,7 @@ export class MessagePersistenceService {
     });
 
     this.logger.log(
-      `Saved user message: user=${userId} agent=${context.agentId} client=${context.clientId} channel=${context.channelId}`,
+      `Saved user message: contact=${contactId} agent=${context.agentId} client=${context.clientId} channel=${context.channelId}`,
     );
   }
 
@@ -67,12 +70,12 @@ export class MessagePersistenceService {
   async saveAgentMessage(
     content: string,
     context: MessagePersistenceContext,
-    userId: Types.ObjectId,
+    contactId: Types.ObjectId,
   ): Promise<void> {
     await this.messageRepository.create({
       content,
       type: 'agent',
-      userId,
+      contactId,
       agentId: new Types.ObjectId(context.agentId),
       clientId: new Types.ObjectId(context.clientId),
       channelId: new Types.ObjectId(context.channelId),
@@ -80,7 +83,7 @@ export class MessagePersistenceService {
     });
 
     this.logger.log(
-      `Saved agent message: user=${userId} agent=${context.agentId} client=${context.clientId} channel=${context.channelId}`,
+      `Saved agent message: contact=${contactId} agent=${context.agentId} client=${context.clientId} channel=${context.channelId}`,
     );
   }
 
@@ -90,11 +93,11 @@ export class MessagePersistenceService {
    */
   async getConversationContext(
     context: MessagePersistenceContext,
-    userId: Types.ObjectId,
+    contactId: Types.ObjectId,
   ): Promise<Array<{ role: 'user' | 'assistant'; content: string }>> {
     const messages = await this.messageRepository.findConversationContext(
       new Types.ObjectId(context.channelId),
-      userId,
+      contactId,
       new Types.ObjectId(context.agentId),
     );
 
@@ -112,13 +115,13 @@ export class MessagePersistenceService {
    */
   triggerSummarization(
     context: MessagePersistenceContext,
-    userId: Types.ObjectId,
+    contactId: Types.ObjectId,
     agentContext: AgentContext,
   ): void {
     this.conversationSummaryService
       .checkAndSummarizeIfNeeded(
         new Types.ObjectId(context.channelId),
-        userId,
+        contactId,
         new Types.ObjectId(context.agentId),
         agentContext,
       )
@@ -131,32 +134,33 @@ export class MessagePersistenceService {
 
   /**
    * Complete message persistence flow for incoming messages
-   * Returns the conversation history and user object
+   * Returns the conversation history and contact object
    */
   async handleIncomingMessage(
     content: string,
     context: MessagePersistenceContext,
   ): Promise<{
-    user: any;
+    contact: any;
     conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
   }> {
-    // Find or create user
-    const user = await this.findOrCreateUser(
+    // Find or create contact
+    const contact = await this.findOrCreateContact(
       context.externalUserId,
       context.clientId,
+      context.channelType,
       context.userName,
     );
 
     // Save user message
-    await this.saveUserMessage(content, context, user._id as Types.ObjectId);
+    await this.saveUserMessage(content, context, contact._id as Types.ObjectId);
 
     // Get conversation context
     const conversationHistory = await this.getConversationContext(
       context,
-      user._id as Types.ObjectId,
+      contact._id as Types.ObjectId,
     );
 
-    return { user, conversationHistory };
+    return { contact, conversationHistory };
   }
 
   /**
@@ -165,13 +169,13 @@ export class MessagePersistenceService {
   async handleOutgoingMessage(
     content: string,
     context: MessagePersistenceContext,
-    userId: Types.ObjectId,
+    contactId: Types.ObjectId,
     agentContext: AgentContext,
   ): Promise<void> {
     // Save agent message
-    await this.saveAgentMessage(content, context, userId);
+    await this.saveAgentMessage(content, context, contactId);
 
     // Trigger async summarization check
-    this.triggerSummarization(context, userId, agentContext);
+    this.triggerSummarization(context, contactId, agentContext);
   }
 }

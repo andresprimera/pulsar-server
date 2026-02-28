@@ -15,10 +15,10 @@ export class Message extends Document {
 
   @Prop({
     type: Types.ObjectId,
-    ref: 'User',
+    ref: 'Contact',
     index: true,
   })
-  userId?: Types.ObjectId;
+  contactId?: Types.ObjectId;
 
   @Prop({
     type: Types.ObjectId,
@@ -57,10 +57,10 @@ export class Message extends Document {
 
 export const MessageSchema = SchemaFactory.createForClass(Message);
 
-// Validation: user messages must have userId, agent/summary messages must have agentId
+// Validation: user messages must have contactId, agent/summary messages must have agentId
 MessageSchema.pre('save', function (next) {
-  if (this.type === 'user' && !this.userId) {
-    next(new Error('userId is required for user messages'));
+  if (this.type === 'user' && !this.contactId) {
+    next(new Error('contactId is required for user messages'));
   } else if ((this.type === 'agent' || this.type === 'summary') && !this.agentId) {
     next(new Error('agentId is required for agent and summary messages'));
   } else {
@@ -71,8 +71,8 @@ MessageSchema.pre('save', function (next) {
 // Validation for updates
 MessageSchema.pre('findOneAndUpdate', function (next) {
   const update = this.getUpdate() as any;
-  if (update.type === 'user' && !update.userId) {
-    next(new Error('userId is required for user messages'));
+  if (update.type === 'user' && !update.contactId) {
+    next(new Error('contactId is required for user messages'));
   } else if ((update.type === 'agent' || update.type === 'summary') && !update.agentId) {
     next(new Error('agentId is required for agent and summary messages'));
   } else {

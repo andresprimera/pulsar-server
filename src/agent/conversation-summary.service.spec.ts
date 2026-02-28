@@ -22,7 +22,7 @@ describe('ConversationSummaryService', () => {
   let loggerErrorSpy: jest.SpyInstance;
 
   const mockChannelId = new Types.ObjectId('507f1f77bcf86cd799439011');
-  const mockUserId = new Types.ObjectId('507f1f77bcf86cd799439012');
+  const mockContactId = new Types.ObjectId('507f1f77bcf86cd799439012');
   const mockAgentId = new Types.ObjectId('507f1f77bcf86cd799439013');
   const mockClientId = new Types.ObjectId('507f1f77bcf86cd799439014');
 
@@ -43,7 +43,7 @@ describe('ConversationSummaryService', () => {
       _id: new Types.ObjectId(),
       content: 'User message 1',
       type: 'user' as const,
-      userId: mockUserId,
+      contactId: mockContactId,
       agentId: mockAgentId,
       clientId: mockClientId,
       channelId: mockChannelId,
@@ -55,7 +55,7 @@ describe('ConversationSummaryService', () => {
       _id: new Types.ObjectId(),
       content: 'Agent response 1',
       type: 'agent' as const,
-      userId: mockUserId,
+      contactId: mockContactId,
       agentId: mockAgentId,
       clientId: mockClientId,
       channelId: mockChannelId,
@@ -109,14 +109,14 @@ describe('ConversationSummaryService', () => {
 
       await service.checkAndSummarizeIfNeeded(
         mockChannelId,
-        mockUserId,
+        mockContactId,
         mockAgentId,
         mockContext,
       );
 
       expect(messageRepository.countTokensInConversation).toHaveBeenCalledWith(
         mockChannelId,
-        mockUserId,
+        mockContactId,
         mockAgentId,
       );
       expect(messageRepository.findConversationContext).not.toHaveBeenCalled();
@@ -134,7 +134,7 @@ describe('ConversationSummaryService', () => {
 
       await service.checkAndSummarizeIfNeeded(
         mockChannelId,
-        mockUserId,
+        mockContactId,
         mockAgentId,
         mockContext,
       );
@@ -147,7 +147,7 @@ describe('ConversationSummaryService', () => {
         expect.objectContaining({
           type: 'summary',
           content: 'This is a summary of the conversation',
-          userId: mockUserId,
+          contactId: mockContactId,
           agentId: mockAgentId,
           clientId: expect.any(Types.ObjectId),
           channelId: mockChannelId,
@@ -163,7 +163,7 @@ describe('ConversationSummaryService', () => {
 
       await service.checkAndSummarizeIfNeeded(
         mockChannelId,
-        mockUserId,
+        mockContactId,
         mockAgentId,
         mockContext,
       );
@@ -183,7 +183,7 @@ describe('ConversationSummaryService', () => {
       await expect(
         service.checkAndSummarizeIfNeeded(
           mockChannelId,
-          mockUserId,
+          mockContactId,
           mockAgentId,
           mockContext,
         ),
@@ -196,7 +196,7 @@ describe('ConversationSummaryService', () => {
 
       await service.checkAndSummarizeIfNeeded(
         mockChannelId,
-        mockUserId,
+        mockContactId,
         mockAgentId,
         mockContext,
       );
@@ -215,7 +215,7 @@ describe('ConversationSummaryService', () => {
 
       await service.checkAndSummarizeIfNeeded(
         mockChannelId,
-        mockUserId,
+        mockContactId,
         mockAgentId,
         mockContext,
       );
