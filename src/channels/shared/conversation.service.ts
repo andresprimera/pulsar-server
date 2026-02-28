@@ -31,7 +31,7 @@ export class ConversationService {
         lookupParams,
       );
 
-    if (!existingOpenConversation) {
+    if (!existingOpenConversation || existingOpenConversation.status !== 'open') {
       return this.createOpenConversationWithDuplicateRecovery(
         params,
         lookupParams,

@@ -121,6 +121,32 @@ describe('MessagePersistenceService', () => {
         mockConversationId,
         expect.any(Date),
       );
+
+      const resolveOrder =
+        conversationService.resolveOrCreate.mock.invocationCallOrder[0];
+      const createOrder = messageRepository.create.mock.invocationCallOrder[0];
+      const touchOrder = conversationService.touch.mock.invocationCallOrder[0];
+
+      expect(resolveOrder).toBeLessThan(createOrder);
+      expect(createOrder).toBeLessThan(touchOrder);
+    });
+
+    it('should not allow createUserMessage when resolved conversation has no id', async () => {
+      conversationService.resolveOrCreate.mockResolvedValue({
+        _id: undefined,
+      } as any);
+      messageRepository.create.mockImplementation(async (payload: any) => {
+        if (!payload?.conversationId) {
+          throw new Error('conversationId is required');
+        }
+        return {} as any;
+      });
+
+      await expect(
+        service.createUserMessage('Hello!', mockContext, mockContact._id as Types.ObjectId),
+      ).rejects.toThrow('conversationId is required');
+
+      expect(messageRepository.create).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -144,6 +170,14 @@ describe('MessagePersistenceService', () => {
         mockConversationId,
         expect.any(Date),
       );
+
+      const resolveOrder =
+        conversationService.resolveOrCreate.mock.invocationCallOrder[0];
+      const createOrder = messageRepository.create.mock.invocationCallOrder[0];
+      const touchOrder = conversationService.touch.mock.invocationCallOrder[0];
+
+      expect(resolveOrder).toBeLessThan(createOrder);
+      expect(createOrder).toBeLessThan(touchOrder);
     });
   });
 

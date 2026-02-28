@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model, Types } from 'mongoose';
 import { Message } from '../schemas/message.schema';
@@ -14,6 +14,10 @@ export class MessageRepository {
     data: Partial<Message>,
     session?: ClientSession,
   ): Promise<Message> {
+    if (!data.conversationId) {
+      throw new BadRequestException('conversationId is required');
+    }
+
     const [doc] = await this.model.create([data], { session });
     return doc;
   }

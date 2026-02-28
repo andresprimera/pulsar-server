@@ -117,6 +117,56 @@ describe('ConversationService', () => {
     expect(result._id.toString()).toBe(newConversationId.toString());
   });
 
+  it('never reuses closed conversations', async () => {
+    repository.findLatestOpenByClientContactAndChannel.mockResolvedValue(null);
+    repository.create.mockResolvedValue({
+      _id: newConversationId,
+      status: 'open',
+      lastMessageAt: now,
+    } as any);
+
+    const result = await service.resolveOrCreate({
+      clientId,
+      contactId,
+      channelId,
+      now,
+    });
+
+    expect(repository.findLatestOpenByClientContactAndChannel).toHaveBeenCalledWith({
+      clientId,
+      contactId,
+      channelId,
+    });
+    expect(result._id.toString()).toBe(newConversationId.toString());
+    expect((result as any).status).toBe('open');
+  });
+
+  it('does not reuse a closed conversation even when it is within timeout', async () => {
+    repository.findLatestOpenByClientContactAndChannel.mockResolvedValue({
+      _id: existingConversationId,
+      status: 'closed',
+      lastMessageAt: new Date(now.getTime() - 1000),
+    } as any);
+
+    repository.create.mockResolvedValue({
+      _id: newConversationId,
+      status: 'open',
+      lastMessageAt: now,
+    } as any);
+
+    const result = await service.resolveOrCreate({
+      clientId,
+      contactId,
+      channelId,
+      now,
+    });
+
+    expect(result._id.toString()).toBe(newConversationId.toString());
+    expect((result as any).status).toBe('open');
+    expect(repository.create).toHaveBeenCalledTimes(1);
+    expect(repository.updateStatus).not.toHaveBeenCalled();
+  });
+
   it('touch updates lastMessageAt', async () => {
     repository.updateLastMessageAt.mockResolvedValue({} as any);
 
@@ -160,5 +210,6 @@ describe('ConversationService', () => {
     expect(resultB._id.toString()).toBe(newConversationId.toString());
     expect(repository.create).toHaveBeenCalledTimes(2);
     expect(repository.findLatestOpenByClientContactAndChannel).toHaveBeenCalledTimes(3);
+    expect(resultA._id.toString()).toBe(resultB._id.toString());
   });
 });

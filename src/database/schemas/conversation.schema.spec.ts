@@ -52,4 +52,19 @@ describe('ConversationSchema', () => {
       unique: true,
     });
   });
+
+  it('enforces partial unique index for open conversations', () => {
+    const indexes = ConversationSchema.indexes();
+
+    const hasPartial = indexes.some(
+      ([fields, options]) =>
+        fields.clientId === 1 &&
+        fields.contactId === 1 &&
+        fields.channelId === 1 &&
+        options?.unique === true &&
+        options?.partialFilterExpression?.status === 'open',
+    );
+
+    expect(hasPartial).toBe(true);
+  });
 });

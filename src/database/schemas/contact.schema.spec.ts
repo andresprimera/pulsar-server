@@ -5,6 +5,21 @@ import {
 } from './contact.schema';
 
 describe('ContactSchema', () => {
+  it('requires clientId', () => {
+    const clientIdPath = ContactSchema.path('clientId') as any;
+    expect(clientIdPath?.isRequired).toBeTruthy();
+  });
+
+  it('requires channelId', () => {
+    const channelIdPath = ContactSchema.path('channelId') as any;
+    expect(channelIdPath?.isRequired).toBeTruthy();
+  });
+
+  it('requires channelIdentifier (externalId)', () => {
+    const externalIdPath = ContactSchema.path('externalId') as any;
+    expect(externalIdPath?.isRequired).toBeTruthy();
+  });
+
   it('enforces unique compound index on clientId+channelId+externalId without legacy unique index', () => {
     const indexes = ContactSchema.indexes();
 

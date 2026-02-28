@@ -80,6 +80,17 @@ describe('MessageRepository', () => {
   });
 
   describe('create', () => {
+    it('should reject create when conversationId is null', async () => {
+      await expect(
+        repository.create({
+          ...mockAgentMessage,
+          conversationId: null as any,
+        }),
+      ).rejects.toThrow('conversationId is required');
+
+      expect(mockModel.create).not.toHaveBeenCalled();
+    });
+
     it('should create and return new agent message', async () => {
       mockModel.create.mockResolvedValue([mockAgentMessage]);
 

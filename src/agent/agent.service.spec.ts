@@ -8,6 +8,7 @@ import { MetadataExposureService } from './metadata-exposure.service';
 import * as llmFactory from './llm/llm.factory';
 import * as ai from 'ai';
 import { Logger } from '@nestjs/common';
+import { Types } from 'mongoose';
 
 jest.mock('ai', () => ({
   generateText: jest.fn(),
@@ -228,6 +229,8 @@ describe('AgentService', () => {
 
       const generateTextCall = (ai.generateText as jest.Mock).mock.calls[0][0];
       expect(generateTextCall.system).not.toContain('apiKey');
+      expect(generateTextCall.system).not.toContain('rawPayload');
+      expect(generateTextCall.system).not.toContain('providerCredentials');
 
       expect(logSpy).toHaveBeenCalledWith(
         'Processing 507f1f77bcf86cd799439013 for client 507f1f77bcf86cd799439011 using provider=openai model=gpt-4',
@@ -257,6 +260,67 @@ describe('AgentService', () => {
       expect(generateTextCall.system).toContain(
         'If you greet the contact, you may use their first name: Ana.',
       );
+      expect(generateTextCall.system).toContain(
+        'Do not imply prior-conversation memory or continuity unless it is explicitly present in this conversation history.',
+      );
+      expect(generateTextCall.system).toContain('Safe contact metadata:');
+    });
+
+    it('resolves conversation before persisting user message', async () => {
+      const mockModel = {};
+      (llmFactory.createLLMModel as jest.Mock).mockReturnValue(mockModel);
+      (ai.generateText as jest.Mock).mockResolvedValue({ text: 'AI response' });
+
+      messagePersistenceService.resolveConversation.mockResolvedValue({
+        _id: '507f1f77bcf86cd799439099',
+      } as any);
+      messagePersistenceService.getConversationContextByConversationId.mockResolvedValue([]);
+      messagePersistenceService.createUserMessage.mockResolvedValue();
+      messagePersistenceService.handleOutgoingMessage.mockResolvedValue();
+
+      await service.run(mockInput, mockContext);
+
+      const resolveOrder =
+        messagePersistenceService.resolveConversation.mock.invocationCallOrder[0];
+      const createOrder =
+        messagePersistenceService.createUserMessage.mock.invocationCallOrder[0];
+
+      expect(resolveOrder).toBeLessThan(createOrder);
+    });
+
+    it('does not load old conversation history when a new conversation is resolved', async () => {
+      const mockModel = {};
+      const oldConversationId = new Types.ObjectId('507f1f77bcf86cd799439098');
+      const newConversationId = new Types.ObjectId('507f1f77bcf86cd799439099');
+
+      (llmFactory.createLLMModel as jest.Mock).mockReturnValue(mockModel);
+      (ai.generateText as jest.Mock).mockResolvedValue({ text: 'AI response' });
+      messagePersistenceService.resolveConversation.mockResolvedValue({
+        _id: newConversationId,
+      } as any);
+      messagePersistenceService.getConversationContextByConversationId.mockImplementation(
+        async (conversationId: any) => {
+          if (conversationId?.toString() === oldConversationId.toString()) {
+            return [{ role: 'user', content: 'old memory' }];
+          }
+
+          return [];
+        },
+      );
+      messagePersistenceService.createUserMessage.mockResolvedValue();
+      messagePersistenceService.handleOutgoingMessage.mockResolvedValue();
+
+      await service.run(mockInput, mockContext);
+
+      expect(messagePersistenceService.getConversationContextByConversationId).toHaveBeenCalledWith(
+        newConversationId,
+        expect.anything(),
+      );
+
+      const generateTextCall = (ai.generateText as jest.Mock).mock.calls[0][0];
+      expect(generateTextCall.messages).toEqual([
+        { role: 'user', content: mockInput.message.text },
+      ]);
     });
   });
 });
