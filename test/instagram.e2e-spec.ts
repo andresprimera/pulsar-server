@@ -177,6 +177,9 @@ describe('Instagram Channel (e2e)', () => {
       .expect(200)
       .expect('ok');
 
+    // Allow fire-and-forget webhook processing to complete
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
     expect(mockAgentService.run).toHaveBeenCalledTimes(1);
     const runArgs = (mockAgentService.run as jest.Mock).mock.calls[0][0];
     expect(runArgs.channel).toBe('instagram');

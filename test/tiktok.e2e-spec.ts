@@ -166,6 +166,9 @@ describe('TikTok Channel (e2e)', () => {
       })
       .expect(200);
 
+    // Allow fire-and-forget webhook processing to complete
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
     // Assert
     // Check Agent Service Calls
     expect(mockAgentService.run).toHaveBeenCalledTimes(1);

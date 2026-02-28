@@ -244,6 +244,9 @@ describe('Concurrent Channels (e2e)', () => {
 
     await Promise.all([wa, tt, ig]);
 
+    // Allow fire-and-forget webhook processing to complete
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
     expect(mockAgentService.run).toHaveBeenCalledTimes(3);
     const channels = (mockAgentService.run as jest.Mock).mock.calls
       .map((call) => call[0].channel)
