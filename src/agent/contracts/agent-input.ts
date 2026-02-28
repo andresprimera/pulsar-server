@@ -1,6 +1,8 @@
+import { ChannelType } from '../../channels/shared/channel-type.type';
+
 export interface AgentInput {
-  channel: string;
-  externalUserId: string;
+  channel: ChannelType;
+  contactId: string;
   conversationId: string;
   message: {
     type: 'text';

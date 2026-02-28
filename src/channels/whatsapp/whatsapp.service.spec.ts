@@ -5,15 +5,19 @@ import { WhatsappService } from './whatsapp.service';
 import { AgentService } from '../../agent/agent.service';
 import { AgentRepository } from '../../database/repositories/agent.repository';
 import { ClientRepository } from '../../database/repositories/client.repository';
+import { ContactRepository } from '../../database/repositories/contact.repository';
 import { LlmProvider } from '../../agent/llm/provider.enum';
 import { AgentRoutingService } from '../shared/agent-routing.service';
 import { AgentContextService } from '../../agent/agent-context.service';
+import { ContactIdentifierExtractorRegistry } from '../shared/contact-identifier/contact-identifier-extractor.registry';
 
 describe('WhatsappService', () => {
   let service: WhatsappService;
   let agentService: jest.Mocked<AgentService>;
   let agentRoutingService: jest.Mocked<AgentRoutingService>;
   let agentRepository: jest.Mocked<AgentRepository>;
+  let contactRepository: jest.Mocked<ContactRepository>;
+  let identifierExtractorRegistry: jest.Mocked<ContactIdentifierExtractorRegistry>;
   let loggerLogSpy: jest.SpyInstance;
   let loggerWarnSpy: jest.SpyInstance;
   let fetchSpy: jest.SpyInstance;
@@ -49,6 +53,20 @@ describe('WhatsappService', () => {
           useValue: { findById: jest.fn().mockResolvedValue({ name: 'Test Client' }) },
         },
         {
+          provide: ContactRepository,
+          useValue: { findOrCreateByExternalIdentity: jest.fn() },
+        },
+        {
+          provide: ContactIdentifierExtractorRegistry,
+          useValue: {
+            resolve: jest.fn().mockReturnValue({
+              externalId: '1234567890',
+              externalIdRaw: '+1234567890',
+              identifierType: 'phone',
+            }),
+          },
+        },
+        {
           provide: AgentContextService,
           useValue: {
             enrichContext: jest.fn().mockImplementation((ctx) => Promise.resolve(ctx)),
@@ -61,6 +79,8 @@ describe('WhatsappService', () => {
     agentService = module.get(AgentService);
     agentRoutingService = module.get(AgentRoutingService);
     agentRepository = module.get(AgentRepository);
+    contactRepository = module.get(ContactRepository);
+    identifierExtractorRegistry = module.get(ContactIdentifierExtractorRegistry);
 
     // Spy on Logger.prototype since a new Logger() is instantiated in the service
     loggerLogSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
@@ -135,12 +155,12 @@ describe('WhatsappService', () => {
 
     const mockClientAgent = {
       _id: 'ca-1',
-      clientId: 'client-1',
+      clientId: '507f1f77bcf86cd799439011',
       agentId: 'agent-1',
       status: 'active',
       channels: [
         {
-          channelId: 'whatsapp-1',
+          channelId: '507f1f77bcf86cd799439014',
           status: 'active',
           provider: 'meta',
           credentials: { phoneNumberId: 'phone123', accessToken: 'sk-wa-token' },
@@ -157,6 +177,10 @@ describe('WhatsappService', () => {
       id: 'agent-1',
       name: 'Support Bot',
       systemPrompt: 'You are a helpful assistant.',
+    };
+
+    const mockContact = {
+      _id: '507f1f77bcf86cd799439012',
     };
 
     const mockResolvedRoute = {
@@ -232,6 +256,7 @@ describe('WhatsappService', () => {
     it('should call agentService.run with correct input and context', async () => {
       agentRoutingService.resolveRoute.mockResolvedValue(mockResolvedRoute as any);
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
+      contactRepository.findOrCreateByExternalIdentity.mockResolvedValue(mockContact as any);
       agentService.run.mockResolvedValue({
         reply: { type: 'text', text: 'Hello' },
       });
@@ -242,15 +267,15 @@ describe('WhatsappService', () => {
       expect(agentService.run).toHaveBeenCalledWith(
         {
           channel: 'whatsapp',
-          externalUserId: '1234567890',
+          contactId: '507f1f77bcf86cd799439012',
           conversationId: 'phone123:1234567890',
           message: { type: 'text', text: 'Hello' },
           metadata: { messageId: 'msg123', phoneNumberId: 'phone123' },
         },
         expect.objectContaining({
           agentId: 'agent-1',
-          clientId: 'client-1',
-          channelId: 'whatsapp-1',
+          clientId: '507f1f77bcf86cd799439011',
+          channelId: '507f1f77bcf86cd799439014',
           systemPrompt: 'You are a helpful assistant.',
           channelConfig: mockClientAgent.channels[0].credentials,
         }),
@@ -260,6 +285,7 @@ describe('WhatsappService', () => {
     it('should log outbound message when reply exists', async () => {
       agentRoutingService.resolveRoute.mockResolvedValue(mockResolvedRoute as any);
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
+      contactRepository.findOrCreateByExternalIdentity.mockResolvedValue(mockContact as any);
       agentService.run.mockResolvedValue({
         reply: { type: 'text', text: 'Echo response' },
       });
@@ -275,6 +301,7 @@ describe('WhatsappService', () => {
     it('should not log outbound message when reply is undefined', async () => {
       agentRoutingService.resolveRoute.mockResolvedValue(mockResolvedRoute as any);
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
+      contactRepository.findOrCreateByExternalIdentity.mockResolvedValue(mockContact as any);
       agentService.run.mockResolvedValue({});
 
       const payload = createPayload();

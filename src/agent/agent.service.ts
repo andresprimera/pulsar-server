@@ -25,16 +25,14 @@ export class AgentService {
 
     try {
       // Automatically handle incoming message persistence and get conversation history
-      const { contact, conversationHistory } =
+      const { contactId, conversationHistory } =
         await this.messagePersistenceService.handleIncomingMessage(
           input.message.text,
           {
             channelId: context.channelId,
             agentId: context.agentId,
             clientId: context.clientId,
-            externalUserId: input.externalUserId,
-            channelType: input.channel as 'whatsapp' | 'tiktok' | 'instagram',
-            userName: input.externalUserId, // Use external ID as name initially
+            contactId: input.contactId,
           },
         );
 
@@ -79,11 +77,9 @@ export class AgentService {
           channelId: context.channelId,
           agentId: context.agentId,
           clientId: context.clientId,
-          externalUserId: input.externalUserId,
-          channelType: input.channel as 'whatsapp' | 'tiktok' | 'instagram',
-          userName: input.externalUserId,
+          contactId: input.contactId,
         },
-        contact._id,
+        contactId,
         context,
       );
 

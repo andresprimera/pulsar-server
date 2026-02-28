@@ -57,7 +57,7 @@ describe('AgentRoutingService', () => {
         },
         {
           provide: ContactRepository,
-          useValue: { findByExternalUserId: jest.fn() },
+          useValue: { findByExternalIdentity: jest.fn() },
         },
         {
           provide: MessageRepository,
@@ -90,8 +90,8 @@ describe('AgentRoutingService', () => {
     } as any);
 
     const result = await service.resolveRoute({
-      channelIdentifier: 'phone-1',
-      externalUserId: 'user-1',
+      routeChannelIdentifier: 'phone-1',
+      channelIdentifier: 'user-1',
       incomingText: 'hello',
       channelType: 'whatsapp',
     });
@@ -121,8 +121,8 @@ describe('AgentRoutingService', () => {
       } as any);
 
     const result = await service.resolveRoute({
-      channelIdentifier: 'phone-1',
-      externalUserId: 'user-1',
+      routeChannelIdentifier: 'phone-1',
+      channelIdentifier: 'user-1',
       incomingText: '2',
       channelType: 'whatsapp',
     });
@@ -154,12 +154,12 @@ describe('AgentRoutingService', () => {
         status: 'active',
       } as any);
 
-    contactRepository.findByExternalUserId.mockResolvedValue(null);
+    contactRepository.findByExternalIdentity.mockResolvedValue(null);
     messageRepository.findLatestByContactAndAgents.mockResolvedValue(null);
 
     const result = await service.resolveRoute({
-      channelIdentifier: 'phone-1',
-      externalUserId: 'user-1',
+      routeChannelIdentifier: 'phone-1',
+      channelIdentifier: 'user-1',
       incomingText: 'hello there',
       channelType: 'whatsapp',
     });

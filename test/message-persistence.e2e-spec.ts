@@ -52,7 +52,7 @@ describe('Message Persistence (e2e)', () => {
       await connection.collection('agents').deleteOne({ _id: agentIdObj });
       await connection.collection('client_agents').deleteOne({ _id: clientAgentIdObj });
       await connection.collection('messages').deleteMany({ channelId: channelIdObj });
-      await connection.collection('contacts').deleteMany({ externalUserId: userPhone });
+      await connection.collection('contacts').deleteMany({ externalId: userPhone.replace(/[^\d]/g, '') });
     }
 
     // Create Client
@@ -103,7 +103,7 @@ describe('Message Persistence (e2e)', () => {
       await connection.collection('agents').deleteOne({ _id: agentIdObj });
       await connection.collection('client_agents').deleteOne({ _id: clientAgentIdObj });
       await connection.collection('messages').deleteMany({ channelId: channelIdObj });
-      await connection.collection('contacts').deleteMany({ externalUserId: userPhone });
+      await connection.collection('contacts').deleteMany({ externalId: userPhone.replace(/[^\d]/g, '') });
     }
     await app.close();
   });
@@ -111,7 +111,7 @@ describe('Message Persistence (e2e)', () => {
   beforeEach(async () => {
     // Clean up messages before each test
     await connection.collection('messages').deleteMany({ channelId: channelIdObj });
-    await connection.collection('contacts').deleteMany({ externalUserId: userPhone });
+    await connection.collection('contacts').deleteMany({ externalId: userPhone.replace(/[^\d]/g, '') });
     jest.clearAllMocks();
   });
 
@@ -149,9 +149,9 @@ describe('Message Persistence (e2e)', () => {
       // Assert - Check contact was created
       const contact = await connection
         .collection('contacts')
-        .findOne({ externalUserId: userPhone });
+        .findOne({ externalId: userPhone.replace(/[^\d]/g, '') });
       expect(contact).toBeDefined();
-      expect(contact.externalUserId).toBe(userPhone);
+      expect(contact.externalId).toBe(userPhone.replace(/[^\d]/g, ''));
       expect(contact.clientId.toString()).toBe(clientId);
 
       // Assert - Check user message was persisted
@@ -257,10 +257,16 @@ describe('Message Persistence (e2e)', () => {
 
       // Create a contact with enough messages to exceed threshold
       const contactResult = await connection.collection('contacts').insertOne({
-        externalUserId: userPhone,
+        externalId: userPhone.replace(/[^\d]/g, ''),
+        externalIdRaw: userPhone,
+        identifier: {
+          type: 'phone',
+          value: userPhone.replace(/[^\d]/g, ''),
+        },
         clientId: clientIdObj,
-        channelType: 'whatsapp',
+        channelId: channelIdObj,
         name: userPhone,
+        metadata: {},
         status: 'active',
       });
 
@@ -370,12 +376,12 @@ describe('Message Persistence (e2e)', () => {
 
       const contact = await connection
         .collection('contacts')
-        .findOne({ externalUserId: userPhone });
+        .findOne({ externalId: userPhone.replace(/[^\d]/g, '') });
 
       expect(contact).toBeDefined();
-      expect(contact.externalUserId).toBe(userPhone);
+      expect(contact.externalId).toBe(userPhone.replace(/[^\d]/g, ''));
       expect(contact.name).toBe(userPhone);
-      expect(contact.channelType).toBe('whatsapp');
+      expect(contact.channelId.toString()).toBe(channelIdObj.toString());
       expect(contact.status).toBe('active');
     });
 
@@ -408,7 +414,7 @@ describe('Message Persistence (e2e)', () => {
 
       const contactCountAfterFirst = await connection
         .collection('contacts')
-        .countDocuments({ externalUserId: userPhone });
+        .countDocuments({ externalId: userPhone.replace(/[^\d]/g, '') });
 
       // Second message
       const payload2 = {
@@ -438,7 +444,7 @@ describe('Message Persistence (e2e)', () => {
 
       const contactCountAfterSecond = await connection
         .collection('contacts')
-        .countDocuments({ externalUserId: userPhone });
+        .countDocuments({ externalId: userPhone.replace(/[^\d]/g, '') });
 
       // Should still be only one contact
       expect(contactCountAfterFirst).toBe(1);

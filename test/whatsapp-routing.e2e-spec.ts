@@ -508,20 +508,20 @@ describe('WhatsApp Message Routing (e2e)', () => {
       // Conversations should be separate (verified by conversationId including phoneNumberId)
     });
 
-    it('should maintain separate conversations for same external user ID across different clients', async () => {
+    it('should maintain separate conversations for same channel identifier across different clients', async () => {
       if (!user1PhoneNumberId || !user2PhoneNumberId) {
         return;
       }
 
-      const sameExternalUserId = '5555555555';
+      const sameChannelIdentifier = '5555555555';
 
-      // Same external user messages different clients
+      // Same channel identifier messages different clients
       await request(app.getHttpServer())
         .post('/whatsapp/webhook')
         .send(
           createWhatsAppMessage(
             user1PhoneNumberId,
-            sameExternalUserId,
+            sameChannelIdentifier,
             'Message to User 1',
             'msg-same-user-1',
           ),
@@ -533,7 +533,7 @@ describe('WhatsApp Message Routing (e2e)', () => {
         .send(
           createWhatsAppMessage(
             user2PhoneNumberId,
-            sameExternalUserId,
+            sameChannelIdentifier,
             'Message to User 2',
             'msg-same-user-2',
           ),

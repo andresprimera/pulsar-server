@@ -1,10 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model, Types } from 'mongoose';
 import { Contact } from '../schemas/contact.schema';
+import { ContactIdentifierType } from '../schemas/contact.schema';
 
 @Injectable()
 export class ContactRepository {
+  private readonly logger = new Logger(ContactRepository.name);
+
   constructor(
     @InjectModel(Contact.name)
     private readonly model: Model<Contact>,
@@ -18,42 +21,80 @@ export class ContactRepository {
     return this.model.find({ clientId }).exec();
   }
 
-  async findByExternalUserId(
-    externalUserId: string,
+  async findByExternalIdentity(
     clientId: Types.ObjectId,
+    channelId: Types.ObjectId,
+    externalId: string,
   ): Promise<Contact | null> {
-    return this.model.findOne({ externalUserId, clientId }).exec();
+    return this.model
+      .findOne({ clientId, channelId, externalId })
+      .exec();
   }
 
-  async findOrCreate(
-    externalUserId: string,
+  async findOrCreateByExternalIdentity(
     clientId: Types.ObjectId,
-    channelType: 'whatsapp' | 'tiktok' | 'instagram',
+    channelId: Types.ObjectId,
+    externalId: string,
+    externalIdRaw: string | undefined,
+    identifierType: ContactIdentifierType,
     name: string,
+    metadata?: Record<string, unknown>,
     session?: ClientSession,
   ): Promise<Contact> {
-    const existing = await this.model
-      .findOne({ externalUserId, clientId })
-      .session(session)
-      .exec();
+    const filter = { clientId, channelId, externalId };
+    const setOnInsert = {
+      clientId,
+      channelId,
+      externalId,
+      externalIdRaw,
+      identifier: {
+        type: identifierType,
+        value: externalId,
+      },
+      name,
+      metadata: metadata ?? {},
+      status: 'active',
+    };
 
-    if (existing) {
-      return existing;
+    try {
+      const contact = await this.model
+        .findOneAndUpdate(
+          filter,
+          {
+            $setOnInsert: setOnInsert,
+          },
+          {
+            upsert: true,
+            new: true,
+            setDefaultsOnInsert: true,
+            runValidators: true,
+            session,
+          },
+        )
+        .exec();
+
+      this.logger.log(
+        `event=contact_upsert_success clientId=${clientId.toString()} channelId=${channelId.toString()}`,
+      );
+
+      return contact as Contact;
+    } catch (error) {
+      if (this.isDuplicateKeyError(error)) {
+        this.logger.warn(
+          `event=contact_duplicate_key_retry clientId=${clientId.toString()} channelId=${channelId.toString()}`,
+        );
+
+        const existing = await this.model.findOne(filter).session(session).exec();
+        if (existing) {
+          return existing;
+        }
+      }
+
+      throw error;
     }
+  }
 
-    const [contact] = await this.model.create(
-      [
-        {
-          externalUserId,
-          clientId,
-          channelType,
-          name,
-          status: 'active',
-        },
-      ],
-      { session },
-    );
-
-    return contact;
+  private isDuplicateKeyError(error: unknown): boolean {
+    return typeof error === 'object' && error !== null && (error as any).code === 11000;
   }
 }

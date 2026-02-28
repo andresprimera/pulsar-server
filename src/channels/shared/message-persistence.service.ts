@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { MessageRepository } from '../../database/repositories/message.repository';
-import { ContactRepository } from '../../database/repositories/contact.repository';
 import { ConversationSummaryService } from '../../agent/conversation-summary.service';
 import { AgentContext } from '../../agent/contracts/agent-context';
 
@@ -9,9 +8,7 @@ export interface MessagePersistenceContext {
   channelId: Types.ObjectId | string;
   agentId: Types.ObjectId | string;
   clientId: Types.ObjectId | string;
-  externalUserId: string;
-  channelType: 'whatsapp' | 'tiktok' | 'instagram';
-  userName: string;
+  contactId: Types.ObjectId | string;
 }
 
 @Injectable()
@@ -20,26 +17,8 @@ export class MessagePersistenceService {
 
   constructor(
     private readonly messageRepository: MessageRepository,
-    private readonly contactRepository: ContactRepository,
     private readonly conversationSummaryService: ConversationSummaryService,
   ) {}
-
-  /**
-   * Finds or creates a contact by external ID (e.g., phone number, TikTok user ID)
-   */
-  async findOrCreateContact(
-    externalUserId: string,
-    clientId: Types.ObjectId | string,
-    channelType: 'whatsapp' | 'tiktok' | 'instagram',
-    name: string,
-  ): Promise<any> {
-    return this.contactRepository.findOrCreate(
-      externalUserId,
-      new Types.ObjectId(clientId),
-      channelType,
-      name,
-    );
-  }
 
   /**
    * Saves an incoming user message to the database
@@ -140,27 +119,21 @@ export class MessagePersistenceService {
     content: string,
     context: MessagePersistenceContext,
   ): Promise<{
-    contact: any;
+    contactId: Types.ObjectId;
     conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
   }> {
-    // Find or create contact
-    const contact = await this.findOrCreateContact(
-      context.externalUserId,
-      context.clientId,
-      context.channelType,
-      context.userName,
-    );
+    const contactId = new Types.ObjectId(context.contactId);
 
     // Save user message
-    await this.saveUserMessage(content, context, contact._id as Types.ObjectId);
+    await this.saveUserMessage(content, context, contactId);
 
     // Get conversation context
     const conversationHistory = await this.getConversationContext(
       context,
-      contact._id as Types.ObjectId,
+      contactId,
     );
 
-    return { contact, conversationHistory };
+    return { contactId, conversationHistory };
   }
 
   /**

@@ -5,6 +5,8 @@ import { AgentService } from '../../agent/agent.service';
 import { AgentRoutingService } from '../shared/agent-routing.service';
 import { AgentRepository } from '../../database/repositories/agent.repository';
 import { AgentContextService } from '../../agent/agent-context.service';
+import { ContactRepository } from '../../database/repositories/contact.repository';
+import { ContactIdentifierExtractorRegistry } from '../shared/contact-identifier/contact-identifier-extractor.registry';
 import { AgentOutput } from '../../agent/contracts/agent-output';
 import { encrypt } from '../../database/utils/crypto.util';
 
@@ -13,6 +15,8 @@ describe('TiktokService', () => {
   let agentService: jest.Mocked<AgentService>;
   let agentRoutingService: jest.Mocked<AgentRoutingService>;
   let agentRepository: jest.Mocked<AgentRepository>;
+  let contactRepository: jest.Mocked<ContactRepository>;
+  let identifierExtractorRegistry: jest.Mocked<ContactIdentifierExtractorRegistry>;
   let loggerLogSpy: jest.SpyInstance;
   let loggerWarnSpy: jest.SpyInstance;
   let loggerErrorSpy: jest.SpyInstance;
@@ -44,6 +48,20 @@ describe('TiktokService', () => {
           useValue: { findActiveById: jest.fn() },
         },
         {
+          provide: ContactRepository,
+          useValue: { findOrCreateByExternalIdentity: jest.fn() },
+        },
+        {
+          provide: ContactIdentifierExtractorRegistry,
+          useValue: {
+            resolve: jest.fn().mockReturnValue({
+              externalId: 'sender_456',
+              externalIdRaw: 'sender_456',
+              identifierType: 'platform_id',
+            }),
+          },
+        },
+        {
           provide: AgentContextService,
           useValue: {
             enrichContext: jest.fn().mockImplementation((ctx) => Promise.resolve(ctx)),
@@ -56,6 +74,8 @@ describe('TiktokService', () => {
     agentService = module.get(AgentService);
     agentRoutingService = module.get(AgentRoutingService);
     agentRepository = module.get(AgentRepository);
+    contactRepository = module.get(ContactRepository);
+    identifierExtractorRegistry = module.get(ContactIdentifierExtractorRegistry);
 
     loggerLogSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
     loggerWarnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
@@ -111,11 +131,11 @@ describe('TiktokService', () => {
 
     const mockClientAgent = {
         agentId: 'agent_007',
-        clientId: 'client_001',
+        clientId: '507f1f77bcf86cd799439011',
         channels: [
           {
             status: 'active',
-            channelId: 'channel_1',
+            channelId: '507f1f77bcf86cd799439014',
             credentials: encryptedCredsRecord,
             llmConfig: { provider: 'openai', apiKey: 'key' },
           },
@@ -170,6 +190,9 @@ describe('TiktokService', () => {
         },
       } as any);
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
+      contactRepository.findOrCreateByExternalIdentity.mockResolvedValue({
+        _id: '507f1f77bcf86cd799439012',
+      } as any);
       agentService.run.mockResolvedValue({
         reply: { text: 'Hello back!', type: 'text' },
       });
@@ -203,6 +226,9 @@ describe('TiktokService', () => {
         },
       } as any);
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
+      contactRepository.findOrCreateByExternalIdentity.mockResolvedValue({
+        _id: '507f1f77bcf86cd799439012',
+      } as any);
       agentService.run.mockResolvedValue({
         reply: { text: 'Hello back!', type: 'text' },
       });

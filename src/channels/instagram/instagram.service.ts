@@ -1,9 +1,11 @@
 import { Injectable, ForbiddenException, Logger } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'crypto';
+import { Types } from 'mongoose';
 import { AgentService } from '../../agent/agent.service';
 import { AgentInput } from '../../agent/contracts/agent-input';
 import { AgentContext } from '../../agent/contracts/agent-context';
 import { AgentRepository } from '../../database/repositories/agent.repository';
+import { ContactRepository } from '../../database/repositories/contact.repository';
 import { decryptRecord, decrypt } from '../../database/utils/crypto.util';
 import {
   InstagramServerConfig,
@@ -12,6 +14,8 @@ import {
 } from './instagram.config';
 import { AgentRoutingService } from '../shared/agent-routing.service';
 import { AgentContextService } from '../../agent/agent-context.service';
+import { ContactIdentifierExtractorRegistry } from '../shared/contact-identifier/contact-identifier-extractor.registry';
+import { CHANNEL_TYPES } from '../shared/channel-type.constants';
 
 @Injectable()
 export class InstagramService {
@@ -22,8 +26,10 @@ export class InstagramService {
   constructor(
     private readonly agentService: AgentService,
     private readonly agentRepository: AgentRepository,
+    private readonly contactRepository: ContactRepository,
     private readonly agentRoutingService: AgentRoutingService,
     private readonly agentContextService: AgentContextService,
+    private readonly identifierExtractorRegistry: ContactIdentifierExtractorRegistry,
   ) {
     this.config = loadInstagramConfig();
   }
@@ -152,11 +158,16 @@ export class InstagramService {
           continue;
         }
 
+        const identifier = this.identifierExtractorRegistry.resolve(
+          CHANNEL_TYPES.INSTAGRAM,
+          event,
+        );
+
         const routeDecision = await this.agentRoutingService.resolveRoute({
-          channelIdentifier: instagramAccountId,
-          externalUserId: senderId,
+          routeChannelIdentifier: instagramAccountId,
+          channelIdentifier: identifier.externalId,
           incomingText: text,
-          channelType: 'instagram',
+          channelType: CHANNEL_TYPES.INSTAGRAM,
         });
 
         if (routeDecision.kind === 'unroutable') {
@@ -224,9 +235,18 @@ export class InstagramService {
 
         const context = await this.agentContextService.enrichContext(rawContext);
 
+        const contact = await this.contactRepository.findOrCreateByExternalIdentity(
+          new Types.ObjectId(clientAgent.clientId),
+          new Types.ObjectId(channelConfig.channelId.toString()),
+          identifier.externalId,
+          identifier.externalIdRaw,
+          identifier.identifierType,
+          senderId,
+        );
+
         const input: AgentInput = {
-          channel: 'instagram',
-          externalUserId: senderId,
+          channel: CHANNEL_TYPES.INSTAGRAM,
+          contactId: contact._id.toString(),
           conversationId: `${instagramAccountId}:${senderId}`,
           message: {
             type: 'text',

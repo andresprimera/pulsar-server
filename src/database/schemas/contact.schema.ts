@@ -1,10 +1,37 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
+export type ContactIdentifierType =
+  | 'phone'
+  | 'username'
+  | 'platform_id'
+  | 'email';
+
+@Schema({ _id: false })
+export class ContactIdentifier {
+  @Prop({
+    required: true,
+    enum: ['phone', 'username', 'platform_id', 'email'],
+  })
+  type: ContactIdentifierType;
+
+  @Prop({ required: true })
+  value: string;
+}
+
+export const ContactIdentifierSchema =
+  SchemaFactory.createForClass(ContactIdentifier);
+
 @Schema({ collection: 'contacts', timestamps: true })
 export class Contact extends Document {
-  @Prop({ required: true, index: true })
-  externalUserId: string;
+  @Prop({ required: true, index: true, immutable: true })
+  externalId: string;
+
+  @Prop()
+  externalIdRaw?: string;
+
+  @Prop({ type: ContactIdentifierSchema })
+  identifier?: ContactIdentifier;
 
   @Prop({
     type: Types.ObjectId,
@@ -15,22 +42,26 @@ export class Contact extends Document {
   clientId: Types.ObjectId;
 
   @Prop({
+    type: Types.ObjectId,
+    ref: 'Channel',
     required: true,
-    enum: ['whatsapp', 'tiktok', 'instagram'],
     index: true,
   })
-  channelType: 'whatsapp' | 'tiktok' | 'instagram';
+  channelId: Types.ObjectId;
 
   @Prop({ required: true })
   name: string;
 
+  @Prop({ type: Object, default: {} })
+  metadata?: Record<string, any>;
+
   @Prop({
     required: true,
-    enum: ['active', 'inactive', 'archived'],
+    enum: ['active', 'blocked', 'archived'],
     default: 'active',
     index: true,
   })
-  status: 'active' | 'inactive' | 'archived';
+  status: 'active' | 'blocked' | 'archived';
 
   createdAt: Date;
   updatedAt: Date;
@@ -38,5 +69,34 @@ export class Contact extends Document {
 
 export const ContactSchema = SchemaFactory.createForClass(Contact);
 
-// Unique per external user per client
-ContactSchema.index({ externalUserId: 1, clientId: 1 }, { unique: true });
+export function throwsIfExternalIdMutation(update: Record<string, any>): void {
+  if (!update) {
+    return;
+  }
+
+  const directMutation = Object.prototype.hasOwnProperty.call(update, 'externalId');
+  const setMutation =
+    !!update.$set &&
+    Object.prototype.hasOwnProperty.call(update.$set, 'externalId');
+  const unsetMutation =
+    !!update.$unset &&
+    Object.prototype.hasOwnProperty.call(update.$unset, 'externalId');
+  const renameMutation =
+    !!update.$rename &&
+    Object.prototype.hasOwnProperty.call(update.$rename, 'externalId');
+
+  if (directMutation || setMutation || unsetMutation || renameMutation) {
+    throw new Error('externalId is immutable and cannot be modified');
+  }
+}
+
+ContactSchema.pre('findOneAndUpdate', function () {
+  const update = this.getUpdate() as Record<string, any>;
+  throwsIfExternalIdMutation(update);
+});
+
+// Unique per normalized identifier per client per channel
+ContactSchema.index(
+  { clientId: 1, channelId: 1, externalId: 1 },
+  { unique: true },
+);
