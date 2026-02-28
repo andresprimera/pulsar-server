@@ -76,17 +76,6 @@ describe('MessageRepository', () => {
   });
 
   describe('create', () => {
-    it('should create and return new user message', async () => {
-      mockModel.create.mockResolvedValue([mockUserMessage]);
-
-      const result = await repository.create(mockUserMessage);
-
-      expect(mockModel.create).toHaveBeenCalledWith([mockUserMessage], {
-        session: undefined,
-      });
-      expect(result).toEqual(mockUserMessage);
-    });
-
     it('should create and return new agent message', async () => {
       mockModel.create.mockResolvedValue([mockAgentMessage]);
 

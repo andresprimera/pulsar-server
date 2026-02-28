@@ -5,6 +5,7 @@ import { AgentRoutingService } from './agent-routing.service';
 import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from '../../database/database.module';
 import { ContactIdentifierExtractorRegistry } from './contact-identifier/contact-identifier-extractor.registry';
+import { ContactIdentityResolver } from './contact-identity.resolver';
 import { WhatsappIdentifierExtractor } from './contact-identifier/whatsapp-identifier.extractor';
 import { InstagramIdentifierExtractor } from './contact-identifier/instagram-identifier.extractor';
 import { TelegramIdentifierExtractor } from './contact-identifier/telegram-identifier.extractor';
@@ -19,6 +20,7 @@ import { CONTACT_IDENTIFIER_EXTRACTORS } from './contact-identifier/contact-iden
     MessagePersistenceService,
     ConversationSummaryService,
     AgentRoutingService,
+    ContactIdentityResolver,
     ContactIdentifierExtractorRegistry,
     WhatsappIdentifierExtractor,
     InstagramIdentifierExtractor,
@@ -57,6 +59,7 @@ import { CONTACT_IDENTIFIER_EXTRACTORS } from './contact-identifier/contact-iden
     MessagePersistenceService,
     ConversationSummaryService,
     AgentRoutingService,
+    ContactIdentityResolver,
     ContactIdentifierExtractorRegistry,
   ],
 })

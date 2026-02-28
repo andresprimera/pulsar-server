@@ -16,6 +16,9 @@ export class Message extends Document {
   @Prop({
     type: Types.ObjectId,
     ref: 'Contact',
+    required: function (this: Message) {
+      return this.type === 'user';
+    },
     index: true,
   })
   contactId?: Types.ObjectId;
@@ -58,24 +61,37 @@ export class Message extends Document {
 export const MessageSchema = SchemaFactory.createForClass(Message);
 
 // Validation: user messages must have contactId, agent/summary messages must have agentId
-MessageSchema.pre('save', function (next) {
+MessageSchema.pre('validate', function (next) {
   if (this.type === 'user' && !this.contactId) {
     next(new Error('contactId is required for user messages'));
-  } else if ((this.type === 'agent' || this.type === 'summary') && !this.agentId) {
-    next(new Error('agentId is required for agent and summary messages'));
-  } else {
-    next();
+    return;
   }
+
+  if ((this.type === 'agent' || this.type === 'summary') && !this.agentId) {
+    next(new Error('agentId is required for agent and summary messages'));
+    return;
+  }
+
+  next();
 });
 
 // Validation for updates
 MessageSchema.pre('findOneAndUpdate', function (next) {
   const update = this.getUpdate() as any;
-  if (update.type === 'user' && !update.contactId) {
+  const updatePayload = update?.$set ? { ...update.$set } : { ...update };
+  const type = updatePayload.type;
+  const contactId = updatePayload.contactId;
+  const agentId = updatePayload.agentId;
+
+  if (type === 'user' && !contactId) {
     next(new Error('contactId is required for user messages'));
-  } else if ((update.type === 'agent' || update.type === 'summary') && !update.agentId) {
-    next(new Error('agentId is required for agent and summary messages'));
-  } else {
-    next();
+    return;
   }
+
+  if ((type === 'agent' || type === 'summary') && !agentId) {
+    next(new Error('agentId is required for agent and summary messages'));
+    return;
+  }
+
+  next();
 });

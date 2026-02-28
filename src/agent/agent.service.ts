@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { generateText } from 'ai';
+import { Types } from 'mongoose';
 import { AgentInput } from './contracts/agent-input';
 import { AgentOutput } from './contracts/agent-output';
 import { AgentContext } from './contracts/agent-context';
@@ -24,16 +25,24 @@ export class AgentService {
     );
 
     try {
-      // Automatically handle incoming message persistence and get conversation history
-      const { contactId, conversationHistory } =
-        await this.messagePersistenceService.handleIncomingMessage(
-          input.message.text,
-          {
-            channelId: context.channelId,
-            agentId: context.agentId,
-            clientId: context.clientId,
-            contactId: input.contactId,
-          },
+      const persistenceContext = {
+        channelId: context.channelId,
+        agentId: context.agentId,
+        clientId: context.clientId,
+        contactId: input.contactId,
+      };
+      const contactId = new Types.ObjectId(input.contactId);
+
+      await this.messagePersistenceService.createUserMessage(
+        input.message.text,
+        persistenceContext,
+        contactId,
+      );
+
+      const conversationHistory =
+        await this.messagePersistenceService.getConversationContext(
+          persistenceContext,
+          contactId,
         );
 
       const model = createLLMModel(context.llmConfig);
@@ -73,12 +82,7 @@ export class AgentService {
       // Automatically handle outgoing message persistence
       await this.messagePersistenceService.handleOutgoingMessage(
         safeText,
-        {
-          channelId: context.channelId,
-          agentId: context.agentId,
-          clientId: context.clientId,
-          contactId: input.contactId,
-        },
+        persistenceContext,
         contactId,
         context,
       );

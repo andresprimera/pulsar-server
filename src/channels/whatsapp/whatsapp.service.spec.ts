@@ -5,19 +5,17 @@ import { WhatsappService } from './whatsapp.service';
 import { AgentService } from '../../agent/agent.service';
 import { AgentRepository } from '../../database/repositories/agent.repository';
 import { ClientRepository } from '../../database/repositories/client.repository';
-import { ContactRepository } from '../../database/repositories/contact.repository';
 import { LlmProvider } from '../../agent/llm/provider.enum';
 import { AgentRoutingService } from '../shared/agent-routing.service';
 import { AgentContextService } from '../../agent/agent-context.service';
-import { ContactIdentifierExtractorRegistry } from '../shared/contact-identifier/contact-identifier-extractor.registry';
+import { ContactIdentityResolver } from '../shared/contact-identity.resolver';
 
 describe('WhatsappService', () => {
   let service: WhatsappService;
   let agentService: jest.Mocked<AgentService>;
   let agentRoutingService: jest.Mocked<AgentRoutingService>;
   let agentRepository: jest.Mocked<AgentRepository>;
-  let contactRepository: jest.Mocked<ContactRepository>;
-  let identifierExtractorRegistry: jest.Mocked<ContactIdentifierExtractorRegistry>;
+  let contactIdentityResolver: jest.Mocked<ContactIdentityResolver>;
   let loggerLogSpy: jest.SpyInstance;
   let loggerWarnSpy: jest.SpyInstance;
   let fetchSpy: jest.SpyInstance;
@@ -53,17 +51,9 @@ describe('WhatsappService', () => {
           useValue: { findById: jest.fn().mockResolvedValue({ name: 'Test Client' }) },
         },
         {
-          provide: ContactRepository,
-          useValue: { findOrCreateByExternalIdentity: jest.fn() },
-        },
-        {
-          provide: ContactIdentifierExtractorRegistry,
+          provide: ContactIdentityResolver,
           useValue: {
-            resolve: jest.fn().mockReturnValue({
-              externalId: '1234567890',
-              externalIdRaw: '+1234567890',
-              identifierType: 'phone',
-            }),
+            resolveContact: jest.fn(),
           },
         },
         {
@@ -79,8 +69,7 @@ describe('WhatsappService', () => {
     agentService = module.get(AgentService);
     agentRoutingService = module.get(AgentRoutingService);
     agentRepository = module.get(AgentRepository);
-    contactRepository = module.get(ContactRepository);
-    identifierExtractorRegistry = module.get(ContactIdentifierExtractorRegistry);
+    contactIdentityResolver = module.get(ContactIdentityResolver);
 
     // Spy on Logger.prototype since a new Logger() is instantiated in the service
     loggerLogSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
@@ -256,7 +245,7 @@ describe('WhatsappService', () => {
     it('should call agentService.run with correct input and context', async () => {
       agentRoutingService.resolveRoute.mockResolvedValue(mockResolvedRoute as any);
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
-      contactRepository.findOrCreateByExternalIdentity.mockResolvedValue(mockContact as any);
+      contactIdentityResolver.resolveContact.mockResolvedValue(mockContact as any);
       agentService.run.mockResolvedValue({
         reply: { type: 'text', text: 'Hello' },
       });
@@ -285,7 +274,7 @@ describe('WhatsappService', () => {
     it('should log outbound message when reply exists', async () => {
       agentRoutingService.resolveRoute.mockResolvedValue(mockResolvedRoute as any);
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
-      contactRepository.findOrCreateByExternalIdentity.mockResolvedValue(mockContact as any);
+      contactIdentityResolver.resolveContact.mockResolvedValue(mockContact as any);
       agentService.run.mockResolvedValue({
         reply: { type: 'text', text: 'Echo response' },
       });
@@ -301,7 +290,7 @@ describe('WhatsappService', () => {
     it('should not log outbound message when reply is undefined', async () => {
       agentRoutingService.resolveRoute.mockResolvedValue(mockResolvedRoute as any);
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
-      contactRepository.findOrCreateByExternalIdentity.mockResolvedValue(mockContact as any);
+      contactIdentityResolver.resolveContact.mockResolvedValue(mockContact as any);
       agentService.run.mockResolvedValue({});
 
       const payload = createPayload();

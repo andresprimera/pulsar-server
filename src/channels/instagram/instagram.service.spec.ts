@@ -5,8 +5,7 @@ import { AgentService } from '../../agent/agent.service';
 import { AgentRoutingService } from '../shared/agent-routing.service';
 import { AgentRepository } from '../../database/repositories/agent.repository';
 import { AgentContextService } from '../../agent/agent-context.service';
-import { ContactRepository } from '../../database/repositories/contact.repository';
-import { ContactIdentifierExtractorRegistry } from '../shared/contact-identifier/contact-identifier-extractor.registry';
+import { ContactIdentityResolver } from '../shared/contact-identity.resolver';
 import { encrypt } from '../../database/utils/crypto.util';
 
 describe('InstagramService', () => {
@@ -14,8 +13,7 @@ describe('InstagramService', () => {
   let agentService: jest.Mocked<AgentService>;
   let agentRoutingService: jest.Mocked<AgentRoutingService>;
   let agentRepository: jest.Mocked<AgentRepository>;
-  let contactRepository: jest.Mocked<ContactRepository>;
-  let identifierExtractorRegistry: jest.Mocked<ContactIdentifierExtractorRegistry>;
+  let contactIdentityResolver: jest.Mocked<ContactIdentityResolver>;
   let loggerWarnSpy: jest.SpyInstance;
   let fetchSpy: jest.SpyInstance;
 
@@ -48,17 +46,9 @@ describe('InstagramService', () => {
           useValue: { findActiveById: jest.fn() },
         },
         {
-          provide: ContactRepository,
-          useValue: { findOrCreateByExternalIdentity: jest.fn() },
-        },
-        {
-          provide: ContactIdentifierExtractorRegistry,
+          provide: ContactIdentityResolver,
           useValue: {
-            resolve: jest.fn().mockReturnValue({
-              externalId: 'user_123',
-              externalIdRaw: 'user_123',
-              identifierType: 'platform_id',
-            }),
+            resolveContact: jest.fn(),
           },
         },
         {
@@ -74,8 +64,7 @@ describe('InstagramService', () => {
     agentService = module.get(AgentService);
     agentRoutingService = module.get(AgentRoutingService);
     agentRepository = module.get(AgentRepository);
-    contactRepository = module.get(ContactRepository);
-    identifierExtractorRegistry = module.get(ContactIdentifierExtractorRegistry);
+    contactIdentityResolver = module.get(ContactIdentityResolver);
 
     loggerWarnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
   });
@@ -130,7 +119,7 @@ describe('InstagramService', () => {
     agentRepository.findActiveById.mockResolvedValue({
       systemPrompt: 'prompt',
     } as any);
-    contactRepository.findOrCreateByExternalIdentity.mockResolvedValue({
+    contactIdentityResolver.resolveContact.mockResolvedValue({
       _id: '507f1f77bcf86cd799439012',
     } as any);
 

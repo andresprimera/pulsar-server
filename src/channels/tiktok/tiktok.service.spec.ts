@@ -5,8 +5,7 @@ import { AgentService } from '../../agent/agent.service';
 import { AgentRoutingService } from '../shared/agent-routing.service';
 import { AgentRepository } from '../../database/repositories/agent.repository';
 import { AgentContextService } from '../../agent/agent-context.service';
-import { ContactRepository } from '../../database/repositories/contact.repository';
-import { ContactIdentifierExtractorRegistry } from '../shared/contact-identifier/contact-identifier-extractor.registry';
+import { ContactIdentityResolver } from '../shared/contact-identity.resolver';
 import { AgentOutput } from '../../agent/contracts/agent-output';
 import { encrypt } from '../../database/utils/crypto.util';
 
@@ -15,8 +14,7 @@ describe('TiktokService', () => {
   let agentService: jest.Mocked<AgentService>;
   let agentRoutingService: jest.Mocked<AgentRoutingService>;
   let agentRepository: jest.Mocked<AgentRepository>;
-  let contactRepository: jest.Mocked<ContactRepository>;
-  let identifierExtractorRegistry: jest.Mocked<ContactIdentifierExtractorRegistry>;
+  let contactIdentityResolver: jest.Mocked<ContactIdentityResolver>;
   let loggerLogSpy: jest.SpyInstance;
   let loggerWarnSpy: jest.SpyInstance;
   let loggerErrorSpy: jest.SpyInstance;
@@ -48,17 +46,9 @@ describe('TiktokService', () => {
           useValue: { findActiveById: jest.fn() },
         },
         {
-          provide: ContactRepository,
-          useValue: { findOrCreateByExternalIdentity: jest.fn() },
-        },
-        {
-          provide: ContactIdentifierExtractorRegistry,
+          provide: ContactIdentityResolver,
           useValue: {
-            resolve: jest.fn().mockReturnValue({
-              externalId: 'sender_456',
-              externalIdRaw: 'sender_456',
-              identifierType: 'platform_id',
-            }),
+            resolveContact: jest.fn(),
           },
         },
         {
@@ -74,8 +64,7 @@ describe('TiktokService', () => {
     agentService = module.get(AgentService);
     agentRoutingService = module.get(AgentRoutingService);
     agentRepository = module.get(AgentRepository);
-    contactRepository = module.get(ContactRepository);
-    identifierExtractorRegistry = module.get(ContactIdentifierExtractorRegistry);
+    contactIdentityResolver = module.get(ContactIdentityResolver);
 
     loggerLogSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
     loggerWarnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
@@ -162,6 +151,12 @@ describe('TiktokService', () => {
         expect(agentRoutingService.resolveRoute).not.toHaveBeenCalled();
     });
 
+    it('should ignore messages without sender user_id', async () => {
+      await service.handleIncoming(createPayload({ sender: { user_id: undefined } }));
+      expect(loggerWarnSpy).toHaveBeenCalledWith('[TikTok] Missing sender.user_id in payload.');
+      expect(agentRoutingService.resolveRoute).not.toHaveBeenCalled();
+    });
+
     it('should log warning when no ClientAgent found for tiktokUserId', async () => {
         agentRoutingService.resolveRoute.mockResolvedValue({ kind: 'unroutable', reason: 'no-candidates' });
         await service.handleIncoming(createPayload());
@@ -190,7 +185,7 @@ describe('TiktokService', () => {
         },
       } as any);
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
-      contactRepository.findOrCreateByExternalIdentity.mockResolvedValue({
+      contactIdentityResolver.resolveContact.mockResolvedValue({
         _id: '507f1f77bcf86cd799439012',
       } as any);
       agentService.run.mockResolvedValue({
@@ -226,7 +221,7 @@ describe('TiktokService', () => {
         },
       } as any);
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
-      contactRepository.findOrCreateByExternalIdentity.mockResolvedValue({
+      contactIdentityResolver.resolveContact.mockResolvedValue({
         _id: '507f1f77bcf86cd799439012',
       } as any);
       agentService.run.mockResolvedValue({

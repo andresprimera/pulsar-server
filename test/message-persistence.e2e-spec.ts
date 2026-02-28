@@ -276,7 +276,7 @@ describe('Message Persistence (e2e)', () => {
       for (let i = 0; i < 3; i++) {
         await connection.collection('messages').insertOne({
           content: longMessage,
-          type: 'user',
+          type: 'agent',
           contactId: contactResult.insertedId,
           agentId: agentIdObj,
           channelId: channelIdObj,

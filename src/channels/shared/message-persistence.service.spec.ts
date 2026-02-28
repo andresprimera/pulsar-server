@@ -81,11 +81,11 @@ describe('MessagePersistenceService', () => {
     expect(service).toBeDefined();
   });
 
-  describe('saveUserMessage', () => {
+  describe('createUserMessage', () => {
     it('should save a user message with correct parameters', async () => {
       messageRepository.create.mockResolvedValue({} as any);
 
-      await service.saveUserMessage('Hello!', mockContext, mockContact._id as Types.ObjectId);
+      await service.createUserMessage('Hello!', mockContext, mockContact._id as Types.ObjectId);
 
       expect(messageRepository.create).toHaveBeenCalledWith({
         content: 'Hello!',
@@ -143,6 +143,37 @@ describe('MessagePersistenceService', () => {
     });
   });
 
+  describe('identity guard', () => {
+    it('should throw when contactId is missing for user message creation', async () => {
+      await expect(
+        service.createUserMessage('Hello!', mockContext, undefined as any),
+      ).rejects.toThrow('Identity must be resolved before message creation');
+    });
+
+    it('should throw when context.contactId is missing', async () => {
+      const invalidContext = {
+        ...mockContext,
+        contactId: undefined as any,
+      };
+
+      await expect(
+        service.createUserMessage(
+          'Hello!',
+          invalidContext,
+          mockContact._id as Types.ObjectId,
+        ),
+      ).rejects.toThrow('Identity must be resolved before message creation');
+    });
+
+    it('should throw when contactId does not match context.contactId', async () => {
+      const mismatchedContactId = new Types.ObjectId('507f1f77bcf86cd799439099');
+
+      await expect(
+        service.createUserMessage('Hello!', mockContext, mismatchedContactId),
+      ).rejects.toThrow('Identity must be resolved before message creation');
+    });
+  });
+
   describe('triggerSummarization', () => {
     it('should call conversationSummaryService without blocking', async () => {
       conversationSummaryService.checkAndSummarizeIfNeeded.mockResolvedValue();
@@ -166,25 +197,6 @@ describe('MessagePersistenceService', () => {
       await new Promise(resolve => setTimeout(resolve, 10));
 
       expect(conversationSummaryService.checkAndSummarizeIfNeeded).toHaveBeenCalled();
-    });
-  });
-
-  describe('handleIncomingMessage', () => {
-    it('should save message and return context', async () => {
-      messageRepository.create.mockResolvedValue({} as any);
-      messageRepository.findConversationContext.mockResolvedValue(mockMessages as any);
-
-      const result = await service.handleIncomingMessage('Hello!', mockContext);
-
-      expect(messageRepository.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          content: 'Hello!',
-          type: 'user',
-        }),
-      );
-      expect(messageRepository.findConversationContext).toHaveBeenCalled();
-      expect(result.contactId.toString()).toEqual(mockContact._id.toString());
-      expect(result.conversationHistory).toHaveLength(2);
     });
   });
 

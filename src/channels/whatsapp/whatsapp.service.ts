@@ -5,7 +5,6 @@ import { AgentInput } from '../../agent/contracts/agent-input';
 import { AgentContext } from '../../agent/contracts/agent-context';
 import { AgentRepository } from '../../database/repositories/agent.repository';
 import { ClientRepository } from '../../database/repositories/client.repository';
-import { ContactRepository } from '../../database/repositories/contact.repository';
 import { decryptRecord, decrypt } from '../../database/utils/crypto.util';
 import { RouteCandidate } from '../shared/agent-routing.service';
 import {
@@ -15,7 +14,7 @@ import {
 } from './whatsapp.config';
 import { AgentRoutingService } from '../shared/agent-routing.service';
 import { AgentContextService } from '../../agent/agent-context.service';
-import { ContactIdentifierExtractorRegistry } from '../shared/contact-identifier/contact-identifier-extractor.registry';
+import { ContactIdentityResolver } from '../shared/contact-identity.resolver';
 import { CHANNEL_TYPES } from '../shared/channel-type.constants';
 
 @Injectable()
@@ -27,10 +26,9 @@ export class WhatsappService {
     private readonly agentService: AgentService,
     private readonly agentRepository: AgentRepository,
     private readonly clientRepository: ClientRepository,
-    private readonly contactRepository: ContactRepository,
     private readonly agentRoutingService: AgentRoutingService,
     private readonly agentContextService: AgentContextService,
-    private readonly identifierExtractorRegistry: ContactIdentifierExtractorRegistry,
+    private readonly contactIdentityResolver: ContactIdentityResolver,
   ) {
     this.config = loadWhatsAppConfig();
   }
@@ -110,14 +108,9 @@ export class WhatsappService {
     );
     this.logger.log(`[WhatsApp] Extracted phoneNumberId: ${phoneNumberId}`);
 
-    const identifier = this.identifierExtractorRegistry.resolve(
-      CHANNEL_TYPES.WHATSAPP,
-      payload,
-    );
-
     const routeDecision = await this.agentRoutingService.resolveRoute({
       routeChannelIdentifier: phoneNumberId,
-      channelIdentifier: identifier.externalId,
+      channelIdentifier: message.from,
       incomingText: message.text.body,
       channelType: CHANNEL_TYPES.WHATSAPP,
     });
@@ -192,14 +185,13 @@ export class WhatsappService {
 
     const context = await this.agentContextService.enrichContext(rawContext);
 
-    const contact = await this.contactRepository.findOrCreateByExternalIdentity(
-      new Types.ObjectId(clientAgent.clientId),
-      new Types.ObjectId(channelConfig.channelId.toString()),
-      identifier.externalId,
-      identifier.externalIdRaw,
-      identifier.identifierType,
-      message.from,
-    );
+    const contact = await this.contactIdentityResolver.resolveContact({
+      channelType: CHANNEL_TYPES.WHATSAPP,
+      payload,
+      clientId: new Types.ObjectId(clientAgent.clientId),
+      channelId: new Types.ObjectId(channelConfig.channelId.toString()),
+      contactName: message.from,
+    });
 
     const input: AgentInput = {
       channel: CHANNEL_TYPES.WHATSAPP,

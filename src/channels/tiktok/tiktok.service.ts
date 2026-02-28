@@ -4,12 +4,11 @@ import { AgentService } from '../../agent/agent.service';
 import { AgentInput } from '../../agent/contracts/agent-input';
 import { AgentContext } from '../../agent/contracts/agent-context';
 import { AgentRepository } from '../../database/repositories/agent.repository';
-import { ContactRepository } from '../../database/repositories/contact.repository';
 import { AgentRoutingService } from '../shared/agent-routing.service';
 import { AgentContextService } from '../../agent/agent-context.service';
 import { decryptRecord, decrypt } from '../../database/utils/crypto.util';
 import { TIKTOK_API_BASE_URL } from './tiktok.config';
-import { ContactIdentifierExtractorRegistry } from '../shared/contact-identifier/contact-identifier-extractor.registry';
+import { ContactIdentityResolver } from '../shared/contact-identity.resolver';
 import { CHANNEL_TYPES } from '../shared/channel-type.constants';
 
 @Injectable()
@@ -20,9 +19,8 @@ export class TiktokService {
     private readonly agentService: AgentService,
     private readonly agentRoutingService: AgentRoutingService,
     private readonly agentRepository: AgentRepository,
-    private readonly contactRepository: ContactRepository,
     private readonly agentContextService: AgentContextService,
-    private readonly identifierExtractorRegistry: ContactIdentifierExtractorRegistry,
+    private readonly contactIdentityResolver: ContactIdentityResolver,
   ) {}
 
   async handleIncoming(payload: any): Promise<void> {
@@ -45,19 +43,20 @@ export class TiktokService {
       return;
     }
 
+    const senderUserId = data.sender?.user_id;
+    if (!senderUserId) {
+      this.logger.warn('[TikTok] Missing sender.user_id in payload.');
+      return;
+    }
+
     this.logger.log(
       `[TikTok] Incoming message from sender=${data.sender?.user_id} to recipient=${recipientUserId}`,
-    );
-
-    const identifier = this.identifierExtractorRegistry.resolve(
-      CHANNEL_TYPES.TIKTOK,
-      payload,
     );
 
     // Route: resolve which agent should handle this message
     const routeDecision = await this.agentRoutingService.resolveRoute({
       routeChannelIdentifier: recipientUserId,
-      channelIdentifier: identifier.externalId,
+      channelIdentifier: senderUserId,
       incomingText: data.message.text,
       channelType: CHANNEL_TYPES.TIKTOK,
     });
@@ -123,14 +122,13 @@ export class TiktokService {
 
     const context = await this.agentContextService.enrichContext(rawContext);
 
-    const contact = await this.contactRepository.findOrCreateByExternalIdentity(
-      new Types.ObjectId(clientAgent.clientId),
-      new Types.ObjectId(channelConfig.channelId.toString()),
-      identifier.externalId,
-      identifier.externalIdRaw,
-      identifier.identifierType,
-      data.sender.user_id,
-    );
+    const contact = await this.contactIdentityResolver.resolveContact({
+      channelType: CHANNEL_TYPES.TIKTOK,
+      payload,
+      clientId: new Types.ObjectId(clientAgent.clientId),
+      channelId: new Types.ObjectId(channelConfig.channelId.toString()),
+      contactName: senderUserId,
+    });
 
     const input: AgentInput = {
       channel: CHANNEL_TYPES.TIKTOK,

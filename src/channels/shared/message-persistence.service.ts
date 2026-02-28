@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { MessageRepository } from '../../database/repositories/message.repository';
 import { ConversationSummaryService } from '../../agent/conversation-summary.service';
@@ -14,6 +14,8 @@ export interface MessagePersistenceContext {
 @Injectable()
 export class MessagePersistenceService {
   private readonly logger = new Logger(MessagePersistenceService.name);
+  private static readonly MISSING_IDENTITY_ERROR =
+    'Identity must be resolved before message creation';
 
   constructor(
     private readonly messageRepository: MessageRepository,
@@ -21,13 +23,26 @@ export class MessagePersistenceService {
   ) {}
 
   /**
-   * Saves an incoming user message to the database
+   * Single entrypoint for creating user messages.
    */
-  async saveUserMessage(
+  async createUserMessage(
     content: string,
     context: MessagePersistenceContext,
     contactId: Types.ObjectId,
   ): Promise<void> {
+    if (!contactId || !context.contactId) {
+      throw new BadRequestException(
+        MessagePersistenceService.MISSING_IDENTITY_ERROR,
+      );
+    }
+
+    const contextContactId = new Types.ObjectId(context.contactId);
+    if (!contactId.equals(contextContactId)) {
+      throw new BadRequestException(
+        MessagePersistenceService.MISSING_IDENTITY_ERROR,
+      );
+    }
+
     await this.messageRepository.create({
       content,
       type: 'user',
@@ -39,7 +54,7 @@ export class MessagePersistenceService {
     });
 
     this.logger.log(
-      `Saved user message: contact=${contactId} agent=${context.agentId} client=${context.clientId} channel=${context.channelId}`,
+      `Created user message: contact=${contactId} agent=${context.agentId} client=${context.clientId} channel=${context.channelId}`,
     );
   }
 
@@ -51,6 +66,12 @@ export class MessagePersistenceService {
     context: MessagePersistenceContext,
     contactId: Types.ObjectId,
   ): Promise<void> {
+    if (!contactId) {
+      throw new BadRequestException(
+        MessagePersistenceService.MISSING_IDENTITY_ERROR,
+      );
+    }
+
     await this.messageRepository.create({
       content,
       type: 'agent',
@@ -74,6 +95,12 @@ export class MessagePersistenceService {
     context: MessagePersistenceContext,
     contactId: Types.ObjectId,
   ): Promise<Array<{ role: 'user' | 'assistant'; content: string }>> {
+    if (!contactId) {
+      throw new BadRequestException(
+        MessagePersistenceService.MISSING_IDENTITY_ERROR,
+      );
+    }
+
     const messages = await this.messageRepository.findConversationContext(
       new Types.ObjectId(context.channelId),
       contactId,
@@ -109,31 +136,6 @@ export class MessagePersistenceService {
           `Background summary check failed: ${err.message}`,
         );
       });
-  }
-
-  /**
-   * Complete message persistence flow for incoming messages
-   * Returns the conversation history and contact object
-   */
-  async handleIncomingMessage(
-    content: string,
-    context: MessagePersistenceContext,
-  ): Promise<{
-    contactId: Types.ObjectId;
-    conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
-  }> {
-    const contactId = new Types.ObjectId(context.contactId);
-
-    // Save user message
-    await this.saveUserMessage(content, context, contactId);
-
-    // Get conversation context
-    const conversationHistory = await this.getConversationContext(
-      context,
-      contactId,
-    );
-
-    return { contactId, conversationHistory };
   }
 
   /**

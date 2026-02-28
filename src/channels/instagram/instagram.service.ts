@@ -5,7 +5,6 @@ import { AgentService } from '../../agent/agent.service';
 import { AgentInput } from '../../agent/contracts/agent-input';
 import { AgentContext } from '../../agent/contracts/agent-context';
 import { AgentRepository } from '../../database/repositories/agent.repository';
-import { ContactRepository } from '../../database/repositories/contact.repository';
 import { decryptRecord, decrypt } from '../../database/utils/crypto.util';
 import {
   InstagramServerConfig,
@@ -14,7 +13,7 @@ import {
 } from './instagram.config';
 import { AgentRoutingService } from '../shared/agent-routing.service';
 import { AgentContextService } from '../../agent/agent-context.service';
-import { ContactIdentifierExtractorRegistry } from '../shared/contact-identifier/contact-identifier-extractor.registry';
+import { ContactIdentityResolver } from '../shared/contact-identity.resolver';
 import { CHANNEL_TYPES } from '../shared/channel-type.constants';
 
 @Injectable()
@@ -26,10 +25,9 @@ export class InstagramService {
   constructor(
     private readonly agentService: AgentService,
     private readonly agentRepository: AgentRepository,
-    private readonly contactRepository: ContactRepository,
     private readonly agentRoutingService: AgentRoutingService,
     private readonly agentContextService: AgentContextService,
-    private readonly identifierExtractorRegistry: ContactIdentifierExtractorRegistry,
+    private readonly contactIdentityResolver: ContactIdentityResolver,
   ) {
     this.config = loadInstagramConfig();
   }
@@ -158,14 +156,9 @@ export class InstagramService {
           continue;
         }
 
-        const identifier = this.identifierExtractorRegistry.resolve(
-          CHANNEL_TYPES.INSTAGRAM,
-          event,
-        );
-
         const routeDecision = await this.agentRoutingService.resolveRoute({
           routeChannelIdentifier: instagramAccountId,
-          channelIdentifier: identifier.externalId,
+          channelIdentifier: senderId,
           incomingText: text,
           channelType: CHANNEL_TYPES.INSTAGRAM,
         });
@@ -235,14 +228,13 @@ export class InstagramService {
 
         const context = await this.agentContextService.enrichContext(rawContext);
 
-        const contact = await this.contactRepository.findOrCreateByExternalIdentity(
-          new Types.ObjectId(clientAgent.clientId),
-          new Types.ObjectId(channelConfig.channelId.toString()),
-          identifier.externalId,
-          identifier.externalIdRaw,
-          identifier.identifierType,
-          senderId,
-        );
+        const contact = await this.contactIdentityResolver.resolveContact({
+          channelType: CHANNEL_TYPES.INSTAGRAM,
+          payload: event,
+          clientId: new Types.ObjectId(clientAgent.clientId),
+          channelId: new Types.ObjectId(channelConfig.channelId.toString()),
+          contactName: senderId,
+        });
 
         const input: AgentInput = {
           channel: CHANNEL_TYPES.INSTAGRAM,
