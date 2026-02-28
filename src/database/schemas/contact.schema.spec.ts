@@ -1,4 +1,8 @@
-import { ContactSchema, throwsIfExternalIdMutation } from './contact.schema';
+import {
+  ContactSchema,
+  throwsIfExternalIdMutation,
+  validateMetadataSize,
+} from './contact.schema';
 
 describe('ContactSchema', () => {
   it('enforces unique compound index on clientId+channelId+externalId without legacy unique index', () => {
@@ -59,5 +63,23 @@ describe('ContactSchema', () => {
     }
 
     expect(persisted.externalId).toBe('12345678');
+  });
+
+  it('rejects oversized metadata payloads above 16KB', () => {
+    const oversized = {
+      payload: 'x'.repeat(16 * 1024 + 1),
+    };
+
+    expect(() => validateMetadataSize(oversized)).toThrow(
+      'contact metadata exceeds 16KB limit',
+    );
+  });
+
+  it('allows metadata payloads at or below 16KB', () => {
+    const valid = {
+      payload: 'x'.repeat(1024),
+    };
+
+    expect(() => validateMetadataSize(valid)).not.toThrow();
   });
 });

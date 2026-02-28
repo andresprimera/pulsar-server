@@ -138,6 +138,8 @@ export class TiktokService {
         type: 'text',
         text: data.message.text,
       },
+      contactMetadata: contact.metadata,
+      contactSummary: contact.contactSummary,
       metadata: {
         messageId: data.message_id,
         senderUsername: data.sender?.username,

@@ -244,6 +244,8 @@ export class InstagramService {
             type: 'text',
             text,
           },
+          contactMetadata: contact.metadata,
+          contactSummary: contact.contactSummary,
           metadata: {
             messageId: event?.message?.mid,
             instagramAccountId,

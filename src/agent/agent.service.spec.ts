@@ -4,6 +4,7 @@ import { AgentInput } from './contracts/agent-input';
 import { AgentContext } from './contracts/agent-context';
 import { LlmProvider } from './llm/provider.enum';
 import { MessagePersistenceService } from '../channels/shared/message-persistence.service';
+import { MetadataExposureService } from './metadata-exposure.service';
 import * as llmFactory from './llm/llm.factory';
 import * as ai from 'ai';
 import { Logger } from '@nestjs/common';
@@ -27,6 +28,11 @@ describe('AgentService', () => {
     contactId: '507f1f77bcf86cd799439012',
     conversationId: 'phone123:1234567890',
     message: { type: 'text', text: 'Hello, world!' },
+    contactMetadata: {
+      firstName: 'Ana',
+      language: 'es',
+      apiKey: 'secret',
+    },
   };
 
   const mockContext: AgentContext = {
@@ -60,6 +66,7 @@ describe('AgentService', () => {
             handleOutgoingMessage: jest.fn(),
           },
         },
+        MetadataExposureService,
       ],
     }).compile();
 
@@ -122,7 +129,9 @@ describe('AgentService', () => {
       );
       expect(ai.generateText).toHaveBeenCalledWith({
         model: mockModel,
-        system: mockContext.systemPrompt,
+        system:
+          `${mockContext.systemPrompt}\n\n` +
+          'Safe contact metadata: {"firstName":"Ana","language":"es"}',
         messages: [
           { role: 'user', content: 'Previous message' },
           {
@@ -194,6 +203,9 @@ describe('AgentService', () => {
       messagePersistenceService.handleOutgoingMessage.mockResolvedValue();
 
       await service.run(mockInput, mockContext);
+
+      const generateTextCall = (ai.generateText as jest.Mock).mock.calls[0][0];
+      expect(generateTextCall.system).not.toContain('apiKey');
 
       expect(logSpy).toHaveBeenCalledWith(
         'Processing agent-1 for client client-1 using provider=openai model=gpt-4',

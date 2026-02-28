@@ -1,4 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { BadRequestException } from '@nestjs/common';
 import { Document, Types } from 'mongoose';
 
 export type ContactIdentifierType =
@@ -55,6 +56,9 @@ export class Contact extends Document {
   @Prop({ type: Object, default: {} })
   metadata?: Record<string, any>;
 
+  @Prop()
+  contactSummary?: string;
+
   @Prop({
     required: true,
     enum: ['active', 'blocked', 'archived'],
@@ -68,6 +72,19 @@ export class Contact extends Document {
 }
 
 export const ContactSchema = SchemaFactory.createForClass(Contact);
+
+const MAX_METADATA_SIZE_BYTES = 16 * 1024;
+
+export function validateMetadataSize(metadata?: Record<string, any>): void {
+  if (metadata === undefined) {
+    return;
+  }
+
+  const size = Buffer.byteLength(JSON.stringify(metadata), 'utf8');
+  if (size > MAX_METADATA_SIZE_BYTES) {
+    throw new BadRequestException('contact metadata exceeds 16KB limit');
+  }
+}
 
 export function throwsIfExternalIdMutation(update: Record<string, any>): void {
   if (!update) {
@@ -93,6 +110,33 @@ export function throwsIfExternalIdMutation(update: Record<string, any>): void {
 ContactSchema.pre('findOneAndUpdate', function () {
   const update = this.getUpdate() as Record<string, any>;
   throwsIfExternalIdMutation(update);
+
+  if (!update) {
+    return;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(update, 'metadata')) {
+    validateMetadataSize(update.metadata);
+  }
+
+  if (
+    update.$set &&
+    Object.prototype.hasOwnProperty.call(update.$set, 'metadata')
+  ) {
+    validateMetadataSize(update.$set.metadata);
+  }
+
+  if (
+    update.$setOnInsert &&
+    Object.prototype.hasOwnProperty.call(update.$setOnInsert, 'metadata')
+  ) {
+    validateMetadataSize(update.$setOnInsert.metadata);
+  }
+});
+
+ContactSchema.pre('validate', function () {
+  const contact = this as Contact;
+  validateMetadataSize(contact.metadata);
 });
 
 // Unique per normalized identifier per client per channel

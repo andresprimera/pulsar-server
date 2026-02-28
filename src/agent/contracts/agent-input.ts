@@ -8,5 +8,7 @@ export interface AgentInput {
     type: 'text';
     text: string;
   };
+  contactMetadata?: Record<string, unknown>;
+  contactSummary?: string;
   metadata?: Record<string, unknown>;
 }

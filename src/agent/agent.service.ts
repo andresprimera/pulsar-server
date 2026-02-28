@@ -6,6 +6,7 @@ import { AgentOutput } from './contracts/agent-output';
 import { AgentContext } from './contracts/agent-context';
 import { createLLMModel } from './llm/llm.factory';
 import { MessagePersistenceService } from '../channels/shared/message-persistence.service';
+import { MetadataExposureService } from './metadata-exposure.service';
 
 @Injectable()
 export class AgentService {
@@ -13,6 +14,7 @@ export class AgentService {
 
   constructor(
     private readonly messagePersistenceService: MessagePersistenceService,
+    private readonly metadataExposureService: MetadataExposureService,
   ) {}
 
   async run(
@@ -68,9 +70,19 @@ export class AgentService {
         content: input.message.text,
       });
 
+      const safeMetadata = this.metadataExposureService.extractSafeMetadata(
+        input.contactMetadata as Record<string, any>,
+      );
+
+      const systemPrompt = this.buildSystemPrompt(
+        context.systemPrompt,
+        safeMetadata,
+        input.contactSummary,
+      );
+
       const { text } = await generateText({
         model,
-        system: context.systemPrompt,
+        system: systemPrompt,
         messages,
       });
 
@@ -106,5 +118,29 @@ export class AgentService {
         },
       };
     }
+  }
+
+  private buildSystemPrompt(
+    baseSystemPrompt: string,
+    safeMetadata: Record<string, any>,
+    contactSummary?: string,
+  ): string {
+    const contextLines: string[] = [];
+
+    if (contactSummary?.trim()) {
+      contextLines.push(`Contact summary: ${contactSummary.trim()}`);
+    }
+
+    if (Object.keys(safeMetadata).length > 0) {
+      contextLines.push(
+        `Safe contact metadata: ${JSON.stringify(safeMetadata)}`,
+      );
+    }
+
+    if (contextLines.length === 0) {
+      return baseSystemPrompt;
+    }
+
+    return `${baseSystemPrompt}\n\n${contextLines.join('\n')}`;
   }
 }

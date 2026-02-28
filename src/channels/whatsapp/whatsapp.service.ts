@@ -201,6 +201,8 @@ export class WhatsappService {
         type: 'text',
         text: message.text.body,
       },
+      contactMetadata: contact.metadata,
+      contactSummary: contact.contactSummary,
       metadata: {
         messageId: message.id,
         phoneNumberId,
