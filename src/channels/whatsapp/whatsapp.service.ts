@@ -40,6 +40,16 @@ export class WhatsappService {
   ): Promise<void> {
     const url = buildMessagesUrl(this.config, channelCredentials.phoneNumberId);
 
+    const body = JSON.stringify({
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to,
+      type: 'text',
+      text: { body: text },
+    });
+
+    this.logger.log(`[WhatsApp] Sending message to ${url} | payload: ${body}`);
+
     let response: Response;
     try {
       response = await fetch(url, {
@@ -48,13 +58,7 @@ export class WhatsappService {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${channelCredentials.accessToken}`,
         },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          recipient_type: 'individual',
-          to,
-          type: 'text',
-          text: { body: text },
-        }),
+        body,
       });
     } catch (error) {
       const cause = error instanceof Error ? (error as any).cause : undefined;
@@ -68,7 +72,7 @@ export class WhatsappService {
     if (!response.ok) {
       const errorBody = await response.text();
       this.logger.error(
-        `[WhatsApp] Failed to send message: ${response.status} ${errorBody}`,
+        `[WhatsApp] Failed to send message to ${url}: ${response.status} ${errorBody}`,
       );
       throw new Error(`WhatsApp API error: ${response.status}`);
     }
