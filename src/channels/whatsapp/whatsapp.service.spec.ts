@@ -4,6 +4,7 @@ import { ForbiddenException, Logger } from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
 import { AgentService } from '../../agent/agent.service';
 import { AgentRepository } from '../../database/repositories/agent.repository';
+import { ClientRepository } from '../../database/repositories/client.repository';
 import { LlmProvider } from '../../agent/llm/provider.enum';
 import { AgentRoutingService } from '../shared/agent-routing.service';
 import { AgentContextService } from '../../agent/agent-context.service';
@@ -42,6 +43,10 @@ describe('WhatsappService', () => {
         {
           provide: AgentRepository,
           useValue: { findActiveById: jest.fn() },
+        },
+        {
+          provide: ClientRepository,
+          useValue: { findById: jest.fn().mockResolvedValue({ name: 'Test Client' }) },
         },
         {
           provide: AgentContextService,
@@ -204,6 +209,11 @@ describe('WhatsappService', () => {
             clientAgent: mockClientAgent as any,
             channelConfig: mockClientAgent.channels[0] as any,
             agentName: 'Support Bot',
+          },
+          {
+            clientAgent: mockClientAgent as any,
+            channelConfig: mockClientAgent.channels[0] as any,
+            agentName: 'Sales Bot',
           },
         ],
         prompt: 'Please choose the agent',

@@ -3,7 +3,9 @@ import { AgentService } from '../../agent/agent.service';
 import { AgentInput } from '../../agent/contracts/agent-input';
 import { AgentContext } from '../../agent/contracts/agent-context';
 import { AgentRepository } from '../../database/repositories/agent.repository';
+import { ClientRepository } from '../../database/repositories/client.repository';
 import { decryptRecord, decrypt } from '../../database/utils/crypto.util';
+import { RouteCandidate } from '../shared/agent-routing.service';
 import {
   WhatsAppServerConfig,
   loadWhatsAppConfig,
@@ -20,6 +22,7 @@ export class WhatsappService {
   constructor(
     private readonly agentService: AgentService,
     private readonly agentRepository: AgentRepository,
+    private readonly clientRepository: ClientRepository,
     private readonly agentRoutingService: AgentRoutingService,
     private readonly agentContextService: AgentContextService,
   ) {
@@ -124,8 +127,9 @@ export class WhatsappService {
         return;
       }
 
+      const prompt = await this.buildAmbiguousPrompt(routeDecision.candidates);
       const decryptedCredentials = decryptRecord(fallback.channelConfig.credentials);
-      await this.sendMessage(message.from, routeDecision.prompt, {
+      await this.sendMessage(message.from, prompt, {
         phoneNumberId: decryptedCredentials.phoneNumberId,
         accessToken: decryptedCredentials.accessToken,
       });
@@ -204,5 +208,30 @@ export class WhatsappService {
         accessToken: decryptedCredentials.accessToken,
       });
     }
+  }
+
+  private async buildAmbiguousPrompt(
+    candidates: RouteCandidate[],
+  ): Promise<string> {
+    const clientId = candidates[0].clientAgent.clientId;
+    const client = await this.clientRepository.findById(clientId);
+    const clientName = client?.name;
+
+    const lines = candidates.map(
+      (candidate, index) => `${index + 1}. ${candidate.agentName}`,
+    );
+
+    const greeting = clientName
+      ? `Hey there! Thanks for reaching out to *${clientName}*.`
+      : `Hey there! Thanks for reaching out.`;
+
+    return [
+      greeting,
+      '',
+      'We have a few specialists ready to help you:',
+      ...lines,
+      '',
+      'Just reply with a number or name to get started!',
+    ].join('\n');
   }
 }
