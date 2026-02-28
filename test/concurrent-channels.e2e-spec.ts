@@ -27,6 +27,22 @@ describe('Concurrent Channels (e2e)', () => {
   const tiktokRecipientId = 'tiktok-recipient-123';
   const instagramAccountId = '17841400000000000';
 
+  const waitForMockCalls = async (
+    mockFn: jest.Mock,
+    expectedCalls: number,
+    timeoutMs = 5000,
+  ): Promise<void> => {
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < timeoutMs) {
+      if (mockFn.mock.calls.length >= expectedCalls) {
+        return;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  };
+
   beforeAll(async () => {
     fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
@@ -61,6 +77,16 @@ describe('Concurrent Channels (e2e)', () => {
     await app.init();
 
     connection = moduleFixture.get<Connection>(getConnectionToken());
+
+    if (connection) {
+      try {
+        await connection
+          .collection('contacts')
+          .dropIndex('externalUserId_1_clientId_1');
+      } catch {
+        // index may not exist depending on environment state
+      }
+    }
 
     if (connection) {
       await connection
@@ -244,8 +270,7 @@ describe('Concurrent Channels (e2e)', () => {
 
     await Promise.all([wa, tt, ig]);
 
-    // Allow fire-and-forget webhook processing to complete
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await waitForMockCalls(mockAgentService.run as jest.Mock, 3);
 
     expect(mockAgentService.run).toHaveBeenCalledTimes(3);
     const channels = (mockAgentService.run as jest.Mock).mock.calls

@@ -14,7 +14,7 @@ describe('ContactSchema', () => {
 
     const hasLegacyUniqueIndex = indexes.some(
       ([fields, options]) =>
-        ((fields as any).channelIdentifier === 1 || (fields as any).externalUserId === 1) &&
+        (fields as any).channelIdentifier === 1 &&
         options?.unique === true,
     );
 
