@@ -4,6 +4,7 @@ import { TiktokService } from './tiktok.service';
 import { AgentService } from '../../agent/agent.service';
 import { AgentRoutingService } from '../shared/agent-routing.service';
 import { AgentRepository } from '../../database/repositories/agent.repository';
+import { AgentContextService } from '../../agent/agent-context.service';
 import { AgentOutput } from '../../agent/contracts/agent-output';
 import { encrypt } from '../../database/utils/crypto.util';
 
@@ -41,6 +42,12 @@ describe('TiktokService', () => {
         {
           provide: AgentRepository,
           useValue: { findActiveById: jest.fn() },
+        },
+        {
+          provide: AgentContextService,
+          useValue: {
+            enrichContext: jest.fn().mockImplementation((ctx) => Promise.resolve(ctx)),
+          },
         },
       ],
     }).compile();

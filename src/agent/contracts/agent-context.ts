@@ -2,7 +2,9 @@ import { LlmProvider } from '../llm/provider.enum';
 
 export interface AgentContext {
   agentId: string;
+  agentName?: string;
   clientId: string;
+  clientName?: string;
   channelId: string;
   systemPrompt: string;
   llmConfig: {

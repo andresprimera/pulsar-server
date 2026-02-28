@@ -10,6 +10,7 @@ import {
   buildMessagesUrl,
 } from './whatsapp.config';
 import { AgentRoutingService } from '../shared/agent-routing.service';
+import { AgentContextService } from '../../agent/agent-context.service';
 
 @Injectable()
 export class WhatsappService {
@@ -20,6 +21,7 @@ export class WhatsappService {
     private readonly agentService: AgentService,
     private readonly agentRepository: AgentRepository,
     private readonly agentRoutingService: AgentRoutingService,
+    private readonly agentContextService: AgentContextService,
   ) {
     this.config = loadWhatsAppConfig();
   }
@@ -136,8 +138,9 @@ export class WhatsappService {
       return;
     }
 
-    const context: AgentContext = {
+    const rawContext: AgentContext = {
       agentId: clientAgent.agentId,
+      agentName: agent.name,
       clientId: clientAgent.clientId,
       channelId: channelConfig.channelId.toString(),
       systemPrompt: agent.systemPrompt,
@@ -157,6 +160,8 @@ export class WhatsappService {
       },
       channelConfig: decryptRecord(channelConfig.credentials),
     };
+
+    const context = await this.agentContextService.enrichContext(rawContext);
 
     const input: AgentInput = {
       channel: 'whatsapp',

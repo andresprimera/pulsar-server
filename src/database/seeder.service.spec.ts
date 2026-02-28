@@ -403,7 +403,9 @@ describe('SeederService', () => {
               channelId: 'instagram-channel-id',
               provider: 'instagram',
               credentials: expect.objectContaining({
-                instagramAccountId: '17841400000000001',
+                instagramAccountId:
+                  (SEED_DATA.users[0].agentHirings[0].channels[1].credentials as any)
+                    .instagramAccountId,
               }),
             }),
           ]),
@@ -444,7 +446,8 @@ describe('SeederService', () => {
       process.env.NODE_ENV = 'development';
 
       const originalUsers = SEED_DATA.users;
-      (SEED_DATA as any).users = [SEED_DATA.users[2]];
+      const seedUser = SEED_DATA.users[2];
+      (SEED_DATA as any).users = [seedUser];
 
       const customerServiceAgentId = new Types.ObjectId(
         'bbbbbbbbbbbbbbbbbbbbbbbb',
@@ -494,12 +497,16 @@ describe('SeederService', () => {
         onboardingResultForUser3,
       );
 
+      const expectedPhoneNumberId = (
+        seedUser.agentHirings[1].channels[0].credentials as any
+      ).phoneNumberId;
+
       try {
         await service.onApplicationBootstrap();
 
         expect(mockClientPhoneRepository.resolveOrCreate).toHaveBeenCalledWith(
           '507f1f77bcf86cd799439011',
-          '573332809804',
+          expectedPhoneNumberId,
           { provider: 'meta' },
         );
       } finally {
@@ -610,7 +617,8 @@ describe('SeederService', () => {
       process.env.NODE_ENV = 'development';
 
       const originalUsers = SEED_DATA.users;
-      (SEED_DATA as any).users = [SEED_DATA.users[1]];
+      const seedUser = SEED_DATA.users[1];
+      (SEED_DATA as any).users = [seedUser];
 
       mockUserRepository.findByEmail.mockResolvedValue(null);
       mockAgentModel.findOne.mockReturnValue({
@@ -645,7 +653,7 @@ describe('SeederService', () => {
           expect.objectContaining({
             client: expect.objectContaining({
               type: 'organization',
-              name: 'Andres Company Inc.',
+              name: (seedUser.client as any).name,
             }),
           }),
         );

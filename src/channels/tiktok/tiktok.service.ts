@@ -4,6 +4,7 @@ import { AgentInput } from '../../agent/contracts/agent-input';
 import { AgentContext } from '../../agent/contracts/agent-context';
 import { AgentRepository } from '../../database/repositories/agent.repository';
 import { AgentRoutingService } from '../shared/agent-routing.service';
+import { AgentContextService } from '../../agent/agent-context.service';
 import { decryptRecord, decrypt } from '../../database/utils/crypto.util';
 import { TIKTOK_API_BASE_URL } from './tiktok.config';
 
@@ -15,6 +16,7 @@ export class TiktokService {
     private readonly agentService: AgentService,
     private readonly agentRoutingService: AgentRoutingService,
     private readonly agentRepository: AgentRepository,
+    private readonly agentContextService: AgentContextService,
   ) {}
 
   async handleIncoming(payload: any): Promise<void> {
@@ -85,8 +87,9 @@ export class TiktokService {
       return;
     }
 
-    const context: AgentContext = {
+    const rawContext: AgentContext = {
       agentId: clientAgent.agentId,
+      agentName: agent.name,
       clientId: clientAgent.clientId,
       channelId: channelConfig.channelId.toString(),
       systemPrompt: agent.systemPrompt,
@@ -106,6 +109,8 @@ export class TiktokService {
       },
       channelConfig: decryptRecord(channelConfig.credentials),
     };
+
+    const context = await this.agentContextService.enrichContext(rawContext);
 
     const input: AgentInput = {
       channel: 'tiktok',

@@ -59,10 +59,11 @@ NestJS + MongoDB (Mongoose) backend. Follow established patterns. Do not break e
 
 - Follow `src/channels/whatsapp/` pattern: `config.ts` + `service.ts` + `controller.ts` + `module.ts`
 - MUST use `AgentRoutingService.resolveRoute()` — handle `resolved`, `ambiguous`, `unroutable`
+- MUST call `AgentContextService.enrichContext()` before `AgentService.run()` — enriches system prompt with client/agent identity
 - Do NOT persist messages manually — `AgentService.run()` handles it via `MessagePersistenceService`
 - LLM calls via Vercel AI SDK (`generateText`) through `createLLMModel()` — never import provider SDKs directly
 
-→ Details: `docs/rules/channel-integration.md`
+→ Details: `docs/rules/channel-integration.md` | `docs/rules/context-enrichment.md`
 
 ## 9. Data Modeling
 
@@ -90,6 +91,7 @@ Success = minimal diff + zero regressions + full alignment with existing pattern
 **Rules (how to write code):**
 - `docs/rules/credential-encryption.md` — encryption patterns, routing keys, crypto utility
 - `docs/rules/channel-integration.md` — new channel blueprint, routing, message flow
+- `docs/rules/context-enrichment.md` — AgentContextService, system prompt enrichment, adding new context
 - `docs/rules/data-modeling.md` — schemas, indexes, transactions, repository conventions
 - `docs/rules/configuration.md` — ValidationPipe, Logger, DatabaseModule, LLM SDK
 

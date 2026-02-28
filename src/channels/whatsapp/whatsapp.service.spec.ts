@@ -6,6 +6,7 @@ import { AgentService } from '../../agent/agent.service';
 import { AgentRepository } from '../../database/repositories/agent.repository';
 import { LlmProvider } from '../../agent/llm/provider.enum';
 import { AgentRoutingService } from '../shared/agent-routing.service';
+import { AgentContextService } from '../../agent/agent-context.service';
 
 describe('WhatsappService', () => {
   let service: WhatsappService;
@@ -41,6 +42,12 @@ describe('WhatsappService', () => {
         {
           provide: AgentRepository,
           useValue: { findActiveById: jest.fn() },
+        },
+        {
+          provide: AgentContextService,
+          useValue: {
+            enrichContext: jest.fn().mockImplementation((ctx) => Promise.resolve(ctx)),
+          },
         },
       ],
     }).compile();

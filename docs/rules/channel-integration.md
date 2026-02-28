@@ -103,17 +103,20 @@ Handle all three outcomes:
 
 ## Message Flow (REQUIRED)
 
-Channel services build `AgentContext` + `AgentInput` and call `AgentService.run()`:
+Channel services build `AgentContext` + `AgentInput`, enrich the context, and call `AgentService.run()`:
 
 ```typescript
-const context: AgentContext = {
+const rawContext: AgentContext = {
   agentId: clientAgent.agentId,
+  agentName: agent.name,
   clientId: clientAgent.clientId,
   channelId: channelConfig.channelId.toString(),
   systemPrompt: agent.systemPrompt,
   llmConfig: { provider, apiKey: decrypt(apiKey), model },
   channelConfig: decryptRecord(channelConfig.credentials),
 };
+
+const context = await this.agentContextService.enrichContext(rawContext);
 
 const input: AgentInput = {
   channel: 'whatsapp',
@@ -125,6 +128,8 @@ const input: AgentInput = {
 
 const output = await this.agentService.run(input, context);
 ```
+
+> **REQUIRED**: Always call `agentContextService.enrichContext()` before `agentService.run()`. See `docs/rules/context-enrichment.md` for details.
 
 Do NOT persist messages manually — `AgentService.run()` handles incoming + outgoing persistence automatically via `MessagePersistenceService`. Conversation history is automatically loaded and passed to the LLM.
 
