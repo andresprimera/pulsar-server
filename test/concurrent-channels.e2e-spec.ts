@@ -35,6 +35,7 @@ describe('Concurrent Channels (e2e)', () => {
     } as any);
 
     process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN = 'ig-verify-token';
+    delete process.env.INSTAGRAM_APP_SECRET;
 
     mockAgentService = {
       run: jest.fn().mockImplementation(async (input) => {

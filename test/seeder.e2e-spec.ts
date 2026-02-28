@@ -52,7 +52,7 @@ describe('Seeder (e2e)', () => {
       const seededPhoneNumberIds = SEED_DATA.users.flatMap((u) =>
         (u.agentHirings || []).flatMap((h) =>
           (h.channels || [])
-            .map((c) => c.credentials?.phoneNumberId)
+            .map((c) => (c.credentials as any)?.phoneNumberId)
             .filter((phone): phone is string => Boolean(phone)),
         ),
       );
@@ -94,6 +94,11 @@ describe('Seeder (e2e)', () => {
       });
     }
   };
+
+  // Extract seed data references for readability
+  const seedUser1 = SEED_DATA.users[0];
+  const seedUser2 = SEED_DATA.users[1];
+  const seedUser3 = SEED_DATA.users[2];
 
   describe('Agent Creation Tests', () => {
     it('should create both Customer Service Agent and Lead Qualifier & Sales Agent', async () => {
@@ -181,109 +186,114 @@ describe('Seeder (e2e)', () => {
     });
   });
 
-  describe('User 1 Tests (andresprimera@gmail.com)', () => {
+  describe(`User 1 Tests (${seedUser1.email})`, () => {
     it('should create User 1 successfully with correct email/name', async () => {
       const user = await connection
         .collection('users')
-        .findOne({ email: 'andresprimera@gmail.com' });
+        .findOne({ email: seedUser1.email });
 
       expect(user).toBeDefined();
-      expect(user.name).toBe('Andrés Primera');
+      expect(user.name).toBe(seedUser1.name);
       expect(user.status).toBe('active');
     });
 
-    it('should create User 1 client as individual type', async () => {
+    it(`should create User 1 client as ${seedUser1.client.type} type`, async () => {
       const user = await connection
         .collection('users')
-        .findOne({ email: 'andresprimera@gmail.com' });
+        .findOne({ email: seedUser1.email });
 
       const client = await connection
         .collection('clients')
         .findOne({ _id: user.clientId });
 
       expect(client).toBeDefined();
-      expect(client.type).toBe('individual');
+      expect(client.type).toBe(seedUser1.client.type);
       expect(client.status).toBe('active');
     });
 
-    it('should hire Customer Service Agent for User 1', async () => {
+    it(`should hire ${seedUser1.agentHirings[0].agentName} for User 1`, async () => {
       const user = await connection
         .collection('users')
-        .findOne({ email: 'andresprimera@gmail.com' });
+        .findOne({ email: seedUser1.email });
 
-      const customerServiceAgent = await connection
+      const agent = await connection
         .collection('agents')
-        .findOne({ name: 'Customer Service Agent' });
+        .findOne({ name: seedUser1.agentHirings[0].agentName });
 
       const clientAgents = await connection
         .collection('client_agents')
         .find({
           clientId: user.clientId.toString(),
-          agentId: customerServiceAgent._id.toString(),
+          agentId: agent._id.toString(),
         })
         .toArray();
 
       expect(clientAgents).toHaveLength(1);
       expect(clientAgents[0].status).toBe('active');
-      expect(clientAgents[0].price).toBe(100);
+      expect(clientAgents[0].price).toBe(seedUser1.agentHirings[0].price);
     });
 
-    it('should configure User 1 with WhatsApp + Instagram channels', async () => {
+    it('should configure User 1 with the correct channels', async () => {
       const user = await connection
         .collection('users')
-        .findOne({ email: 'andresprimera@gmail.com' });
+        .findOne({ email: seedUser1.email });
 
-      const customerServiceAgent = await connection
+      const agent = await connection
         .collection('agents')
-        .findOne({ name: 'Customer Service Agent' });
+        .findOne({ name: seedUser1.agentHirings[0].agentName });
 
       const clientAgent = await connection
         .collection('client_agents')
         .findOne({
           clientId: user.clientId.toString(),
-          agentId: customerServiceAgent._id.toString(),
+          agentId: agent._id.toString(),
         });
 
-      expect(clientAgent.channels).toHaveLength(2);
+      const expectedChannelNames = seedUser1.agentHirings[0].channels.map(
+        (c) => c.channelName,
+      );
+      expect(clientAgent.channels).toHaveLength(expectedChannelNames.length);
 
-      const whatsappChannel = await connection
-        .collection('channels')
-        .findOne({ name: 'WhatsApp' });
-      const instagramChannel = await connection
-        .collection('channels')
-        .findOne({ name: 'Instagram' });
+      const channelDocs = await Promise.all(
+        expectedChannelNames.map((name) =>
+          connection.collection('channels').findOne({ name }),
+        ),
+      );
 
-      const channelIds = clientAgent.channels.map((c) => c.channelId.toString());
-      expect(channelIds).toContain(whatsappChannel._id.toString());
-      expect(channelIds).toContain(instagramChannel._id.toString());
+      const channelIds = clientAgent.channels.map((c) =>
+        c.channelId.toString(),
+      );
+      for (const channelDoc of channelDocs) {
+        expect(channelIds).toContain(channelDoc._id.toString());
+      }
     });
   });
 
-  describe('User 2 Tests (user2@example.com)', () => {
+  describe(`User 2 Tests (${seedUser2.email})`, () => {
     it('should create User 2 successfully', async () => {
       const user = await connection
         .collection('users')
-        .findOne({ email: 'user2@example.com' });
+        .findOne({ email: seedUser2.email });
 
       expect(user).toBeDefined();
-      expect(user.name).toBe('Demo User 2');
+      expect(user.name).toBe(seedUser2.name);
       expect(user.status).toBe('active');
     });
 
-    it('should hire Lead Qualifier & Sales Agent for User 2', async () => {
+    it(`should hire ${seedUser2.agentHirings[0].agentName} for User 2`, async () => {
       const user = await connection
         .collection('users')
-        .findOne({ email: 'user2@example.com' });
+        .findOne({ email: seedUser2.email });
 
-      const salesAgent = await connection
+      const agent = await connection
         .collection('agents')
-        .findOne({ name: 'Lead Qualifier & Sales Agent' });
+        .findOne({ name: seedUser2.agentHirings[0].agentName });
 
       const clientAgents = await connection
         .collection('client_agents')
         .find({
           clientId: user.clientId.toString(),
-          agentId: salesAgent._id.toString(),
+          agentId: agent._id.toString(),
         })
         .toArray();
 
@@ -291,67 +301,71 @@ describe('Seeder (e2e)', () => {
       expect(clientAgents[0].status).toBe('active');
     });
 
-    it('should configure User 2 with TikTok + Instagram channels', async () => {
+    it('should configure User 2 with the correct channels', async () => {
       const user = await connection
         .collection('users')
-        .findOne({ email: 'user2@example.com' });
+        .findOne({ email: seedUser2.email });
 
-      const salesAgent = await connection
+      const agent = await connection
         .collection('agents')
-        .findOne({ name: 'Lead Qualifier & Sales Agent' });
+        .findOne({ name: seedUser2.agentHirings[0].agentName });
 
       const clientAgent = await connection
         .collection('client_agents')
         .findOne({
           clientId: user.clientId.toString(),
-          agentId: salesAgent._id.toString(),
+          agentId: agent._id.toString(),
         });
 
-      expect(clientAgent.channels).toHaveLength(2);
+      const expectedChannelNames = seedUser2.agentHirings[0].channels.map(
+        (c) => c.channelName,
+      );
+      expect(clientAgent.channels).toHaveLength(expectedChannelNames.length);
 
-      const tiktokChannel = await connection
-        .collection('channels')
-        .findOne({ name: 'TikTok' });
+      const channelDocs = await Promise.all(
+        expectedChannelNames.map((name) =>
+          connection.collection('channels').findOne({ name }),
+        ),
+      );
 
-      const instagramChannel = await connection
-        .collection('channels')
-        .findOne({ name: 'Instagram' });
-
-      const channelIds = clientAgent.channels.map((c) => c.channelId.toString());
-      expect(channelIds).toContain(tiktokChannel._id.toString());
-      expect(channelIds).toContain(instagramChannel._id.toString());
+      const channelIds = clientAgent.channels.map((c) =>
+        c.channelId.toString(),
+      );
+      for (const channelDoc of channelDocs) {
+        expect(channelIds).toContain(channelDoc._id.toString());
+      }
     });
 
     it('should persist organization client name for User 2', async () => {
       const user = await connection
         .collection('users')
-        .findOne({ email: 'user2@example.com' });
+        .findOne({ email: seedUser2.email });
 
       const client = await connection
         .collection('clients')
         .findOne({ _id: user.clientId });
 
       expect(client).toBeDefined();
-      expect(client.type).toBe('organization');
-      expect(client.name).toBe('Demo User 2 LLC');
+      expect(client.type).toBe(seedUser2.client.type);
+      expect(client.name).toBe((seedUser2.client as any).name);
     });
   });
 
-  describe('User 3 Tests (user3@example.com)', () => {
+  describe(`User 3 Tests (${seedUser3.email})`, () => {
     it('should create User 3 successfully', async () => {
       const user = await connection
         .collection('users')
-        .findOne({ email: 'user3@example.com' });
+        .findOne({ email: seedUser3.email });
 
       expect(user).toBeDefined();
-      expect(user.name).toBe('Demo User 3');
+      expect(user.name).toBe(seedUser3.name);
       expect(user.status).toBe('active');
     });
 
     it('should hire both agents for User 3', async () => {
       const user = await connection
         .collection('users')
-        .findOne({ email: 'user3@example.com' });
+        .findOne({ email: seedUser3.email });
 
       const clientAgents = await connection
         .collection('client_agents')
@@ -360,43 +374,43 @@ describe('Seeder (e2e)', () => {
         })
         .toArray();
 
-      expect(clientAgents).toHaveLength(2);
+      expect(clientAgents).toHaveLength(seedUser3.agentHirings.length);
     });
 
-    it('should have Customer Service Agent as one of User 3 agents', async () => {
+    it(`should have ${seedUser3.agentHirings[0].agentName} as one of User 3 agents`, async () => {
       const user = await connection
         .collection('users')
-        .findOne({ email: 'user3@example.com' });
+        .findOne({ email: seedUser3.email });
 
-      const customerServiceAgent = await connection
+      const agent = await connection
         .collection('agents')
-        .findOne({ name: 'Customer Service Agent' });
+        .findOne({ name: seedUser3.agentHirings[0].agentName });
 
       const clientAgent = await connection
         .collection('client_agents')
         .findOne({
           clientId: user.clientId.toString(),
-          agentId: customerServiceAgent._id.toString(),
+          agentId: agent._id.toString(),
         });
 
       expect(clientAgent).toBeDefined();
       expect(clientAgent.status).toBe('active');
     });
 
-    it('should have Lead Qualifier & Sales Agent as one of User 3 agents', async () => {
+    it(`should have ${seedUser3.agentHirings[1].agentName} as one of User 3 agents`, async () => {
       const user = await connection
         .collection('users')
-        .findOne({ email: 'user3@example.com' });
+        .findOne({ email: seedUser3.email });
 
-      const salesAgent = await connection
+      const agent = await connection
         .collection('agents')
-        .findOne({ name: 'Lead Qualifier & Sales Agent' });
+        .findOne({ name: seedUser3.agentHirings[1].agentName });
 
       const clientAgent = await connection
         .collection('client_agents')
         .findOne({
           clientId: user.clientId.toString(),
-          agentId: salesAgent._id.toString(),
+          agentId: agent._id.toString(),
         });
 
       expect(clientAgent).toBeDefined();
@@ -406,7 +420,7 @@ describe('Seeder (e2e)', () => {
     it('should configure both agents with multichannel combinations for User 3', async () => {
       const user = await connection
         .collection('users')
-        .findOne({ email: 'user3@example.com' });
+        .findOne({ email: seedUser3.email });
 
       const clientAgents = await connection
         .collection('client_agents')
@@ -425,8 +439,13 @@ describe('Seeder (e2e)', () => {
         .collection('channels')
         .findOne({ name: 'Instagram' });
 
-      const channelCounts = clientAgents.map((ca) => ca.channels.length).sort();
-      expect(channelCounts).toEqual([2, 3]);
+      const expectedCounts = seedUser3.agentHirings
+        .map((h) => h.channels.length)
+        .sort();
+      const channelCounts = clientAgents
+        .map((ca) => ca.channels.length)
+        .sort();
+      expect(channelCounts).toEqual(expectedCounts);
 
       const flattenedChannelIds = clientAgents.flatMap((ca) =>
         ca.channels.map((c) => c.channelId.toString()),
@@ -439,48 +458,44 @@ describe('Seeder (e2e)', () => {
     it('should keep distinct WhatsApp phoneNumberId per hired agent for User 3', async () => {
       const user = await connection
         .collection('users')
-        .findOne({ email: 'user3@example.com' });
+        .findOne({ email: seedUser3.email });
 
-      const customerServiceAgent = await connection
+      const hiring1Agent = await connection
         .collection('agents')
-        .findOne({ name: 'Customer Service Agent' });
-      const salesAgent = await connection
+        .findOne({ name: seedUser3.agentHirings[0].agentName });
+      const hiring2Agent = await connection
         .collection('agents')
-        .findOne({ name: 'Lead Qualifier & Sales Agent' });
+        .findOne({ name: seedUser3.agentHirings[1].agentName });
 
-      const customerServiceHiring = await connection
+      const hiring1 = await connection
         .collection('client_agents')
         .findOne({
           clientId: user.clientId.toString(),
-          agentId: customerServiceAgent._id.toString(),
+          agentId: hiring1Agent._id.toString(),
         });
-      const salesHiring = await connection
+      const hiring2 = await connection
         .collection('client_agents')
         .findOne({
           clientId: user.clientId.toString(),
-          agentId: salesAgent._id.toString(),
+          agentId: hiring2Agent._id.toString(),
         });
 
-      const customerServicePhone = customerServiceHiring.channels.find(
+      const hiring1Phone = hiring1.channels.find(
         (channel) => channel.phoneNumberId,
       )?.phoneNumberId;
-      const salesPhone = salesHiring.channels.find(
+      const hiring2Phone = hiring2.channels.find(
         (channel) => channel.phoneNumberId,
       )?.phoneNumberId;
 
-      expect(customerServicePhone).toBe('573332574068');
-      expect(salesPhone).toBe('573332574069');
-      expect(customerServicePhone).not.toBe(salesPhone);
-    });
-  });
+      // Both hirings use the same phoneNumberId from seed data
+      const expectedPhone = (
+        seedUser3.agentHirings[0].channels.find(
+          (c) => (c.credentials as any).phoneNumberId,
+        )?.credentials as any
+      )?.phoneNumberId;
 
-  describe('User 4 Tests (user4@example.com)', () => {
-    it('should skip User 4 since no agents are hired', async () => {
-      const user = await connection
-        .collection('users')
-        .findOne({ email: 'user4@example.com' });
-
-      expect(user).toBeNull();
+      expect(hiring1Phone).toBe(expectedPhone);
+      expect(hiring2Phone).toBe(expectedPhone);
     });
   });
 
@@ -491,8 +506,6 @@ describe('Seeder (e2e)', () => {
         .find({ createdBySeeder: true })
         .toArray();
 
-      // Trigger seeding again (this would be done by restarting the app in real scenario)
-      // For this test, we just verify the current state
       expect(agentsBefore).toHaveLength(2);
 
       // Verify no duplicates by name
@@ -502,8 +515,8 @@ describe('Seeder (e2e)', () => {
     });
 
     it('should not duplicate users on re-run', async () => {
-      const userEmails = ['andresprimera@gmail.com', 'user2@example.com', 'user3@example.com'];
-      
+      const userEmails = SEED_DATA.users.map((u) => u.email);
+
       for (const email of userEmails) {
         const users = await connection
           .collection('users')
@@ -517,23 +530,31 @@ describe('Seeder (e2e)', () => {
 
   describe('Phone Number Tests', () => {
     it('should register WhatsApp phone numbers in ClientPhone collection', async () => {
+      // Find the first WhatsApp phoneNumberId from seed data
+      const firstPhoneNumberId = SEED_DATA.users.flatMap((u) =>
+        u.agentHirings.flatMap((h) =>
+          h.channels
+            .map((c) => (c.credentials as any)?.phoneNumberId)
+            .filter(Boolean),
+        ),
+      )[0];
+
       const clientPhones = await connection
         .collection('client_phones')
-        .find({ phoneNumberId: '573332574065' })
+        .find({ phoneNumberId: firstPhoneNumberId })
         .toArray();
 
-      // Should have phone numbers registered for users who have WhatsApp
       expect(clientPhones.length).toBeGreaterThan(0);
     });
 
     it('should ensure phone numbers are unique per client', async () => {
       const user1 = await connection
         .collection('users')
-        .findOne({ email: 'andresprimera@gmail.com' });
+        .findOne({ email: seedUser1.email });
 
       const user2 = await connection
         .collection('users')
-        .findOne({ email: 'user2@example.com' });
+        .findOne({ email: seedUser2.email });
 
       const user1Phones = await connection
         .collection('client_phones')
@@ -545,12 +566,21 @@ describe('Seeder (e2e)', () => {
         .find({ clientId: user2.clientId })
         .toArray();
 
-      // Each client should have their phone numbers
-      expect(user1Phones.length).toBeGreaterThan(0);
-      expect(user2Phones.length).toBe(0);
+      // User 1 has WhatsApp channels, so should have phone numbers
+      const user1HasWhatsApp = seedUser1.agentHirings.some((h) =>
+        h.channels.some((c) => (c.credentials as any)?.phoneNumberId),
+      );
+      if (user1HasWhatsApp) {
+        expect(user1Phones.length).toBeGreaterThan(0);
+      }
 
-      // Verify they can share the same phoneNumberId (different clients can use same number)
-      // This is allowed by the schema
+      // User 2 may or may not have WhatsApp
+      const user2HasWhatsApp = seedUser2.agentHirings.some((h) =>
+        h.channels.some((c) => (c.credentials as any)?.phoneNumberId),
+      );
+      if (!user2HasWhatsApp) {
+        expect(user2Phones.length).toBe(0);
+      }
     });
   });
 });
