@@ -35,17 +35,26 @@ export class AgentService {
       };
       const contactId = new Types.ObjectId(input.contactId);
 
+      const conversation =
+        await this.messagePersistenceService.resolveConversation(
+          persistenceContext,
+          contactId,
+        );
+
+      const conversationId = conversation._id as Types.ObjectId;
+
+      const conversationHistory =
+        await this.messagePersistenceService.getConversationContextByConversationId(
+          conversationId,
+          new Types.ObjectId(context.agentId),
+        );
+
       await this.messagePersistenceService.createUserMessage(
         input.message.text,
         persistenceContext,
         contactId,
+        conversationId,
       );
-
-      const conversationHistory =
-        await this.messagePersistenceService.getConversationContext(
-          persistenceContext,
-          contactId,
-        );
 
       const model = createLLMModel(context.llmConfig);
 
@@ -97,6 +106,7 @@ export class AgentService {
         persistenceContext,
         contactId,
         context,
+        conversationId,
       );
 
       return {
@@ -136,6 +146,16 @@ export class AgentService {
         `Safe contact metadata: ${JSON.stringify(safeMetadata)}`,
       );
     }
+
+    if (typeof safeMetadata.firstName === 'string' && safeMetadata.firstName.trim()) {
+      contextLines.push(
+        `If you greet the contact, you may use their first name: ${safeMetadata.firstName.trim()}.`,
+      );
+    }
+
+    contextLines.push(
+      'Do not imply prior-conversation memory or continuity unless it is explicitly present in this conversation history.',
+    );
 
     if (contextLines.length === 0) {
       return baseSystemPrompt;

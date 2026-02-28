@@ -3,11 +3,14 @@ import { MessagePersistenceService } from './message-persistence.service';
 import { MessageRepository } from '../../database/repositories/message.repository';
 import { ConversationSummaryService } from '../../agent/conversation-summary.service';
 import { Types } from 'mongoose';
+import { ConversationService } from './conversation.service';
 
 describe('MessagePersistenceService', () => {
   let service: MessagePersistenceService;
   let messageRepository: jest.Mocked<MessageRepository>;
   let conversationSummaryService: jest.Mocked<ConversationSummaryService>;
+  let conversationService: jest.Mocked<ConversationService>;
+  const mockConversationId = new Types.ObjectId('507f1f77bcf86cd799439015');
 
   const mockContext = {
     channelId: '507f1f77bcf86cd799439014',
@@ -34,6 +37,7 @@ describe('MessagePersistenceService', () => {
       agentId: new Types.ObjectId('507f1f77bcf86cd799439013'),
       clientId: new Types.ObjectId('507f1f77bcf86cd799439011'),
       channelId: new Types.ObjectId('507f1f77bcf86cd799439014'),
+      conversationId: mockConversationId,
       status: 'active' as const,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -46,6 +50,7 @@ describe('MessagePersistenceService', () => {
       agentId: new Types.ObjectId('507f1f77bcf86cd799439013'),
       clientId: new Types.ObjectId('507f1f77bcf86cd799439011'),
       channelId: new Types.ObjectId('507f1f77bcf86cd799439014'),
+      conversationId: mockConversationId,
       status: 'active' as const,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -64,6 +69,13 @@ describe('MessagePersistenceService', () => {
           },
         },
         {
+          provide: ConversationService,
+          useValue: {
+            resolveOrCreate: jest.fn(),
+            touch: jest.fn(),
+          },
+        },
+        {
           provide: ConversationSummaryService,
           useValue: {
             checkAndSummarizeIfNeeded: jest.fn(),
@@ -74,7 +86,15 @@ describe('MessagePersistenceService', () => {
 
     service = module.get<MessagePersistenceService>(MessagePersistenceService);
     messageRepository = module.get(MessageRepository);
+    conversationService = module.get(ConversationService);
     conversationSummaryService = module.get(ConversationSummaryService);
+
+    conversationService.resolveOrCreate.mockResolvedValue({
+      _id: mockConversationId,
+      status: 'open',
+      lastMessageAt: new Date(),
+    } as any);
+    conversationService.touch.mockResolvedValue();
   });
 
   it('should be defined', () => {
@@ -94,8 +114,13 @@ describe('MessagePersistenceService', () => {
         agentId: expect.any(Types.ObjectId),
         clientId: expect.any(Types.ObjectId),
         channelId: expect.any(Types.ObjectId),
+        conversationId: mockConversationId,
         status: 'active',
       });
+      expect(conversationService.touch).toHaveBeenCalledWith(
+        mockConversationId,
+        expect.any(Date),
+      );
     });
   });
 
@@ -112,20 +137,27 @@ describe('MessagePersistenceService', () => {
         agentId: expect.any(Types.ObjectId),
         clientId: expect.any(Types.ObjectId),
         channelId: expect.any(Types.ObjectId),
+        conversationId: mockConversationId,
         status: 'active',
       });
+      expect(conversationService.touch).toHaveBeenCalledWith(
+        mockConversationId,
+        expect.any(Date),
+      );
     });
   });
 
-  describe('getConversationContext', () => {
+  describe('getConversationContextByConversationId', () => {
     it('should retrieve and format conversation context', async () => {
       messageRepository.findConversationContext.mockResolvedValue(mockMessages as any);
 
-      const result = await service.getConversationContext(mockContext, mockContact._id as Types.ObjectId);
+      const result = await service.getConversationContextByConversationId(
+        mockConversationId,
+        new Types.ObjectId(mockContext.agentId),
+      );
 
       expect(messageRepository.findConversationContext).toHaveBeenCalledWith(
-        expect.any(Types.ObjectId),
-        mockContact._id,
+        mockConversationId,
         expect.any(Types.ObjectId),
       );
       expect(result).toEqual([
@@ -137,7 +169,10 @@ describe('MessagePersistenceService', () => {
     it('should return empty array when no messages found', async () => {
       messageRepository.findConversationContext.mockResolvedValue([]);
 
-      const result = await service.getConversationContext(mockContext, mockContact._id as Types.ObjectId);
+      const result = await service.getConversationContextByConversationId(
+        mockConversationId,
+        new Types.ObjectId(mockContext.agentId),
+      );
 
       expect(result).toEqual([]);
     });
@@ -191,7 +226,11 @@ describe('MessagePersistenceService', () => {
       };
 
       // Should not throw even if summarization fails
-      service.triggerSummarization(mockContext, mockContact._id as Types.ObjectId, agentContext);
+      service.triggerSummarization(
+        mockConversationId,
+        new Types.ObjectId(mockContext.agentId),
+        agentContext,
+      );
 
       // Wait a bit for async call
       await new Promise(resolve => setTimeout(resolve, 10));
@@ -222,6 +261,7 @@ describe('MessagePersistenceService', () => {
         mockContext,
         mockContact._id as Types.ObjectId,
         agentContext,
+        mockConversationId,
       );
 
       expect(messageRepository.create).toHaveBeenCalledWith(

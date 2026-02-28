@@ -63,15 +63,13 @@ export class MessageRepository {
   }
 
   async findConversationContext(
-    channelId: Types.ObjectId,
-    contactId: Types.ObjectId,
+    conversationId: Types.ObjectId,
     agentId: Types.ObjectId,
   ): Promise<Message[]> {
     // Find the most recent summary for this conversation
     const lastSummary = await this.model
       .findOne({
-        channelId,
-        contactId,
+        conversationId,
         agentId,
         type: 'summary',
         status: 'active',
@@ -81,8 +79,7 @@ export class MessageRepository {
 
     // Build query for messages after the last summary
     const query: any = {
-      channelId,
-      contactId,
+      conversationId,
       agentId,
       status: 'active',
       type: { $in: ['user', 'agent'] },
@@ -116,13 +113,11 @@ export class MessageRepository {
   }
 
   async countTokensInConversation(
-    channelId: Types.ObjectId,
-    contactId: Types.ObjectId,
+    conversationId: Types.ObjectId,
     agentId: Types.ObjectId,
   ): Promise<number> {
     const messages = await this.findConversationContext(
-      channelId,
-      contactId,
+      conversationId,
       agentId,
     );
 

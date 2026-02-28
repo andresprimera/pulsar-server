@@ -12,6 +12,7 @@ describe('MessageRepository', () => {
   const mockContactId = new Types.ObjectId('507f1f77bcf86cd799439012');
   const mockAgentId = new Types.ObjectId('507f1f77bcf86cd799439013');
   const mockClientId = new Types.ObjectId('507f1f77bcf86cd799439014');
+  const mockConversationId = new Types.ObjectId('507f1f77bcf86cd799439015');
 
   const mockUserMessage = {
     _id: new Types.ObjectId(),
@@ -20,6 +21,7 @@ describe('MessageRepository', () => {
     contactId: mockContactId,
     clientId: mockClientId,
     channelId: mockChannelId,
+    conversationId: mockConversationId,
     status: 'active' as const,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -32,6 +34,7 @@ describe('MessageRepository', () => {
     agentId: mockAgentId,
     clientId: mockClientId,
     channelId: mockChannelId,
+    conversationId: mockConversationId,
     status: 'active' as const,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -44,6 +47,7 @@ describe('MessageRepository', () => {
     agentId: mockAgentId,
     clientId: mockClientId,
     channelId: mockChannelId,
+    conversationId: mockConversationId,
     status: 'active' as const,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -317,8 +321,7 @@ describe('MessageRepository', () => {
       });
 
       const result = await repository.findConversationContext(
-        mockChannelId,
-        mockContactId,
+        mockConversationId,
         mockAgentId,
       );
 
@@ -343,8 +346,7 @@ describe('MessageRepository', () => {
       });
 
       const result = await repository.findConversationContext(
-        mockChannelId,
-        mockContactId,
+        mockConversationId,
         mockAgentId,
       );
 
@@ -362,8 +364,7 @@ describe('MessageRepository', () => {
       jest.spyOn(repository, 'findConversationContext').mockResolvedValue(messages as any);
 
       const result = await repository.countTokensInConversation(
-        mockChannelId,
-        mockContactId,
+        mockConversationId,
         mockAgentId,
       );
 
@@ -375,8 +376,7 @@ describe('MessageRepository', () => {
       jest.spyOn(repository, 'findConversationContext').mockResolvedValue([]);
 
       const result = await repository.countTokensInConversation(
-        mockChannelId,
-        mockContactId,
+        mockConversationId,
         mockAgentId,
       );
 

@@ -26,7 +26,6 @@ describe('AgentService', () => {
   const mockInput: AgentInput = {
     channel: 'whatsapp',
     contactId: '507f1f77bcf86cd799439012',
-    conversationId: 'phone123:1234567890',
     message: { type: 'text', text: 'Hello, world!' },
     contactMetadata: {
       firstName: 'Ana',
@@ -36,9 +35,9 @@ describe('AgentService', () => {
   };
 
   const mockContext: AgentContext = {
-    agentId: 'agent-1',
-    clientId: 'client-1',
-    channelId: 'channel-1',
+    agentId: '507f1f77bcf86cd799439013',
+    clientId: '507f1f77bcf86cd799439011',
+    channelId: '507f1f77bcf86cd799439014',
     systemPrompt: 'You are a helpful assistant.',
     llmConfig: {
       provider: LlmProvider.OpenAI,
@@ -50,8 +49,8 @@ describe('AgentService', () => {
   const mockContact = {
     _id: 'contact-1',
     channelIdentifier: '1234567890',
-    clientId: 'client-1',
-    channelId: 'channel-1',
+    clientId: '507f1f77bcf86cd799439011',
+    channelId: '507f1f77bcf86cd799439014',
   };
 
   beforeEach(async () => {
@@ -61,8 +60,9 @@ describe('AgentService', () => {
         {
           provide: MessagePersistenceService,
           useValue: {
+            resolveConversation: jest.fn(),
             createUserMessage: jest.fn(),
-            getConversationContext: jest.fn(),
+            getConversationContextByConversationId: jest.fn(),
             handleOutgoingMessage: jest.fn(),
           },
         },
@@ -89,38 +89,48 @@ describe('AgentService', () => {
   describe('run', () => {
     it('should call generateText with correct parameters', async () => {
       const mockModel = {};
+      const conversationId = '507f1f77bcf86cd799439099';
       const conversationHistory = [
         { role: 'user' as const, content: 'Previous message' },
       ];
 
       (llmFactory.createLLMModel as jest.Mock).mockReturnValue(mockModel);
       (ai.generateText as jest.Mock).mockResolvedValue({ text: 'AI response' });
+      messagePersistenceService.resolveConversation.mockResolvedValue({
+        _id: conversationId,
+      } as any);
       messagePersistenceService.createUserMessage.mockResolvedValue();
-      messagePersistenceService.getConversationContext.mockResolvedValue(
+      messagePersistenceService.getConversationContextByConversationId.mockResolvedValue(
         conversationHistory,
       );
       messagePersistenceService.handleOutgoingMessage.mockResolvedValue();
 
       const result = await service.run(mockInput, mockContext);
 
-      expect(messagePersistenceService.createUserMessage).toHaveBeenCalledWith(
-        'Hello, world!',
+      expect(messagePersistenceService.resolveConversation).toHaveBeenCalledWith(
         {
-          channelId: 'channel-1',
-          agentId: 'agent-1',
-          clientId: 'client-1',
+          channelId: '507f1f77bcf86cd799439014',
+          agentId: '507f1f77bcf86cd799439013',
+          clientId: '507f1f77bcf86cd799439011',
           contactId: '507f1f77bcf86cd799439012',
         },
         expect.anything(),
       );
 
-      expect(messagePersistenceService.getConversationContext).toHaveBeenCalledWith(
+      expect(messagePersistenceService.getConversationContextByConversationId).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+      );
+
+      expect(messagePersistenceService.createUserMessage).toHaveBeenCalledWith(
+        'Hello, world!',
         {
-          channelId: 'channel-1',
-          agentId: 'agent-1',
-          clientId: 'client-1',
+          channelId: '507f1f77bcf86cd799439014',
+          agentId: '507f1f77bcf86cd799439013',
+          clientId: '507f1f77bcf86cd799439011',
           contactId: '507f1f77bcf86cd799439012',
         },
+        expect.anything(),
         expect.anything(),
       );
 
@@ -131,7 +141,9 @@ describe('AgentService', () => {
         model: mockModel,
         system:
           `${mockContext.systemPrompt}\n\n` +
-          'Safe contact metadata: {"firstName":"Ana","language":"es"}',
+          'Safe contact metadata: {"firstName":"Ana","language":"es"}\n' +
+          'If you greet the contact, you may use their first name: Ana.\n' +
+          'Do not imply prior-conversation memory or continuity unless it is explicitly present in this conversation history.',
         messages: [
           { role: 'user', content: 'Previous message' },
           {
@@ -144,13 +156,14 @@ describe('AgentService', () => {
       expect(messagePersistenceService.handleOutgoingMessage).toHaveBeenCalledWith(
         'AI response',
         {
-          channelId: 'channel-1',
-          agentId: 'agent-1',
-          clientId: 'client-1',
+          channelId: '507f1f77bcf86cd799439014',
+          agentId: '507f1f77bcf86cd799439013',
+          clientId: '507f1f77bcf86cd799439011',
           contactId: '507f1f77bcf86cd799439012',
         },
         expect.anything(),
         mockContext,
+        expect.anything(),
       );
 
       expect(result).toEqual({
@@ -162,8 +175,11 @@ describe('AgentService', () => {
       const mockModel = {};
       (llmFactory.createLLMModel as jest.Mock).mockReturnValue(mockModel);
       (ai.generateText as jest.Mock).mockResolvedValue({ text: '   ' });
+      messagePersistenceService.resolveConversation.mockResolvedValue({
+        _id: '507f1f77bcf86cd799439099',
+      } as any);
       messagePersistenceService.createUserMessage.mockResolvedValue();
-      messagePersistenceService.getConversationContext.mockResolvedValue([]);
+      messagePersistenceService.getConversationContextByConversationId.mockResolvedValue([]);
       messagePersistenceService.handleOutgoingMessage.mockResolvedValue();
 
       const result = await service.run(mockInput, mockContext);
@@ -180,8 +196,11 @@ describe('AgentService', () => {
       (llmFactory.createLLMModel as jest.Mock).mockImplementation(() => {
         throw new Error('API error');
       });
+      messagePersistenceService.resolveConversation.mockResolvedValue({
+        _id: '507f1f77bcf86cd799439099',
+      } as any);
       messagePersistenceService.createUserMessage.mockResolvedValue();
-      messagePersistenceService.getConversationContext.mockResolvedValue([]);
+      messagePersistenceService.getConversationContextByConversationId.mockResolvedValue([]);
 
       const result = await service.run(mockInput, mockContext);
 
@@ -198,8 +217,11 @@ describe('AgentService', () => {
       const mockModel = {};
       (llmFactory.createLLMModel as jest.Mock).mockReturnValue(mockModel);
       (ai.generateText as jest.Mock).mockResolvedValue({ text: 'response' });
+      messagePersistenceService.resolveConversation.mockResolvedValue({
+        _id: '507f1f77bcf86cd799439099',
+      } as any);
       messagePersistenceService.createUserMessage.mockResolvedValue();
-      messagePersistenceService.getConversationContext.mockResolvedValue([]);
+      messagePersistenceService.getConversationContextByConversationId.mockResolvedValue([]);
       messagePersistenceService.handleOutgoingMessage.mockResolvedValue();
 
       await service.run(mockInput, mockContext);
@@ -208,9 +230,33 @@ describe('AgentService', () => {
       expect(generateTextCall.system).not.toContain('apiKey');
 
       expect(logSpy).toHaveBeenCalledWith(
-        'Processing agent-1 for client client-1 using provider=openai model=gpt-4',
+        'Processing 507f1f77bcf86cd799439013 for client 507f1f77bcf86cd799439011 using provider=openai model=gpt-4',
       );
-      expect(logSpy).toHaveBeenCalledWith('Response generated for agent-1');
+      expect(logSpy).toHaveBeenCalledWith('Response generated for 507f1f77bcf86cd799439013');
+    });
+
+    it('should keep new conversation history empty and still allow first-name greeting context', async () => {
+      const mockModel = {};
+      (llmFactory.createLLMModel as jest.Mock).mockReturnValue(mockModel);
+      (ai.generateText as jest.Mock).mockResolvedValue({ text: 'Hi Ana! How can I help today?' });
+      messagePersistenceService.resolveConversation.mockResolvedValue({
+        _id: '507f1f77bcf86cd799439099',
+      } as any);
+      messagePersistenceService.getConversationContextByConversationId.mockResolvedValue([]);
+      messagePersistenceService.createUserMessage.mockResolvedValue();
+      messagePersistenceService.handleOutgoingMessage.mockResolvedValue();
+
+      await service.run(mockInput, mockContext);
+
+      expect(messagePersistenceService.getConversationContextByConversationId).toHaveBeenCalled();
+
+      const generateTextCall = (ai.generateText as jest.Mock).mock.calls[0][0];
+      expect(generateTextCall.messages).toEqual([
+        { role: 'user', content: mockInput.message.text },
+      ]);
+      expect(generateTextCall.system).toContain(
+        'If you greet the contact, you may use their first name: Ana.',
+      );
     });
   });
 });

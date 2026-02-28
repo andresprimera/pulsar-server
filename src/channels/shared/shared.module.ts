@@ -13,12 +13,14 @@ import { TiktokIdentifierExtractor } from './contact-identifier/tiktok-identifie
 import { WebIdentifierExtractor } from './contact-identifier/web-identifier.extractor';
 import { ApiIdentifierExtractor } from './contact-identifier/api-identifier.extractor';
 import { CONTACT_IDENTIFIER_EXTRACTORS } from './contact-identifier/contact-identifier-extractor.interface';
+import { ConversationService } from './conversation.service';
 
 @Module({
   imports: [ConfigModule, DatabaseModule],
   providers: [
     MessagePersistenceService,
     ConversationSummaryService,
+    ConversationService,
     AgentRoutingService,
     ContactIdentityResolver,
     ContactIdentifierExtractorRegistry,
@@ -58,6 +60,7 @@ import { CONTACT_IDENTIFIER_EXTRACTORS } from './contact-identifier/contact-iden
   exports: [
     MessagePersistenceService,
     ConversationSummaryService,
+    ConversationService,
     AgentRoutingService,
     ContactIdentityResolver,
     ContactIdentifierExtractorRegistry,

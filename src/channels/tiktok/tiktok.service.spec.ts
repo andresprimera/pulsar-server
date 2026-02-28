@@ -196,6 +196,13 @@ describe('TiktokService', () => {
 
       expect(agentRoutingService.resolveRoute).toHaveBeenCalled();
       expect(agentService.run).toHaveBeenCalled();
+      expect(agentService.run).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channel: 'tiktok',
+          contactId: '507f1f77bcf86cd799439012',
+        }),
+        expect.anything(),
+      );
       
       // Verify fetch was called with correct args
       expect(fetchSpy).toHaveBeenCalledWith(

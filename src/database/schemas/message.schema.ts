@@ -47,6 +47,14 @@ export class Message extends Document {
   channelId: Types.ObjectId;
 
   @Prop({
+    type: Types.ObjectId,
+    ref: 'Conversation',
+    required: true,
+    index: true,
+  })
+  conversationId: Types.ObjectId;
+
+  @Prop({
     required: true,
     enum: ['active', 'inactive', 'archived'],
     default: 'active',

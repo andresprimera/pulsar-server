@@ -257,7 +257,6 @@ describe('WhatsappService', () => {
         {
           channel: 'whatsapp',
           contactId: '507f1f77bcf86cd799439012',
-          conversationId: 'phone123:1234567890',
           message: { type: 'text', text: 'Hello' },
           contactMetadata: undefined,
           contactSummary: undefined,

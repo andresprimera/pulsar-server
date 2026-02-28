@@ -196,7 +196,6 @@ export class WhatsappService {
     const input: AgentInput = {
       channel: CHANNEL_TYPES.WHATSAPP,
       contactId: contact._id.toString(),
-      conversationId: `${phoneNumberId}:${message.from}`,
       message: {
         type: 'text',
         text: message.text.body,

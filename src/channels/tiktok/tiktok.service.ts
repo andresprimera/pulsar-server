@@ -133,7 +133,6 @@ export class TiktokService {
     const input: AgentInput = {
       channel: CHANNEL_TYPES.TIKTOK,
       contactId: contact._id.toString(),
-      conversationId: data.conversation_id,
       message: {
         type: 'text',
         text: data.message.text,

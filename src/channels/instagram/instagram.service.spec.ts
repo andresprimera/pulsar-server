@@ -143,6 +143,13 @@ describe('InstagramService', () => {
     });
 
     expect(agentService.run).toHaveBeenCalledTimes(1);
+    expect(agentService.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: 'instagram',
+        contactId: '507f1f77bcf86cd799439012',
+      }),
+      expect.anything(),
+    );
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining('/me/messages'),
       expect.objectContaining({

@@ -3,6 +3,8 @@ import { Types } from 'mongoose';
 import { MessageRepository } from '../../database/repositories/message.repository';
 import { ConversationSummaryService } from '../../agent/conversation-summary.service';
 import { AgentContext } from '../../agent/contracts/agent-context';
+import { ConversationService } from './conversation.service';
+import { Conversation } from '../../database/schemas/conversation.schema';
 
 export interface MessagePersistenceContext {
   channelId: Types.ObjectId | string;
@@ -20,7 +22,27 @@ export class MessagePersistenceService {
   constructor(
     private readonly messageRepository: MessageRepository,
     private readonly conversationSummaryService: ConversationSummaryService,
+    private readonly conversationService: ConversationService,
   ) {}
+
+  async resolveConversation(
+    context: MessagePersistenceContext,
+    contactId: Types.ObjectId,
+    now: Date = new Date(),
+  ): Promise<Conversation> {
+    if (!contactId) {
+      throw new BadRequestException(
+        MessagePersistenceService.MISSING_IDENTITY_ERROR,
+      );
+    }
+
+    return this.conversationService.resolveOrCreate({
+      clientId: new Types.ObjectId(context.clientId),
+      contactId,
+      channelId: new Types.ObjectId(context.channelId),
+      now,
+    });
+  }
 
   /**
    * Single entrypoint for creating user messages.
@@ -29,6 +51,7 @@ export class MessagePersistenceService {
     content: string,
     context: MessagePersistenceContext,
     contactId: Types.ObjectId,
+    conversationId?: Types.ObjectId,
   ): Promise<void> {
     if (!contactId || !context.contactId) {
       throw new BadRequestException(
@@ -43,6 +66,11 @@ export class MessagePersistenceService {
       );
     }
 
+    const now = new Date();
+    const conversation = conversationId
+      ? ({ _id: conversationId } as Conversation)
+      : await this.resolveConversation(context, contactId, now);
+
     await this.messageRepository.create({
       content,
       type: 'user',
@@ -50,8 +78,14 @@ export class MessagePersistenceService {
       agentId: new Types.ObjectId(context.agentId),
       clientId: new Types.ObjectId(context.clientId),
       channelId: new Types.ObjectId(context.channelId),
+      conversationId: conversation._id,
       status: 'active',
     });
+
+    await this.conversationService.touch(
+      conversation._id as Types.ObjectId,
+      now,
+    );
 
     this.logger.log(
       `Created user message: contact=${contactId} agent=${context.agentId} client=${context.clientId} channel=${context.channelId}`,
@@ -65,12 +99,18 @@ export class MessagePersistenceService {
     content: string,
     context: MessagePersistenceContext,
     contactId: Types.ObjectId,
+    conversationId?: Types.ObjectId,
   ): Promise<void> {
     if (!contactId) {
       throw new BadRequestException(
         MessagePersistenceService.MISSING_IDENTITY_ERROR,
       );
     }
+
+    const now = new Date();
+    const conversation = conversationId
+      ? ({ _id: conversationId } as Conversation)
+      : await this.resolveConversation(context, contactId, now);
 
     await this.messageRepository.create({
       content,
@@ -79,8 +119,14 @@ export class MessagePersistenceService {
       agentId: new Types.ObjectId(context.agentId),
       clientId: new Types.ObjectId(context.clientId),
       channelId: new Types.ObjectId(context.channelId),
+      conversationId: conversation._id,
       status: 'active',
     });
+
+    await this.conversationService.touch(
+      conversation._id as Types.ObjectId,
+      now,
+    );
 
     this.logger.log(
       `Saved agent message: contact=${contactId} agent=${context.agentId} client=${context.clientId} channel=${context.channelId}`,
@@ -91,20 +137,13 @@ export class MessagePersistenceService {
    * Retrieves conversation context (messages since last summary)
    * Returns an array of messages formatted for the agent's conversation history
    */
-  async getConversationContext(
-    context: MessagePersistenceContext,
-    contactId: Types.ObjectId,
+  async getConversationContextByConversationId(
+    conversationId: Types.ObjectId,
+    agentId: Types.ObjectId,
   ): Promise<Array<{ role: 'user' | 'assistant'; content: string }>> {
-    if (!contactId) {
-      throw new BadRequestException(
-        MessagePersistenceService.MISSING_IDENTITY_ERROR,
-      );
-    }
-
     const messages = await this.messageRepository.findConversationContext(
-      new Types.ObjectId(context.channelId),
-      contactId,
-      new Types.ObjectId(context.agentId),
+      conversationId,
+      agentId,
     );
 
     return messages.map((msg) => ({
@@ -120,15 +159,14 @@ export class MessagePersistenceService {
    * This is fire-and-forget and will not block the response flow
    */
   triggerSummarization(
-    context: MessagePersistenceContext,
-    contactId: Types.ObjectId,
+    conversationId: Types.ObjectId,
+    agentId: Types.ObjectId,
     agentContext: AgentContext,
   ): void {
     this.conversationSummaryService
       .checkAndSummarizeIfNeeded(
-        new Types.ObjectId(context.channelId),
-        contactId,
-        new Types.ObjectId(context.agentId),
+        conversationId,
+        agentId,
         agentContext,
       )
       .catch((err) => {
@@ -146,11 +184,22 @@ export class MessagePersistenceService {
     context: MessagePersistenceContext,
     contactId: Types.ObjectId,
     agentContext: AgentContext,
+    conversationId?: Types.ObjectId,
   ): Promise<void> {
     // Save agent message
-    await this.saveAgentMessage(content, context, contactId);
+    await this.saveAgentMessage(content, context, contactId, conversationId);
 
     // Trigger async summarization check
-    this.triggerSummarization(context, contactId, agentContext);
+    const resolvedConversationId =
+      conversationId ||
+      (
+        await this.resolveConversation(context, contactId)
+      )._id;
+
+    this.triggerSummarization(
+      resolvedConversationId as Types.ObjectId,
+      new Types.ObjectId(context.agentId),
+      agentContext,
+    );
   }
 }

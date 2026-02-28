@@ -20,6 +20,11 @@ import { User, UserSchema } from './schemas/user.schema';
 import { UserRepository } from './repositories/user.repository';
 import { Message, MessageSchema } from './schemas/message.schema';
 import { MessageRepository } from './repositories/message.repository';
+import {
+  Conversation,
+  ConversationSchema,
+} from './schemas/conversation.schema';
+import { ConversationRepository } from './repositories/conversation.repository';
 import { OnboardingModule } from '../onboarding/onboarding.module';
 
 const repositories = [
@@ -32,6 +37,7 @@ const repositories = [
   ContactRepository,
   UserRepository,
   MessageRepository,
+  ConversationRepository,
 ];
 
 @Global()
@@ -56,6 +62,7 @@ const repositories = [
       { name: Contact.name, schema: ContactSchema },
       { name: User.name, schema: UserSchema },
       { name: Message.name, schema: MessageSchema },
+      { name: Conversation.name, schema: ConversationSchema },
     ]),
     forwardRef(() => OnboardingModule),
   ],

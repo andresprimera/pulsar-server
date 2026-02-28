@@ -239,7 +239,6 @@ export class InstagramService {
         const input: AgentInput = {
           channel: CHANNEL_TYPES.INSTAGRAM,
           contactId: contact._id.toString(),
-          conversationId: `${instagramAccountId}:${senderId}`,
           message: {
             type: 'text',
             text,
