@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model, Types } from 'mongoose';
 import { Message } from '../schemas/message.schema';
@@ -14,6 +14,10 @@ export class MessageRepository {
     data: Partial<Message>,
     session?: ClientSession,
   ): Promise<Message> {
+    if (!data.conversationId) {
+      throw new BadRequestException('conversationId is required');
+    }
+
     const [doc] = await this.model.create([data], { session });
     return doc;
   }
@@ -30,20 +34,20 @@ export class MessageRepository {
     return this.model.find({ channelId }).sort({ createdAt: 1 }).exec();
   }
 
-  async findByUser(userId: Types.ObjectId): Promise<Message[]> {
-    return this.model.find({ userId }).sort({ createdAt: 1 }).exec();
+  async findByContact(contactId: Types.ObjectId): Promise<Message[]> {
+    return this.model.find({ contactId }).sort({ createdAt: 1 }).exec();
   }
 
   async findByAgent(agentId: Types.ObjectId): Promise<Message[]> {
     return this.model.find({ agentId }).sort({ createdAt: 1 }).exec();
   }
 
-  async findByChannelAndUser(
+  async findByChannelAndContact(
     channelId: Types.ObjectId,
-    userId: Types.ObjectId,
+    contactId: Types.ObjectId,
   ): Promise<Message[]> {
     return this.model
-      .find({ channelId, userId })
+      .find({ channelId, contactId })
       .sort({ createdAt: 1 })
       .exec();
   }
@@ -63,15 +67,13 @@ export class MessageRepository {
   }
 
   async findConversationContext(
-    channelId: Types.ObjectId,
-    userId: Types.ObjectId,
+    conversationId: Types.ObjectId,
     agentId: Types.ObjectId,
   ): Promise<Message[]> {
     // Find the most recent summary for this conversation
     const lastSummary = await this.model
       .findOne({
-        channelId,
-        userId,
+        conversationId,
         agentId,
         type: 'summary',
         status: 'active',
@@ -81,8 +83,7 @@ export class MessageRepository {
 
     // Build query for messages after the last summary
     const query: any = {
-      channelId,
-      userId,
+      conversationId,
       agentId,
       status: 'active',
       type: { $in: ['user', 'agent'] },
@@ -96,13 +97,13 @@ export class MessageRepository {
     return this.model.find(query).sort({ createdAt: 1 }).exec();
   }
 
-  async findLatestByUserAndAgents(
-    userId: Types.ObjectId,
+  async findLatestByContactAndAgents(
+    contactId: Types.ObjectId,
     agentIds: Types.ObjectId[],
     channelIds?: Types.ObjectId[],
   ): Promise<Message | null> {
     const query: any = {
-      userId,
+      contactId,
       status: 'active',
       type: { $in: ['user', 'agent'] },
       agentId: { $in: agentIds },
@@ -116,13 +117,11 @@ export class MessageRepository {
   }
 
   async countTokensInConversation(
-    channelId: Types.ObjectId,
-    userId: Types.ObjectId,
+    conversationId: Types.ObjectId,
     agentId: Types.ObjectId,
   ): Promise<number> {
     const messages = await this.findConversationContext(
-      channelId,
-      userId,
+      conversationId,
       agentId,
     );
 

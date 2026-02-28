@@ -1,5 +1,6 @@
 import { Injectable, ForbiddenException, Logger } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'crypto';
+import { Types } from 'mongoose';
 import { AgentService } from '../../agent/agent.service';
 import { AgentInput } from '../../agent/contracts/agent-input';
 import { AgentContext } from '../../agent/contracts/agent-context';
@@ -12,6 +13,8 @@ import {
 } from './instagram.config';
 import { AgentRoutingService } from '../shared/agent-routing.service';
 import { AgentContextService } from '../../agent/agent-context.service';
+import { ContactIdentityResolver } from '../shared/contact-identity.resolver';
+import { CHANNEL_TYPES } from '../shared/channel-type.constants';
 
 @Injectable()
 export class InstagramService {
@@ -24,6 +27,7 @@ export class InstagramService {
     private readonly agentRepository: AgentRepository,
     private readonly agentRoutingService: AgentRoutingService,
     private readonly agentContextService: AgentContextService,
+    private readonly contactIdentityResolver: ContactIdentityResolver,
   ) {
     this.config = loadInstagramConfig();
   }
@@ -153,10 +157,10 @@ export class InstagramService {
         }
 
         const routeDecision = await this.agentRoutingService.resolveRoute({
-          channelIdentifier: instagramAccountId,
-          externalUserId: senderId,
+          routeChannelIdentifier: instagramAccountId,
+          channelIdentifier: senderId,
           incomingText: text,
-          channelType: 'instagram',
+          channelType: CHANNEL_TYPES.INSTAGRAM,
         });
 
         if (routeDecision.kind === 'unroutable') {
@@ -224,14 +228,23 @@ export class InstagramService {
 
         const context = await this.agentContextService.enrichContext(rawContext);
 
+        const contact = await this.contactIdentityResolver.resolveContact({
+          channelType: CHANNEL_TYPES.INSTAGRAM,
+          payload: event,
+          clientId: new Types.ObjectId(clientAgent.clientId),
+          channelId: new Types.ObjectId(channelConfig.channelId.toString()),
+          contactName: senderId,
+        });
+
         const input: AgentInput = {
-          channel: 'instagram',
-          externalUserId: senderId,
-          conversationId: `${instagramAccountId}:${senderId}`,
+          channel: CHANNEL_TYPES.INSTAGRAM,
+          contactId: contact._id.toString(),
           message: {
             type: 'text',
             text,
           },
+          contactMetadata: contact.metadata,
+          contactSummary: contact.contactSummary,
           metadata: {
             messageId: event?.message?.mid,
             instagramAccountId,

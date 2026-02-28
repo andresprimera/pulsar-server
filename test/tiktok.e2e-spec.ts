@@ -20,11 +20,28 @@ describe('TikTok Channel (e2e)', () => {
   const agentId = agentIdObj.toString();
   const clientAgentIdObj = new Types.ObjectId();
   const tiktokChannelIdObj = new Types.ObjectId();
+  const tiktokChannelName = `E2E TikTok Channel ${tiktokChannelIdObj.toString()}`;
   
   // Valid Channels Config
   const validTiktokUserId = 'tiktok-user-123';
   const senderUserId = 'sender-456';
   const validAccessToken = 'valid-access-token';
+
+  const waitForMockCalls = async (
+    mockFn: jest.Mock,
+    expectedCalls: number,
+    timeoutMs = 5000,
+  ): Promise<void> => {
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < timeoutMs) {
+      if (mockFn.mock.calls.length >= expectedCalls) {
+        return;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  };
   
   beforeAll(async () => {
     // 1. Mock global fetch
@@ -77,7 +94,7 @@ describe('TikTok Channel (e2e)', () => {
 
     await connection.collection('channels').insertOne({
         _id: tiktokChannelIdObj,
-        name: 'E2E TikTok Channel',
+      name: tiktokChannelName,
         type: 'tiktok',
         supportedProviders: [ChannelProvider.Tiktok],
     });
@@ -166,8 +183,7 @@ describe('TikTok Channel (e2e)', () => {
       })
       .expect(200);
 
-    // Allow fire-and-forget webhook processing to complete
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await waitForMockCalls(mockAgentService.run as jest.Mock, 1);
 
     // Assert
     // Check Agent Service Calls
@@ -190,6 +206,8 @@ describe('TikTok Channel (e2e)', () => {
   });
 
   it('should handle message for unregistered user (ignore)', async () => {
+    const callsBeforeRequest = (mockAgentService.run as jest.Mock).mock.calls.length;
+
     // Act
     await request(app.getHttpServer())
       .post('/tiktok/webhook')
@@ -212,8 +230,12 @@ describe('TikTok Channel (e2e)', () => {
       })
       .expect(200);
 
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
     // Assert
-    expect(mockAgentService.run).not.toHaveBeenCalled();
+    expect((mockAgentService.run as jest.Mock).mock.calls.length).toBe(
+      callsBeforeRequest,
+    );
     // Should verify fetch was NOT called for sending reply (fetch might be called if logging uses it? No, logging uses stdout/err)
     // Wait, fetch is mocked globally. If handleIncoming returns early, sendMessage is not called.
     expect(fetchSpy).not.toHaveBeenCalledWith(

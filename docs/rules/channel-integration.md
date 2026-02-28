@@ -84,8 +84,8 @@ All incoming channel messages MUST use `AgentRoutingService.resolveRoute()` for 
 
 ```typescript
 const routeDecision = await this.agentRoutingService.resolveRoute({
-  channelIdentifier: phoneNumberId,  // or tiktokUserId, instagramAccountId
-  externalUserId: message.from,
+  routeChannelIdentifier: phoneNumberId,  // or tiktokUserId, instagramAccountId
+  channelIdentifier: message.from,
   incomingText: message.text.body,
   channelType: 'whatsapp',           // or 'tiktok', 'instagram'
 });
@@ -120,7 +120,7 @@ const context = await this.agentContextService.enrichContext(rawContext);
 
 const input: AgentInput = {
   channel: 'whatsapp',
-  externalUserId: message.from,
+  contactId: contact._id.toString(),
   conversationId: `${phoneNumberId}:${message.from}`,
   message: { type: 'text', text: message.text.body },
   metadata: { messageId: message.id, phoneNumberId },

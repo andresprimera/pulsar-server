@@ -4,10 +4,12 @@ import { generateText } from 'ai';
 import { AgentRepository } from '../../database/repositories/agent.repository';
 import { ClientAgentRepository } from '../../database/repositories/client-agent.repository';
 import { MessageRepository } from '../../database/repositories/message.repository';
-import { UserRepository } from '../../database/repositories/user.repository';
+import { ContactRepository } from '../../database/repositories/contact.repository';
 import { ClientAgent, HireChannelConfig } from '../../database/schemas/client-agent.schema';
 import { createLLMModel } from '../../agent/llm/llm.factory';
 import { LlmProvider } from '../../agent/llm/provider.enum';
+import { ChannelType } from './channel-type.type';
+import { CHANNEL_TYPES } from './channel-type.constants';
 
 export interface RouteCandidate {
   clientAgent: ClientAgent;
@@ -34,14 +36,14 @@ export type AgentRouteDecision =
  * Channel-specific routing context
  */
 export interface ChannelRoutingContext {
-  /** Channel identifier (phoneNumberId, tiktokUserId, instagramAccountId, etc.) */
+  /** Routing account identifier (phoneNumberId, tiktokUserId, instagramAccountId, etc.) */
+  routeChannelIdentifier: string;
+  /** Contact identity identifier within the channel (phone, sender user ID, etc.) */
   channelIdentifier: string;
-  /** External user identifier (phone, email, userId) */
-  externalUserId: string;
   /** Incoming message text */
   incomingText: string;
   /** Channel type for logging */
-  channelType: 'whatsapp' | 'tiktok' | 'instagram';
+  channelType: ChannelType;
 }
 
 @Injectable()
@@ -51,7 +53,7 @@ export class AgentRoutingService {
 
   constructor(
     private readonly clientAgentRepository: ClientAgentRepository,
-    private readonly userRepository: UserRepository,
+    private readonly contactRepository: ContactRepository,
     private readonly messageRepository: MessageRepository,
     private readonly agentRepository: AgentRepository,
   ) {
@@ -66,18 +68,18 @@ export class AgentRoutingService {
   async resolveRoute(
     context: ChannelRoutingContext,
   ): Promise<AgentRouteDecision> {
-    if (!context.channelIdentifier) {
+    if (!context.routeChannelIdentifier) {
       return { kind: 'unroutable', reason: 'missing-identifier' };
     }
 
     const clientAgents = await this.findCandidatesByChannel(
       context.channelType,
-      context.channelIdentifier,
+      context.routeChannelIdentifier,
     );
 
     const candidates = await this.buildCandidates(
       clientAgents,
-      context.channelIdentifier,
+      context.routeChannelIdentifier,
       context.channelType,
     );
 
@@ -94,7 +96,10 @@ export class AgentRoutingService {
       return { kind: 'resolved', candidate: explicit };
     }
 
-    const sticky = await this.resolveFromRecentHistory(candidates, context.externalUserId);
+    const sticky = await this.resolveFromRecentHistory(
+      candidates,
+      context.channelIdentifier,
+    );
     if (sticky) {
       return { kind: 'resolved', candidate: sticky };
     }
@@ -130,16 +135,18 @@ export class AgentRoutingService {
    * Find candidate ClientAgents based on channel type.
    */
   private async findCandidatesByChannel(
-    channelType: 'whatsapp' | 'tiktok' | 'instagram',
+    channelType: ChannelType,
     identifier: string,
   ): Promise<ClientAgent[]> {
     switch (channelType) {
-      case 'whatsapp':
+      case CHANNEL_TYPES.WHATSAPP:
         return this.clientAgentRepository.findActiveByPhoneNumberId(identifier);
-      case 'tiktok':
+      case CHANNEL_TYPES.TIKTOK:
         return this.clientAgentRepository.findActiveByTiktokUserId(identifier);
-      case 'instagram':
+      case CHANNEL_TYPES.INSTAGRAM:
         return this.clientAgentRepository.findActiveByInstagramAccountId(identifier);
+      default:
+        return [];
     }
   }
 
@@ -149,7 +156,7 @@ export class AgentRoutingService {
   private async buildCandidates(
     clientAgents: ClientAgent[],
     identifier: string,
-    channelType: 'whatsapp' | 'tiktok' | 'instagram',
+    channelType: ChannelType,
   ): Promise<RouteCandidate[]> {
     const unresolved = clientAgents
       .map((clientAgent) => {
@@ -157,12 +164,14 @@ export class AgentRoutingService {
           if (channel.status !== 'active') return false;
           
           switch (channelType) {
-            case 'whatsapp':
+            case CHANNEL_TYPES.WHATSAPP:
               return channel.phoneNumberId === identifier;
-            case 'tiktok':
+            case CHANNEL_TYPES.TIKTOK:
               return channel.tiktokUserId === identifier;
-            case 'instagram':
+            case CHANNEL_TYPES.INSTAGRAM:
               return channel.instagramAccountId === identifier;
+            default:
+              return false;
           }
         });
 
@@ -231,7 +240,7 @@ export class AgentRoutingService {
 
   private async resolveFromRecentHistory(
     candidates: RouteCandidate[],
-    externalUserId: string,
+    channelIdentifier: string,
   ): Promise<RouteCandidate | null> {
     const byClient = new Map<string, RouteCandidate[]>();
 
@@ -246,15 +255,6 @@ export class AgentRoutingService {
 
     for (const [clientId, clientCandidates] of byClient) {
       if (!Types.ObjectId.isValid(clientId)) {
-        continue;
-      }
-
-      const user = await this.userRepository.findByExternalUserId(
-        externalUserId,
-        new Types.ObjectId(clientId),
-      );
-
-      if (!user) {
         continue;
       }
 
@@ -273,28 +273,46 @@ export class AgentRoutingService {
         continue;
       }
 
-      const latestMessage = await this.messageRepository.findLatestByUserAndAgents(
-        user._id as Types.ObjectId,
-        agentIds,
-        channelIds,
-      );
+      for (const candidate of clientCandidates) {
+        const channelId = candidate.channelConfig.channelId.toString();
+        if (!Types.ObjectId.isValid(channelId)) {
+          continue;
+        }
 
-      if (!latestMessage) {
-        continue;
-      }
+        const contact = await this.contactRepository.findByExternalIdentity(
+          new Types.ObjectId(clientId),
+          new Types.ObjectId(channelId),
+          channelIdentifier,
+        );
 
-      const matched = clientCandidates.find(
-        (candidate) =>
-          candidate.clientAgent.agentId.toString() ===
-          latestMessage.agentId.toString(),
-      );
+        if (!contact) {
+          continue;
+        }
 
-      if (!matched) {
-        continue;
-      }
+        const latestMessage =
+          await this.messageRepository.findLatestByContactAndAgents(
+            contact._id as Types.ObjectId,
+            agentIds,
+            channelIds,
+          );
 
-      if (!mostRecent || latestMessage.createdAt > mostRecent.createdAt) {
-        mostRecent = { createdAt: latestMessage.createdAt, candidate: matched };
+        if (!latestMessage) {
+          continue;
+        }
+
+        const matched = clientCandidates.find(
+          (candidate) =>
+            candidate.clientAgent.agentId.toString() ===
+            latestMessage.agentId.toString(),
+        );
+
+        if (!matched) {
+          continue;
+        }
+
+        if (!mostRecent || latestMessage.createdAt > mostRecent.createdAt) {
+          mostRecent = { createdAt: latestMessage.createdAt, candidate: matched };
+        }
       }
     }
 

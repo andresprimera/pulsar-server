@@ -80,20 +80,21 @@ The threshold should leave room for:
 
 ## Database Schema
 
-### User Schema Updates
+### Contact Schema Updates
 
 ```typescript
 {
-  email: string;              // Existing
-  name: string;               // Existing
-  clientId: ObjectId;         // Existing
-  status: string;             // Existing
-  externalUserId?: string;    // NEW: WhatsApp phone number or other external ID
+  clientId: ObjectId;
+  channelId: ObjectId;
+  channelIdentifier: string;  // Channel-specific sender identity
+  name: string;
+  metadata?: Record<string, unknown>;
+  status: 'active' | 'blocked' | 'archived';
 }
 ```
 
 **Indexes:**
-- `{ externalUserId: 1, clientId: 1 }` - For efficient external user lookups
+- `{ clientId: 1, channelId: 1, channelIdentifier: 1 }` (unique) - Canonical contact identity
 
 ### Message Schema
 
@@ -101,7 +102,7 @@ The threshold should leave room for:
 {
   content: string;            // Message text or summary text
   type: 'user' | 'agent' | 'summary';  // Message type
-  userId: ObjectId;           // Reference to User
+  contactId: ObjectId;        // Reference to Contact
   agentId: ObjectId;          // Reference to Agent
   channelId: ObjectId;        // Reference to Channel
   status: string;             // 'active', 'inactive', 'archived'
@@ -178,7 +179,7 @@ npm test -- --testPathPattern="(repository|agent.service|users|agents)"
 
 Check:
 1. MongoDB connection is working
-2. User collection has the `externalUserId` field
+2. Contact collection has the `channelIdentifier` field
 3. Message collection exists
 4. Proper indexes are created
 
@@ -192,7 +193,7 @@ Check:
 ### Context Not Loading
 
 Check:
-1. Messages are being saved with correct `userId`, `agentId`, and `channelId`
+1. Messages are being saved with correct `contactId`, `agentId`, and `channelId`
 2. MessageRepository.findConversationContext query is working
 3. Check for database query errors in logs
 
@@ -204,4 +205,4 @@ This implementation follows the existing Pulsar architecture:
 - **Services**: Contain business logic, use repositories for data access
 - **Controllers**: Handle HTTP, delegate to services
 - **No breaking changes**: All existing functionality continues to work
-- **Backward compatible**: Existing users without `externalUserId` are unaffected
+- **Identity-safe**: Contact identity is scoped by client + channel + channelIdentifier

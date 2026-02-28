@@ -19,10 +19,27 @@ describe('Instagram Channel (e2e)', () => {
   const agentId = agentIdObj.toString();
   const clientAgentIdObj = new Types.ObjectId();
   const instagramChannelIdObj = new Types.ObjectId();
+  const instagramChannelName = `E2E Instagram Channel ${instagramChannelIdObj.toString()}`;
 
   const instagramAccountId = '17841400000000000';
   const senderId = 'igsid_sender_123';
   const validAccessToken = 'valid-instagram-access-token';
+
+  const waitForMockCalls = async (
+    mockFn: jest.Mock,
+    expectedCalls: number,
+    timeoutMs = 5000,
+  ): Promise<void> => {
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < timeoutMs) {
+      if (mockFn.mock.calls.length >= expectedCalls) {
+        return;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  };
 
   beforeAll(async () => {
     fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
@@ -76,7 +93,7 @@ describe('Instagram Channel (e2e)', () => {
 
     await connection.collection('channels').insertOne({
       _id: instagramChannelIdObj,
-      name: 'E2E Instagram Channel',
+      name: instagramChannelName,
       type: 'instagram',
       supportedProviders: [ChannelProvider.Instagram],
     });
@@ -177,8 +194,7 @@ describe('Instagram Channel (e2e)', () => {
       .expect(200)
       .expect('ok');
 
-    // Allow fire-and-forget webhook processing to complete
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await waitForMockCalls(mockAgentService.run as jest.Mock, 1);
 
     expect(mockAgentService.run).toHaveBeenCalledTimes(1);
     const runArgs = (mockAgentService.run as jest.Mock).mock.calls[0][0];
@@ -198,6 +214,8 @@ describe('Instagram Channel (e2e)', () => {
   });
 
   it('should ignore unknown instagram account id', async () => {
+    const callsBeforeRequest = (mockAgentService.run as jest.Mock).mock.calls.length;
+
     await request(app.getHttpServer())
       .post('/instagram/webhook')
       .send({
@@ -221,6 +239,10 @@ describe('Instagram Channel (e2e)', () => {
       .expect(200)
       .expect('ok');
 
-    expect(mockAgentService.run).not.toHaveBeenCalled();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    expect((mockAgentService.run as jest.Mock).mock.calls.length).toBe(
+      callsBeforeRequest,
+    );
   });
 });

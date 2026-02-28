@@ -52,7 +52,7 @@ describe('Message Persistence (e2e)', () => {
       await connection.collection('agents').deleteOne({ _id: agentIdObj });
       await connection.collection('client_agents').deleteOne({ _id: clientAgentIdObj });
       await connection.collection('messages').deleteMany({ channelId: channelIdObj });
-      await connection.collection('users').deleteMany({ externalUserId: userPhone });
+      await connection.collection('contacts').deleteMany({ externalId: userPhone.replace(/[^\d]/g, '') });
     }
 
     // Create Client
@@ -103,7 +103,7 @@ describe('Message Persistence (e2e)', () => {
       await connection.collection('agents').deleteOne({ _id: agentIdObj });
       await connection.collection('client_agents').deleteOne({ _id: clientAgentIdObj });
       await connection.collection('messages').deleteMany({ channelId: channelIdObj });
-      await connection.collection('users').deleteMany({ externalUserId: userPhone });
+      await connection.collection('contacts').deleteMany({ externalId: userPhone.replace(/[^\d]/g, '') });
     }
     await app.close();
   });
@@ -111,7 +111,7 @@ describe('Message Persistence (e2e)', () => {
   beforeEach(async () => {
     // Clean up messages before each test
     await connection.collection('messages').deleteMany({ channelId: channelIdObj });
-    await connection.collection('users').deleteMany({ externalUserId: userPhone });
+    await connection.collection('contacts').deleteMany({ externalId: userPhone.replace(/[^\d]/g, '') });
     jest.clearAllMocks();
   });
 
@@ -146,18 +146,18 @@ describe('Message Persistence (e2e)', () => {
       // Wait a bit for async operations
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Assert - Check user was created
-      const user = await connection
-        .collection('users')
-        .findOne({ externalUserId: userPhone });
-      expect(user).toBeDefined();
-      expect(user.externalUserId).toBe(userPhone);
-      expect(user.clientId.toString()).toBe(clientId);
+      // Assert - Check contact was created
+      const contact = await connection
+        .collection('contacts')
+        .findOne({ externalId: userPhone.replace(/[^\d]/g, '') });
+      expect(contact).toBeDefined();
+      expect(contact.externalId).toBe(userPhone.replace(/[^\d]/g, ''));
+      expect(contact.clientId.toString()).toBe(clientId);
 
       // Assert - Check user message was persisted
       const userMessage = await connection
         .collection('messages')
-        .findOne({ type: 'user', userId: user._id });
+        .findOne({ type: 'user', contactId: contact._id });
       expect(userMessage).toBeDefined();
       expect(userMessage.content).toBe('Hello, test message');
       expect(userMessage.channelId.toString()).toBe(channelIdObj.toString());
@@ -167,7 +167,7 @@ describe('Message Persistence (e2e)', () => {
       // Assert - Check agent response was persisted
       const agentMessage = await connection
         .collection('messages')
-        .findOne({ type: 'agent', userId: user._id });
+        .findOne({ type: 'agent', contactId: contact._id });
       expect(agentMessage).toBeDefined();
       expect(agentMessage.content).toBeTruthy();
       expect(agentMessage.channelId.toString()).toBe(channelIdObj.toString());
@@ -255,23 +255,29 @@ describe('Message Persistence (e2e)', () => {
       // Arrange - Set a low threshold for testing
       jest.spyOn(configService, 'get').mockReturnValue(50); // Very low threshold
 
-      // Create a conversation with enough messages to exceed threshold
-      const user = await connection.collection('users').insertOne({
-        externalUserId: userPhone,
+      // Create a contact with enough messages to exceed threshold
+      const contactResult = await connection.collection('contacts').insertOne({
+        externalId: userPhone.replace(/[^\d]/g, ''),
+        externalIdRaw: userPhone,
+        identifier: {
+          type: 'phone',
+          value: userPhone.replace(/[^\d]/g, ''),
+        },
         clientId: clientIdObj,
-        email: `${userPhone}@external.user`,
+        channelId: channelIdObj,
         name: userPhone,
+        metadata: {},
         status: 'active',
       });
 
       // Insert messages that will exceed token threshold
       const longMessage = 'This is a long message with many words to increase token count. '.repeat(10);
-      
+
       for (let i = 0; i < 3; i++) {
         await connection.collection('messages').insertOne({
           content: longMessage,
-          type: 'user',
-          userId: user.insertedId,
+          type: 'agent',
+          contactId: contactResult.insertedId,
           agentId: agentIdObj,
           channelId: channelIdObj,
           status: 'active',
@@ -282,7 +288,7 @@ describe('Message Persistence (e2e)', () => {
         await connection.collection('messages').insertOne({
           content: 'Short response',
           type: 'agent',
-          userId: user.insertedId,
+          contactId: contactResult.insertedId,
           agentId: agentIdObj,
           channelId: channelIdObj,
           status: 'active',
@@ -329,7 +335,7 @@ describe('Message Persistence (e2e)', () => {
         expect(summaryMessage).toBeDefined();
         expect(summaryMessage.type).toBe('summary');
         expect(summaryMessage.content).toBeTruthy();
-        expect(summaryMessage.userId.toString()).toBe(user.insertedId.toString());
+        expect(summaryMessage.contactId.toString()).toBe(contactResult.insertedId.toString());
         expect(summaryMessage.agentId.toString()).toBe(agentId);
       } else {
         // Even if summary wasn't created, messages should be persisted
@@ -341,8 +347,8 @@ describe('Message Persistence (e2e)', () => {
     });
   });
 
-  describe('User Management', () => {
-    it('should create new user on first message', async () => {
+  describe('Contact Management', () => {
+    it('should create new contact on first message', async () => {
       const payload = {
         entry: [
           {
@@ -352,7 +358,7 @@ describe('Message Persistence (e2e)', () => {
                   messages: [
                     {
                       from: userPhone,
-                      id: 'msg-new-user',
+                      id: 'msg-new-contact',
                       type: 'text',
                       text: { body: 'Hello' },
                     },
@@ -368,17 +374,18 @@ describe('Message Persistence (e2e)', () => {
       await whatsappService.handleIncoming(payload);
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      const user = await connection
-        .collection('users')
-        .findOne({ externalUserId: userPhone });
+      const contact = await connection
+        .collection('contacts')
+        .findOne({ externalId: userPhone.replace(/[^\d]/g, '') });
 
-      expect(user).toBeDefined();
-      expect(user.externalUserId).toBe(userPhone);
-      expect(user.name).toBe(userPhone);
-      expect(user.status).toBe('active');
+      expect(contact).toBeDefined();
+      expect(contact.externalId).toBe(userPhone.replace(/[^\d]/g, ''));
+      expect(contact.name).toBe(userPhone);
+      expect(contact.channelId.toString()).toBe(channelIdObj.toString());
+      expect(contact.status).toBe('active');
     });
 
-    it('should reuse existing user on subsequent messages', async () => {
+    it('should reuse existing contact on subsequent messages', async () => {
       // First message
       const payload1 = {
         entry: [
@@ -405,9 +412,9 @@ describe('Message Persistence (e2e)', () => {
       await whatsappService.handleIncoming(payload1);
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      const userCountAfterFirst = await connection
-        .collection('users')
-        .countDocuments({ externalUserId: userPhone });
+      const contactCountAfterFirst = await connection
+        .collection('contacts')
+        .countDocuments({ externalId: userPhone.replace(/[^\d]/g, '') });
 
       // Second message
       const payload2 = {
@@ -435,13 +442,13 @@ describe('Message Persistence (e2e)', () => {
       await whatsappService.handleIncoming(payload2);
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      const userCountAfterSecond = await connection
-        .collection('users')
-        .countDocuments({ externalUserId: userPhone });
+      const contactCountAfterSecond = await connection
+        .collection('contacts')
+        .countDocuments({ externalId: userPhone.replace(/[^\d]/g, '') });
 
-      // Should still be only one user
-      expect(userCountAfterFirst).toBe(1);
-      expect(userCountAfterSecond).toBe(1);
+      // Should still be only one contact
+      expect(contactCountAfterFirst).toBe(1);
+      expect(contactCountAfterSecond).toBe(1);
     });
   });
 });

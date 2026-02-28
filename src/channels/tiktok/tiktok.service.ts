@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Types } from 'mongoose';
 import { AgentService } from '../../agent/agent.service';
 import { AgentInput } from '../../agent/contracts/agent-input';
 import { AgentContext } from '../../agent/contracts/agent-context';
@@ -7,6 +8,8 @@ import { AgentRoutingService } from '../shared/agent-routing.service';
 import { AgentContextService } from '../../agent/agent-context.service';
 import { decryptRecord, decrypt } from '../../database/utils/crypto.util';
 import { TIKTOK_API_BASE_URL } from './tiktok.config';
+import { ContactIdentityResolver } from '../shared/contact-identity.resolver';
+import { CHANNEL_TYPES } from '../shared/channel-type.constants';
 
 @Injectable()
 export class TiktokService {
@@ -17,6 +20,7 @@ export class TiktokService {
     private readonly agentRoutingService: AgentRoutingService,
     private readonly agentRepository: AgentRepository,
     private readonly agentContextService: AgentContextService,
+    private readonly contactIdentityResolver: ContactIdentityResolver,
   ) {}
 
   async handleIncoming(payload: any): Promise<void> {
@@ -39,16 +43,22 @@ export class TiktokService {
       return;
     }
 
+    const senderUserId = data.sender?.user_id;
+    if (!senderUserId) {
+      this.logger.warn('[TikTok] Missing sender.user_id in payload.');
+      return;
+    }
+
     this.logger.log(
       `[TikTok] Incoming message from sender=${data.sender?.user_id} to recipient=${recipientUserId}`,
     );
 
     // Route: resolve which agent should handle this message
     const routeDecision = await this.agentRoutingService.resolveRoute({
-      channelIdentifier: recipientUserId,
-      externalUserId: data.sender.user_id,
+      routeChannelIdentifier: recipientUserId,
+      channelIdentifier: senderUserId,
       incomingText: data.message.text,
-      channelType: 'tiktok',
+      channelType: CHANNEL_TYPES.TIKTOK,
     });
 
     if (routeDecision.kind === 'unroutable') {
@@ -112,14 +122,23 @@ export class TiktokService {
 
     const context = await this.agentContextService.enrichContext(rawContext);
 
+    const contact = await this.contactIdentityResolver.resolveContact({
+      channelType: CHANNEL_TYPES.TIKTOK,
+      payload,
+      clientId: new Types.ObjectId(clientAgent.clientId),
+      channelId: new Types.ObjectId(channelConfig.channelId.toString()),
+      contactName: senderUserId,
+    });
+
     const input: AgentInput = {
-      channel: 'tiktok',
-      externalUserId: data.sender.user_id,
-      conversationId: data.conversation_id,
+      channel: CHANNEL_TYPES.TIKTOK,
+      contactId: contact._id.toString(),
       message: {
         type: 'text',
         text: data.message.text,
       },
+      contactMetadata: contact.metadata,
+      contactSummary: contact.contactSummary,
       metadata: {
         messageId: data.message_id,
         senderUsername: data.sender?.username,

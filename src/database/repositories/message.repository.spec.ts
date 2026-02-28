@@ -9,17 +9,19 @@ describe('MessageRepository', () => {
   let mockModel: any;
 
   const mockChannelId = new Types.ObjectId('507f1f77bcf86cd799439011');
-  const mockUserId = new Types.ObjectId('507f1f77bcf86cd799439012');
+  const mockContactId = new Types.ObjectId('507f1f77bcf86cd799439012');
   const mockAgentId = new Types.ObjectId('507f1f77bcf86cd799439013');
   const mockClientId = new Types.ObjectId('507f1f77bcf86cd799439014');
+  const mockConversationId = new Types.ObjectId('507f1f77bcf86cd799439015');
 
   const mockUserMessage = {
     _id: new Types.ObjectId(),
     content: 'Hello, this is a test message',
     type: 'user' as const,
-    userId: mockUserId,
+    contactId: mockContactId,
     clientId: mockClientId,
     channelId: mockChannelId,
+    conversationId: mockConversationId,
     status: 'active' as const,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -32,6 +34,7 @@ describe('MessageRepository', () => {
     agentId: mockAgentId,
     clientId: mockClientId,
     channelId: mockChannelId,
+    conversationId: mockConversationId,
     status: 'active' as const,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -44,6 +47,7 @@ describe('MessageRepository', () => {
     agentId: mockAgentId,
     clientId: mockClientId,
     channelId: mockChannelId,
+    conversationId: mockConversationId,
     status: 'active' as const,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -76,15 +80,15 @@ describe('MessageRepository', () => {
   });
 
   describe('create', () => {
-    it('should create and return new user message', async () => {
-      mockModel.create.mockResolvedValue([mockUserMessage]);
+    it('should reject create when conversationId is null', async () => {
+      await expect(
+        repository.create({
+          ...mockAgentMessage,
+          conversationId: null as any,
+        }),
+      ).rejects.toThrow('conversationId is required');
 
-      const result = await repository.create(mockUserMessage);
-
-      expect(mockModel.create).toHaveBeenCalledWith([mockUserMessage], {
-        session: undefined,
-      });
-      expect(result).toEqual(mockUserMessage);
+      expect(mockModel.create).not.toHaveBeenCalled();
     });
 
     it('should create and return new agent message', async () => {
@@ -169,17 +173,17 @@ describe('MessageRepository', () => {
     });
   });
 
-  describe('findByUser', () => {
-    it('should return messages for a user sorted by creation date', async () => {
+  describe('findByContact', () => {
+    it('should return messages for a contact sorted by creation date', async () => {
       mockModel.find.mockReturnValue({
         sort: jest.fn().mockReturnValue({
           exec: jest.fn().mockResolvedValue([mockUserMessage]),
         }),
       });
 
-      const result = await repository.findByUser(mockUserId);
+      const result = await repository.findByContact(mockContactId);
 
-      expect(mockModel.find).toHaveBeenCalledWith({ userId: mockUserId });
+      expect(mockModel.find).toHaveBeenCalledWith({ contactId: mockContactId });
       expect(result).toEqual([mockUserMessage]);
     });
   });
@@ -199,22 +203,22 @@ describe('MessageRepository', () => {
     });
   });
 
-  describe('findByChannelAndUser', () => {
-    it('should return conversation history for a channel and user', async () => {
+  describe('findByChannelAndContact', () => {
+    it('should return conversation history for a channel and contact', async () => {
       mockModel.find.mockReturnValue({
         sort: jest.fn().mockReturnValue({
           exec: jest.fn().mockResolvedValue([mockUserMessage]),
         }),
       });
 
-      const result = await repository.findByChannelAndUser(
+      const result = await repository.findByChannelAndContact(
         mockChannelId,
-        mockUserId,
+        mockContactId,
       );
 
       expect(mockModel.find).toHaveBeenCalledWith({
         channelId: mockChannelId,
-        userId: mockUserId,
+        contactId: mockContactId,
       });
       expect(result).toEqual([mockUserMessage]);
     });
@@ -328,8 +332,7 @@ describe('MessageRepository', () => {
       });
 
       const result = await repository.findConversationContext(
-        mockChannelId,
-        mockUserId,
+        mockConversationId,
         mockAgentId,
       );
 
@@ -354,8 +357,7 @@ describe('MessageRepository', () => {
       });
 
       const result = await repository.findConversationContext(
-        mockChannelId,
-        mockUserId,
+        mockConversationId,
         mockAgentId,
       );
 
@@ -373,8 +375,7 @@ describe('MessageRepository', () => {
       jest.spyOn(repository, 'findConversationContext').mockResolvedValue(messages as any);
 
       const result = await repository.countTokensInConversation(
-        mockChannelId,
-        mockUserId,
+        mockConversationId,
         mockAgentId,
       );
 
@@ -386,8 +387,7 @@ describe('MessageRepository', () => {
       jest.spyOn(repository, 'findConversationContext').mockResolvedValue([]);
 
       const result = await repository.countTokensInConversation(
-        mockChannelId,
-        mockUserId,
+        mockConversationId,
         mockAgentId,
       );
 

@@ -1,10 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { generateText } from 'ai';
+import { Types } from 'mongoose';
 import { AgentInput } from './contracts/agent-input';
 import { AgentOutput } from './contracts/agent-output';
 import { AgentContext } from './contracts/agent-context';
 import { createLLMModel } from './llm/llm.factory';
 import { MessagePersistenceService } from '../channels/shared/message-persistence.service';
+import { MetadataExposureService } from './metadata-exposure.service';
 
 @Injectable()
 export class AgentService {
@@ -12,6 +14,7 @@ export class AgentService {
 
   constructor(
     private readonly messagePersistenceService: MessagePersistenceService,
+    private readonly metadataExposureService: MetadataExposureService,
   ) {}
 
   async run(
@@ -24,18 +27,34 @@ export class AgentService {
     );
 
     try {
-      // Automatically handle incoming message persistence and get conversation history
-      const { user, conversationHistory } =
-        await this.messagePersistenceService.handleIncomingMessage(
-          input.message.text,
-          {
-            channelId: context.channelId,
-            agentId: context.agentId,
-            clientId: context.clientId,
-            externalUserId: input.externalUserId,
-            userName: input.externalUserId, // Use external ID as name initially
-          },
+      const persistenceContext = {
+        channelId: context.channelId,
+        agentId: context.agentId,
+        clientId: context.clientId,
+        contactId: input.contactId,
+      };
+      const contactId = new Types.ObjectId(input.contactId);
+
+      const conversation =
+        await this.messagePersistenceService.resolveConversation(
+          persistenceContext,
+          contactId,
         );
+
+      const conversationId = conversation._id as Types.ObjectId;
+
+      const conversationHistory =
+        await this.messagePersistenceService.getConversationContextByConversationId(
+          conversationId,
+          new Types.ObjectId(context.agentId),
+        );
+
+      await this.messagePersistenceService.createUserMessage(
+        input.message.text,
+        persistenceContext,
+        contactId,
+        conversationId,
+      );
 
       const model = createLLMModel(context.llmConfig);
 
@@ -60,9 +79,19 @@ export class AgentService {
         content: input.message.text,
       });
 
+      const safeMetadata = this.metadataExposureService.extractSafeMetadata(
+        input.contactMetadata as Record<string, any>,
+      );
+
+      const systemPrompt = this.buildSystemPrompt(
+        context.systemPrompt,
+        safeMetadata,
+        input.contactSummary,
+      );
+
       const { text } = await generateText({
         model,
-        system: context.systemPrompt,
+        system: systemPrompt,
         messages,
       });
 
@@ -74,15 +103,10 @@ export class AgentService {
       // Automatically handle outgoing message persistence
       await this.messagePersistenceService.handleOutgoingMessage(
         safeText,
-        {
-          channelId: context.channelId,
-          agentId: context.agentId,
-          clientId: context.clientId,
-          externalUserId: input.externalUserId,
-          userName: input.externalUserId,
-        },
-        user._id,
+        persistenceContext,
+        contactId,
         context,
+        conversationId,
       );
 
       return {
@@ -104,5 +128,39 @@ export class AgentService {
         },
       };
     }
+  }
+
+  private buildSystemPrompt(
+    baseSystemPrompt: string,
+    safeMetadata: Record<string, any>,
+    contactSummary?: string,
+  ): string {
+    const contextLines: string[] = [];
+
+    if (contactSummary?.trim()) {
+      contextLines.push(`Contact summary: ${contactSummary.trim()}`);
+    }
+
+    if (Object.keys(safeMetadata).length > 0) {
+      contextLines.push(
+        `Safe contact metadata: ${JSON.stringify(safeMetadata)}`,
+      );
+    }
+
+    if (typeof safeMetadata.firstName === 'string' && safeMetadata.firstName.trim()) {
+      contextLines.push(
+        `If you greet the contact, you may use their first name: ${safeMetadata.firstName.trim()}.`,
+      );
+    }
+
+    contextLines.push(
+      'Do not imply prior-conversation memory or continuity unless it is explicitly present in this conversation history.',
+    );
+
+    if (contextLines.length === 0) {
+      return baseSystemPrompt;
+    }
+
+    return `${baseSystemPrompt}\n\n${contextLines.join('\n')}`;
   }
 }

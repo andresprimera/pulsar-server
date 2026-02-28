@@ -80,9 +80,9 @@ context.transferInfo = {
 Add transfer check as highest priority strategy:
 
 ```typescript
-async resolveRoute(phoneNumberId, externalUserId, incomingText) {
+async resolveRoute(routeChannelIdentifier, channelIdentifier, incomingText) {
   // NEW: Check for active transfer (highest priority)
-  const transfer = await this.getActiveTransfer(externalUserId, phoneNumberId);
+  const transfer = await this.getActiveTransfer(channelIdentifier, routeChannelIdentifier);
   if (transfer) {
     return { kind: 'resolved', candidate: transfer.targetAgent };
   }

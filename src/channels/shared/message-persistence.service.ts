@@ -1,63 +1,94 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { MessageRepository } from '../../database/repositories/message.repository';
-import { UserRepository } from '../../database/repositories/user.repository';
 import { ConversationSummaryService } from '../../agent/conversation-summary.service';
 import { AgentContext } from '../../agent/contracts/agent-context';
+import { ConversationService } from './conversation.service';
+import { Conversation } from '../../database/schemas/conversation.schema';
 
 export interface MessagePersistenceContext {
   channelId: Types.ObjectId | string;
   agentId: Types.ObjectId | string;
   clientId: Types.ObjectId | string;
-  externalUserId: string;
-  userName: string;
+  contactId: Types.ObjectId | string;
 }
 
 @Injectable()
 export class MessagePersistenceService {
   private readonly logger = new Logger(MessagePersistenceService.name);
+  private static readonly MISSING_IDENTITY_ERROR =
+    'Identity must be resolved before message creation';
 
   constructor(
     private readonly messageRepository: MessageRepository,
-    private readonly userRepository: UserRepository,
     private readonly conversationSummaryService: ConversationSummaryService,
+    private readonly conversationService: ConversationService,
   ) {}
 
-  /**
-   * Finds or creates a user by external ID (e.g., phone number, email address)
-   */
-  async findOrCreateUser(
-    externalUserId: string,
-    clientId: Types.ObjectId | string,
-    name: string,
-  ): Promise<any> {
-    return this.userRepository.findOrCreateByExternalUserId(
-      externalUserId,
-      new Types.ObjectId(clientId),
-      name,
-    );
+  async resolveConversation(
+    context: MessagePersistenceContext,
+    contactId: Types.ObjectId,
+    now: Date = new Date(),
+  ): Promise<Conversation> {
+    if (!contactId) {
+      throw new BadRequestException(
+        MessagePersistenceService.MISSING_IDENTITY_ERROR,
+      );
+    }
+
+    return this.conversationService.resolveOrCreate({
+      clientId: new Types.ObjectId(context.clientId),
+      contactId,
+      channelId: new Types.ObjectId(context.channelId),
+      now,
+    });
   }
 
   /**
-   * Saves an incoming user message to the database
+   * Single entrypoint for creating user messages.
    */
-  async saveUserMessage(
+  async createUserMessage(
     content: string,
     context: MessagePersistenceContext,
-    userId: Types.ObjectId,
+    contactId: Types.ObjectId,
+    conversationId?: Types.ObjectId,
   ): Promise<void> {
+    if (!contactId || !context.contactId) {
+      throw new BadRequestException(
+        MessagePersistenceService.MISSING_IDENTITY_ERROR,
+      );
+    }
+
+    const contextContactId = new Types.ObjectId(context.contactId);
+    if (!contactId.equals(contextContactId)) {
+      throw new BadRequestException(
+        MessagePersistenceService.MISSING_IDENTITY_ERROR,
+      );
+    }
+
+    const now = new Date();
+    const conversation = conversationId
+      ? ({ _id: conversationId } as Conversation)
+      : await this.resolveConversation(context, contactId, now);
+
     await this.messageRepository.create({
       content,
       type: 'user',
-      userId,
+      contactId,
       agentId: new Types.ObjectId(context.agentId),
       clientId: new Types.ObjectId(context.clientId),
       channelId: new Types.ObjectId(context.channelId),
+      conversationId: conversation._id,
       status: 'active',
     });
 
+    await this.conversationService.touch(
+      conversation._id as Types.ObjectId,
+      now,
+    );
+
     this.logger.log(
-      `Saved user message: user=${userId} agent=${context.agentId} client=${context.clientId} channel=${context.channelId}`,
+      `Created user message: contact=${contactId} agent=${context.agentId} client=${context.clientId} channel=${context.channelId}`,
     );
   }
 
@@ -67,20 +98,38 @@ export class MessagePersistenceService {
   async saveAgentMessage(
     content: string,
     context: MessagePersistenceContext,
-    userId: Types.ObjectId,
+    contactId: Types.ObjectId,
+    conversationId?: Types.ObjectId,
   ): Promise<void> {
+    if (!contactId) {
+      throw new BadRequestException(
+        MessagePersistenceService.MISSING_IDENTITY_ERROR,
+      );
+    }
+
+    const now = new Date();
+    const conversation = conversationId
+      ? ({ _id: conversationId } as Conversation)
+      : await this.resolveConversation(context, contactId, now);
+
     await this.messageRepository.create({
       content,
       type: 'agent',
-      userId,
+      contactId,
       agentId: new Types.ObjectId(context.agentId),
       clientId: new Types.ObjectId(context.clientId),
       channelId: new Types.ObjectId(context.channelId),
+      conversationId: conversation._id,
       status: 'active',
     });
 
+    await this.conversationService.touch(
+      conversation._id as Types.ObjectId,
+      now,
+    );
+
     this.logger.log(
-      `Saved agent message: user=${userId} agent=${context.agentId} client=${context.clientId} channel=${context.channelId}`,
+      `Saved agent message: contact=${contactId} agent=${context.agentId} client=${context.clientId} channel=${context.channelId}`,
     );
   }
 
@@ -88,14 +137,13 @@ export class MessagePersistenceService {
    * Retrieves conversation context (messages since last summary)
    * Returns an array of messages formatted for the agent's conversation history
    */
-  async getConversationContext(
-    context: MessagePersistenceContext,
-    userId: Types.ObjectId,
+  async getConversationContextByConversationId(
+    conversationId: Types.ObjectId,
+    agentId: Types.ObjectId,
   ): Promise<Array<{ role: 'user' | 'assistant'; content: string }>> {
     const messages = await this.messageRepository.findConversationContext(
-      new Types.ObjectId(context.channelId),
-      userId,
-      new Types.ObjectId(context.agentId),
+      conversationId,
+      agentId,
     );
 
     return messages.map((msg) => ({
@@ -111,15 +159,14 @@ export class MessagePersistenceService {
    * This is fire-and-forget and will not block the response flow
    */
   triggerSummarization(
-    context: MessagePersistenceContext,
-    userId: Types.ObjectId,
+    conversationId: Types.ObjectId,
+    agentId: Types.ObjectId,
     agentContext: AgentContext,
   ): void {
     this.conversationSummaryService
       .checkAndSummarizeIfNeeded(
-        new Types.ObjectId(context.channelId),
-        userId,
-        new Types.ObjectId(context.agentId),
+        conversationId,
+        agentId,
         agentContext,
       )
       .catch((err) => {
@@ -130,48 +177,29 @@ export class MessagePersistenceService {
   }
 
   /**
-   * Complete message persistence flow for incoming messages
-   * Returns the conversation history and user object
-   */
-  async handleIncomingMessage(
-    content: string,
-    context: MessagePersistenceContext,
-  ): Promise<{
-    user: any;
-    conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
-  }> {
-    // Find or create user
-    const user = await this.findOrCreateUser(
-      context.externalUserId,
-      context.clientId,
-      context.userName,
-    );
-
-    // Save user message
-    await this.saveUserMessage(content, context, user._id as Types.ObjectId);
-
-    // Get conversation context
-    const conversationHistory = await this.getConversationContext(
-      context,
-      user._id as Types.ObjectId,
-    );
-
-    return { user, conversationHistory };
-  }
-
-  /**
    * Complete message persistence flow for outgoing agent responses
    */
   async handleOutgoingMessage(
     content: string,
     context: MessagePersistenceContext,
-    userId: Types.ObjectId,
+    contactId: Types.ObjectId,
     agentContext: AgentContext,
+    conversationId?: Types.ObjectId,
   ): Promise<void> {
     // Save agent message
-    await this.saveAgentMessage(content, context, userId);
+    await this.saveAgentMessage(content, context, contactId, conversationId);
 
     // Trigger async summarization check
-    this.triggerSummarization(context, userId, agentContext);
+    const resolvedConversationId =
+      conversationId ||
+      (
+        await this.resolveConversation(context, contactId)
+      )._id;
+
+    this.triggerSummarization(
+      resolvedConversationId as Types.ObjectId,
+      new Types.ObjectId(context.agentId),
+      agentContext,
+    );
   }
 }

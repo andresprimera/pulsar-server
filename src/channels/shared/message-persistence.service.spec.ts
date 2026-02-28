@@ -1,29 +1,29 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { MessagePersistenceService } from './message-persistence.service';
 import { MessageRepository } from '../../database/repositories/message.repository';
-import { UserRepository } from '../../database/repositories/user.repository';
 import { ConversationSummaryService } from '../../agent/conversation-summary.service';
 import { Types } from 'mongoose';
+import { ConversationService } from './conversation.service';
 
 describe('MessagePersistenceService', () => {
   let service: MessagePersistenceService;
   let messageRepository: jest.Mocked<MessageRepository>;
-  let userRepository: jest.Mocked<UserRepository>;
   let conversationSummaryService: jest.Mocked<ConversationSummaryService>;
+  let conversationService: jest.Mocked<ConversationService>;
+  const mockConversationId = new Types.ObjectId('507f1f77bcf86cd799439015');
 
   const mockContext = {
     channelId: '507f1f77bcf86cd799439014',
     agentId: '507f1f77bcf86cd799439013',
     clientId: '507f1f77bcf86cd799439011',
-    externalUserId: 'user@example.com',
-    userName: 'Test User',
+    contactId: '507f1f77bcf86cd799439012',
   };
 
-  const mockUser = {
+  const mockContact = {
     _id: new Types.ObjectId('507f1f77bcf86cd799439012'),
-    externalUserId: 'user@example.com',
+    externalId: 'user@example.com',
     clientId: new Types.ObjectId('507f1f77bcf86cd799439011'),
-    email: 'user@example.com@external.user',
+    channelId: new Types.ObjectId('507f1f77bcf86cd799439014'),
     name: 'Test User',
     status: 'active' as const,
   };
@@ -33,10 +33,11 @@ describe('MessagePersistenceService', () => {
       _id: new Types.ObjectId(),
       content: 'Previous user message',
       type: 'user' as const,
-      userId: mockUser._id,
+      contactId: mockContact._id,
       agentId: new Types.ObjectId('507f1f77bcf86cd799439013'),
       clientId: new Types.ObjectId('507f1f77bcf86cd799439011'),
       channelId: new Types.ObjectId('507f1f77bcf86cd799439014'),
+      conversationId: mockConversationId,
       status: 'active' as const,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -45,10 +46,11 @@ describe('MessagePersistenceService', () => {
       _id: new Types.ObjectId(),
       content: 'Previous agent response',
       type: 'agent' as const,
-      userId: mockUser._id,
+      contactId: mockContact._id,
       agentId: new Types.ObjectId('507f1f77bcf86cd799439013'),
       clientId: new Types.ObjectId('507f1f77bcf86cd799439011'),
       channelId: new Types.ObjectId('507f1f77bcf86cd799439014'),
+      conversationId: mockConversationId,
       status: 'active' as const,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -67,9 +69,10 @@ describe('MessagePersistenceService', () => {
           },
         },
         {
-          provide: UserRepository,
+          provide: ConversationService,
           useValue: {
-            findOrCreateByExternalUserId: jest.fn(),
+            resolveOrCreate: jest.fn(),
+            touch: jest.fn(),
           },
         },
         {
@@ -83,48 +86,67 @@ describe('MessagePersistenceService', () => {
 
     service = module.get<MessagePersistenceService>(MessagePersistenceService);
     messageRepository = module.get(MessageRepository);
-    userRepository = module.get(UserRepository);
+    conversationService = module.get(ConversationService);
     conversationSummaryService = module.get(ConversationSummaryService);
+
+    conversationService.resolveOrCreate.mockResolvedValue({
+      _id: mockConversationId,
+      status: 'open',
+      lastMessageAt: new Date(),
+    } as any);
+    conversationService.touch.mockResolvedValue();
   });
 
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
 
-  describe('findOrCreateUser', () => {
-    it('should call userRepository.findOrCreateByExternalUserId', async () => {
-      userRepository.findOrCreateByExternalUserId.mockResolvedValue(mockUser as any);
-
-      const result = await service.findOrCreateUser(
-        'user@example.com',
-        '507f1f77bcf86cd799439011',
-        'Test User',
-      );
-
-      expect(userRepository.findOrCreateByExternalUserId).toHaveBeenCalledWith(
-        'user@example.com',
-        expect.any(Types.ObjectId),
-        'Test User',
-      );
-      expect(result).toEqual(mockUser);
-    });
-  });
-
-  describe('saveUserMessage', () => {
+  describe('createUserMessage', () => {
     it('should save a user message with correct parameters', async () => {
       messageRepository.create.mockResolvedValue({} as any);
 
-      await service.saveUserMessage('Hello!', mockContext, mockUser._id as Types.ObjectId);
+      await service.createUserMessage('Hello!', mockContext, mockContact._id as Types.ObjectId);
 
       expect(messageRepository.create).toHaveBeenCalledWith({
         content: 'Hello!',
         type: 'user',
-        userId: mockUser._id,
+        contactId: mockContact._id,
         agentId: expect.any(Types.ObjectId),
         clientId: expect.any(Types.ObjectId),
         channelId: expect.any(Types.ObjectId),
+        conversationId: mockConversationId,
         status: 'active',
       });
+      expect(conversationService.touch).toHaveBeenCalledWith(
+        mockConversationId,
+        expect.any(Date),
+      );
+
+      const resolveOrder =
+        conversationService.resolveOrCreate.mock.invocationCallOrder[0];
+      const createOrder = messageRepository.create.mock.invocationCallOrder[0];
+      const touchOrder = conversationService.touch.mock.invocationCallOrder[0];
+
+      expect(resolveOrder).toBeLessThan(createOrder);
+      expect(createOrder).toBeLessThan(touchOrder);
+    });
+
+    it('should not allow createUserMessage when resolved conversation has no id', async () => {
+      conversationService.resolveOrCreate.mockResolvedValue({
+        _id: undefined,
+      } as any);
+      messageRepository.create.mockImplementation(async (payload: any) => {
+        if (!payload?.conversationId) {
+          throw new Error('conversationId is required');
+        }
+        return {} as any;
+      });
+
+      await expect(
+        service.createUserMessage('Hello!', mockContext, mockContact._id as Types.ObjectId),
+      ).rejects.toThrow('conversationId is required');
+
+      expect(messageRepository.create).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -132,29 +154,44 @@ describe('MessagePersistenceService', () => {
     it('should save an agent message with correct parameters', async () => {
       messageRepository.create.mockResolvedValue({} as any);
 
-      await service.saveAgentMessage('Response!', mockContext, mockUser._id as Types.ObjectId);
+      await service.saveAgentMessage('Response!', mockContext, mockContact._id as Types.ObjectId);
 
       expect(messageRepository.create).toHaveBeenCalledWith({
         content: 'Response!',
         type: 'agent',
-        userId: mockUser._id,
+        contactId: mockContact._id,
         agentId: expect.any(Types.ObjectId),
         clientId: expect.any(Types.ObjectId),
         channelId: expect.any(Types.ObjectId),
+        conversationId: mockConversationId,
         status: 'active',
       });
+      expect(conversationService.touch).toHaveBeenCalledWith(
+        mockConversationId,
+        expect.any(Date),
+      );
+
+      const resolveOrder =
+        conversationService.resolveOrCreate.mock.invocationCallOrder[0];
+      const createOrder = messageRepository.create.mock.invocationCallOrder[0];
+      const touchOrder = conversationService.touch.mock.invocationCallOrder[0];
+
+      expect(resolveOrder).toBeLessThan(createOrder);
+      expect(createOrder).toBeLessThan(touchOrder);
     });
   });
 
-  describe('getConversationContext', () => {
+  describe('getConversationContextByConversationId', () => {
     it('should retrieve and format conversation context', async () => {
       messageRepository.findConversationContext.mockResolvedValue(mockMessages as any);
 
-      const result = await service.getConversationContext(mockContext, mockUser._id as Types.ObjectId);
+      const result = await service.getConversationContextByConversationId(
+        mockConversationId,
+        new Types.ObjectId(mockContext.agentId),
+      );
 
       expect(messageRepository.findConversationContext).toHaveBeenCalledWith(
-        expect.any(Types.ObjectId),
-        mockUser._id,
+        mockConversationId,
         expect.any(Types.ObjectId),
       );
       expect(result).toEqual([
@@ -166,9 +203,43 @@ describe('MessagePersistenceService', () => {
     it('should return empty array when no messages found', async () => {
       messageRepository.findConversationContext.mockResolvedValue([]);
 
-      const result = await service.getConversationContext(mockContext, mockUser._id as Types.ObjectId);
+      const result = await service.getConversationContextByConversationId(
+        mockConversationId,
+        new Types.ObjectId(mockContext.agentId),
+      );
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('identity guard', () => {
+    it('should throw when contactId is missing for user message creation', async () => {
+      await expect(
+        service.createUserMessage('Hello!', mockContext, undefined as any),
+      ).rejects.toThrow('Identity must be resolved before message creation');
+    });
+
+    it('should throw when context.contactId is missing', async () => {
+      const invalidContext = {
+        ...mockContext,
+        contactId: undefined as any,
+      };
+
+      await expect(
+        service.createUserMessage(
+          'Hello!',
+          invalidContext,
+          mockContact._id as Types.ObjectId,
+        ),
+      ).rejects.toThrow('Identity must be resolved before message creation');
+    });
+
+    it('should throw when contactId does not match context.contactId', async () => {
+      const mismatchedContactId = new Types.ObjectId('507f1f77bcf86cd799439099');
+
+      await expect(
+        service.createUserMessage('Hello!', mockContext, mismatchedContactId),
+      ).rejects.toThrow('Identity must be resolved before message creation');
     });
   });
 
@@ -189,33 +260,16 @@ describe('MessagePersistenceService', () => {
       };
 
       // Should not throw even if summarization fails
-      service.triggerSummarization(mockContext, mockUser._id as Types.ObjectId, agentContext);
+      service.triggerSummarization(
+        mockConversationId,
+        new Types.ObjectId(mockContext.agentId),
+        agentContext,
+      );
 
       // Wait a bit for async call
       await new Promise(resolve => setTimeout(resolve, 10));
 
       expect(conversationSummaryService.checkAndSummarizeIfNeeded).toHaveBeenCalled();
-    });
-  });
-
-  describe('handleIncomingMessage', () => {
-    it('should find/create user, save message, and return context', async () => {
-      userRepository.findOrCreateByExternalUserId.mockResolvedValue(mockUser as any);
-      messageRepository.create.mockResolvedValue({} as any);
-      messageRepository.findConversationContext.mockResolvedValue(mockMessages as any);
-
-      const result = await service.handleIncomingMessage('Hello!', mockContext);
-
-      expect(userRepository.findOrCreateByExternalUserId).toHaveBeenCalled();
-      expect(messageRepository.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          content: 'Hello!',
-          type: 'user',
-        }),
-      );
-      expect(messageRepository.findConversationContext).toHaveBeenCalled();
-      expect(result.user).toEqual(mockUser);
-      expect(result.conversationHistory).toHaveLength(2);
     });
   });
 
@@ -239,8 +293,9 @@ describe('MessagePersistenceService', () => {
       await service.handleOutgoingMessage(
         'Response!',
         mockContext,
-        mockUser._id as Types.ObjectId,
+        mockContact._id as Types.ObjectId,
         agentContext,
+        mockConversationId,
       );
 
       expect(messageRepository.create).toHaveBeenCalledWith(

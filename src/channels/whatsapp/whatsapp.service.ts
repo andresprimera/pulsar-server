@@ -1,4 +1,5 @@
 import { Injectable, ForbiddenException, Logger } from '@nestjs/common';
+import { Types } from 'mongoose';
 import { AgentService } from '../../agent/agent.service';
 import { AgentInput } from '../../agent/contracts/agent-input';
 import { AgentContext } from '../../agent/contracts/agent-context';
@@ -13,6 +14,8 @@ import {
 } from './whatsapp.config';
 import { AgentRoutingService } from '../shared/agent-routing.service';
 import { AgentContextService } from '../../agent/agent-context.service';
+import { ContactIdentityResolver } from '../shared/contact-identity.resolver';
+import { CHANNEL_TYPES } from '../shared/channel-type.constants';
 
 @Injectable()
 export class WhatsappService {
@@ -25,6 +28,7 @@ export class WhatsappService {
     private readonly clientRepository: ClientRepository,
     private readonly agentRoutingService: AgentRoutingService,
     private readonly agentContextService: AgentContextService,
+    private readonly contactIdentityResolver: ContactIdentityResolver,
   ) {
     this.config = loadWhatsAppConfig();
   }
@@ -105,10 +109,10 @@ export class WhatsappService {
     this.logger.log(`[WhatsApp] Extracted phoneNumberId: ${phoneNumberId}`);
 
     const routeDecision = await this.agentRoutingService.resolveRoute({
-      channelIdentifier: phoneNumberId,
-      externalUserId: message.from,
+      routeChannelIdentifier: phoneNumberId,
+      channelIdentifier: message.from,
       incomingText: message.text.body,
-      channelType: 'whatsapp',
+      channelType: CHANNEL_TYPES.WHATSAPP,
     });
 
     if (routeDecision.kind === 'unroutable') {
@@ -181,14 +185,23 @@ export class WhatsappService {
 
     const context = await this.agentContextService.enrichContext(rawContext);
 
+    const contact = await this.contactIdentityResolver.resolveContact({
+      channelType: CHANNEL_TYPES.WHATSAPP,
+      payload,
+      clientId: new Types.ObjectId(clientAgent.clientId),
+      channelId: new Types.ObjectId(channelConfig.channelId.toString()),
+      contactName: message.from,
+    });
+
     const input: AgentInput = {
-      channel: 'whatsapp',
-      externalUserId: message.from,
-      conversationId: `${phoneNumberId}:${message.from}`,
+      channel: CHANNEL_TYPES.WHATSAPP,
+      contactId: contact._id.toString(),
       message: {
         type: 'text',
         text: message.text.body,
       },
+      contactMetadata: contact.metadata,
+      contactSummary: contact.contactSummary,
       metadata: {
         messageId: message.id,
         phoneNumberId,

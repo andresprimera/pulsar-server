@@ -5,6 +5,7 @@ import { AgentService } from '../../agent/agent.service';
 import { AgentRoutingService } from '../shared/agent-routing.service';
 import { AgentRepository } from '../../database/repositories/agent.repository';
 import { AgentContextService } from '../../agent/agent-context.service';
+import { ContactIdentityResolver } from '../shared/contact-identity.resolver';
 import { encrypt } from '../../database/utils/crypto.util';
 
 describe('InstagramService', () => {
@@ -12,6 +13,7 @@ describe('InstagramService', () => {
   let agentService: jest.Mocked<AgentService>;
   let agentRoutingService: jest.Mocked<AgentRoutingService>;
   let agentRepository: jest.Mocked<AgentRepository>;
+  let contactIdentityResolver: jest.Mocked<ContactIdentityResolver>;
   let loggerWarnSpy: jest.SpyInstance;
   let fetchSpy: jest.SpyInstance;
 
@@ -44,6 +46,12 @@ describe('InstagramService', () => {
           useValue: { findActiveById: jest.fn() },
         },
         {
+          provide: ContactIdentityResolver,
+          useValue: {
+            resolveContact: jest.fn(),
+          },
+        },
+        {
           provide: AgentContextService,
           useValue: {
             enrichContext: jest.fn().mockImplementation((ctx) => Promise.resolve(ctx)),
@@ -56,6 +64,7 @@ describe('InstagramService', () => {
     agentService = module.get(AgentService);
     agentRoutingService = module.get(AgentRoutingService);
     agentRepository = module.get(AgentRepository);
+    contactIdentityResolver = module.get(ContactIdentityResolver);
 
     loggerWarnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
   });
@@ -96,10 +105,10 @@ describe('InstagramService', () => {
       candidate: {
         clientAgent: {
           agentId: 'agent_1',
-          clientId: 'client_1',
+          clientId: '507f1f77bcf86cd799439011',
         },
         channelConfig: {
-          channelId: 'channel_1',
+          channelId: '507f1f77bcf86cd799439014',
           credentials: encryptedCreds,
           llmConfig: { provider: 'openai', apiKey: 'key', model: 'gpt-4o' },
         },
@@ -109,6 +118,9 @@ describe('InstagramService', () => {
 
     agentRepository.findActiveById.mockResolvedValue({
       systemPrompt: 'prompt',
+    } as any);
+    contactIdentityResolver.resolveContact.mockResolvedValue({
+      _id: '507f1f77bcf86cd799439012',
     } as any);
 
     agentService.run.mockResolvedValue({
@@ -131,6 +143,13 @@ describe('InstagramService', () => {
     });
 
     expect(agentService.run).toHaveBeenCalledTimes(1);
+    expect(agentService.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: 'instagram',
+        contactId: '507f1f77bcf86cd799439012',
+      }),
+      expect.anything(),
+    );
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining('/me/messages'),
       expect.objectContaining({

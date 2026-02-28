@@ -20,8 +20,7 @@ export class ConversationSummaryService {
    * This method is fire-and-forget and should not block the main flow.
    */
   async checkAndSummarizeIfNeeded(
-    channelId: Types.ObjectId,
-    userId: Types.ObjectId,
+    conversationId: Types.ObjectId,
     agentId: Types.ObjectId,
     context: AgentContext,
   ): Promise<void> {
@@ -38,17 +37,16 @@ export class ConversationSummaryService {
 
       // Count tokens in current conversation
       const tokenCount = await this.messageRepository.countTokensInConversation(
-        channelId,
-        userId,
+        conversationId,
         agentId,
       );
 
       this.logger.log(
-        `Conversation tokens: ${tokenCount}/${threshold} for user ${userId} agent ${agentId}`,
+        `Conversation tokens: ${tokenCount}/${threshold} for conversation ${conversationId} agent ${agentId}`,
       );
 
       if (tokenCount >= threshold) {
-        await this.generateSummary(channelId, userId, agentId, context);
+        await this.generateSummary(conversationId, agentId, context);
       }
     } catch (error) {
       // Log error but don't throw - this is async background processing
@@ -59,16 +57,14 @@ export class ConversationSummaryService {
   }
 
   private async generateSummary(
-    channelId: Types.ObjectId,
-    userId: Types.ObjectId,
+    conversationId: Types.ObjectId,
     agentId: Types.ObjectId,
     context: AgentContext,
   ): Promise<void> {
     try {
       // Fetch conversation messages
       const messages = await this.messageRepository.findConversationContext(
-        channelId,
-        userId,
+        conversationId,
         agentId,
       );
 
@@ -96,7 +92,7 @@ export class ConversationSummaryService {
 
       if (!text?.trim()) {
         this.logger.warn(
-          `LLM returned empty summary for user ${userId} agent ${agentId}`,
+          `LLM returned empty summary for conversation ${conversationId} agent ${agentId}`,
         );
       }
 
@@ -104,15 +100,15 @@ export class ConversationSummaryService {
       await this.messageRepository.create({
         content: summary,
         type: 'summary',
-        userId,
         agentId,
         clientId: new Types.ObjectId(context.clientId),
-        channelId,
+        channelId: new Types.ObjectId(context.channelId),
+        conversationId,
         status: 'active',
       });
 
       this.logger.log(
-        `Summary generated and saved for user ${userId} agent ${agentId} client ${context.clientId}`,
+        `Summary generated and saved for conversation ${conversationId} agent ${agentId} client ${context.clientId}`,
       );
     } catch (error) {
       this.logger.error(
