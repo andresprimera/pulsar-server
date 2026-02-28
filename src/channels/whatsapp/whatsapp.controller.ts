@@ -18,9 +18,14 @@ export class WhatsappController {
 
   @Post('webhook')
   @HttpCode(200)
-  async handleWebhook(@Body() payload: unknown): Promise<string> {
+  handleWebhook(@Body() payload: unknown): string {
     this.logger.log(`Incoming WhatsApp webhook payload: ${JSON.stringify(payload)}`);
-    await this.whatsappService.handleIncoming(payload);
+    this.whatsappService.handleIncoming(payload).catch((error) => {
+      this.logger.error(
+        `Failed to process WhatsApp webhook: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    });
     return 'ok';
   }
 }

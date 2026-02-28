@@ -40,20 +40,30 @@ export class WhatsappService {
   ): Promise<void> {
     const url = buildMessagesUrl(this.config, channelCredentials.phoneNumberId);
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${channelCredentials.accessToken}`,
-      },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to,
-        type: 'text',
-        text: { body: text },
-      }),
-    });
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${channelCredentials.accessToken}`,
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to,
+          type: 'text',
+          text: { body: text },
+        }),
+      });
+    } catch (error) {
+      const cause = error instanceof Error ? (error as any).cause : undefined;
+      this.logger.error(
+        `[WhatsApp] fetch failed for ${url}: ${error instanceof Error ? error.message : String(error)}` +
+          (cause ? ` | cause: ${cause instanceof Error ? cause.message : String(cause)}` : ''),
+      );
+      throw error;
+    }
 
     if (!response.ok) {
       const errorBody = await response.text();
