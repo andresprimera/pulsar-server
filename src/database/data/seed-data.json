@@ -30,8 +30,8 @@
   ],
   "users": [
     {
-      "email": "andresprimera@gmail.com",
-      "name": "Andrés Primera",
+      "email": "admin@homegroupd.com",
+      "name": "Home Group User",
       "client": {
         "type": "individual"
       },
@@ -45,7 +45,7 @@
               "provider": "meta",
               "status": "active",
               "credentials": {
-                "phoneNumberId": "573332574065",
+                "phoneNumberId": "573053877122",
                 "accessToken": "__REPLACE_ME_ACCESS_TOKEN__",
                 "webhookVerifyToken": "__REPLACE_ME_VERIFY_TOKEN__"
               },
@@ -74,11 +74,11 @@
       ]
     },
     {
-      "email": "user2@example.com",
-      "name": "Demo User 2",
+      "email": "andresprimera@gmail.com.app",
+      "name": "Andrés Primera",
       "client": {
         "type": "organization",
-        "name": "Demo User 2 LLC"
+        "name": "Andres Company Inc."
       },
       "agentHirings": [
         {
@@ -118,11 +118,11 @@
       ]
     },
     {
-      "email": "user3@example.com",
-      "name": "Demo User 3",
+      "email": "admin@codingbox.app",
+      "name": "CodingBox User",
       "client": {
         "type": "organization",
-        "name": "Demo User 3 Inc"
+        "name": "Coding Box LLC"
       },
       "agentHirings": [
         {
@@ -134,7 +134,7 @@
               "provider": "meta",
               "status": "active",
               "credentials": {
-                "phoneNumberId": "573332574068",
+                "phoneNumberId": "573332809804",
                 "accessToken": "__REPLACE_ME_ACCESS_TOKEN__",
                 "webhookVerifyToken": "__REPLACE_ME_VERIFY_TOKEN__"
               },
@@ -169,7 +169,7 @@
               "provider": "meta",
               "status": "active",
               "credentials": {
-                "phoneNumberId": "573332574069",
+                "phoneNumberId": "573332809804",
                 "accessToken": "__REPLACE_ME_ACCESS_TOKEN__",
                 "webhookVerifyToken": "__REPLACE_ME_VERIFY_TOKEN__"
               },

@@ -499,7 +499,7 @@ describe('SeederService', () => {
 
         expect(mockClientPhoneRepository.resolveOrCreate).toHaveBeenCalledWith(
           '507f1f77bcf86cd799439011',
-          '573332574069',
+          '573332809804',
           { provider: 'meta' },
         );
       } finally {
@@ -645,7 +645,7 @@ describe('SeederService', () => {
           expect.objectContaining({
             client: expect.objectContaining({
               type: 'organization',
-              name: 'Demo User 2 LLC',
+              name: 'Andres Company Inc.',
             }),
           }),
         );
