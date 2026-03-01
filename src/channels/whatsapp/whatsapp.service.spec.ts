@@ -3,14 +3,15 @@ import { ForbiddenException, Logger } from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
 import { IncomingMessageOrchestrator } from '../../agent/incoming-message.orchestrator';
 import { CHANNEL_TYPES } from '../shared/channel-type.constants';
-import { AgentRoutingService } from '../shared/agent-routing.service';
 import { encrypt } from '../../database/utils/crypto.util';
+import { ClientAgentRepository } from '../../database/repositories/client-agent.repository';
 
 describe('WhatsappService', () => {
   let service: WhatsappService;
   let incomingMessageOrchestrator: jest.Mocked<IncomingMessageOrchestrator>;
-  let agentRoutingService: jest.Mocked<AgentRoutingService>;
+  let clientAgentRepository: jest.Mocked<ClientAgentRepository>;
   let loggerLogSpy: jest.SpyInstance;
+  let loggerErrorSpy: jest.SpyInstance;
   let fetchSpy: jest.SpyInstance;
 
   beforeEach(async () => {
@@ -29,20 +30,22 @@ describe('WhatsappService', () => {
           useValue: { handle: jest.fn() },
         },
         {
-          provide: AgentRoutingService,
-          useValue: { resolveRoute: jest.fn() },
+          provide: ClientAgentRepository,
+          useValue: { findActiveByPhoneNumberId: jest.fn() },
         },
       ],
     }).compile();
 
     service = module.get<WhatsappService>(WhatsappService);
     incomingMessageOrchestrator = module.get(IncomingMessageOrchestrator);
-    agentRoutingService = module.get(AgentRoutingService);
+    clientAgentRepository = module.get(ClientAgentRepository);
     loggerLogSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+    loggerErrorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
   });
 
   afterEach(() => {
     loggerLogSpy.mockRestore();
+    loggerErrorSpy.mockRestore();
     fetchSpy.mockRestore();
     delete process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
     delete process.env.WHATSAPP_API_HOST;
@@ -117,12 +120,17 @@ describe('WhatsappService', () => {
       incomingMessageOrchestrator.handle.mockResolvedValue({
         reply: { type: 'text', text: 'Echo response' },
       });
-      agentRoutingService.resolveRoute.mockResolvedValue({
-        kind: 'resolved',
-        candidate: {
-          channelConfig: { credentials: encryptedCredentials },
-        },
-      } as any);
+      clientAgentRepository.findActiveByPhoneNumberId.mockResolvedValue([
+        {
+          channels: [
+            {
+              status: 'active',
+              phoneNumberId: 'phone123',
+              credentials: encryptedCredentials,
+            },
+          ],
+        } as any,
+      ]);
 
       await service.handleIncoming(createPayload());
 
@@ -138,6 +146,63 @@ describe('WhatsappService', () => {
       await service.handleIncoming(createPayload());
 
       expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('logs API error and does not throw', async () => {
+      incomingMessageOrchestrator.handle.mockResolvedValue({
+        reply: { type: 'text', text: 'Echo response' },
+      });
+      clientAgentRepository.findActiveByPhoneNumberId.mockResolvedValue([
+        {
+          channels: [
+            {
+              status: 'active',
+              phoneNumberId: 'phone123',
+              credentials: encryptedCredentials,
+            },
+          ],
+        } as any,
+      ]);
+      fetchSpy.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        text: jest.fn().mockResolvedValue('Internal Error'),
+      } as unknown as Response);
+
+      await expect(service.handleIncoming(createPayload())).resolves.not.toThrow();
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[WhatsApp] Failed to send reply'),
+      );
+    });
+
+    it('returns early on invalid payload and does not call orchestrator', async () => {
+      await service.handleIncoming({});
+      await service.handleIncoming({
+        entry: [{ changes: [{ value: { messages: [{ type: 'image' }] } }] }],
+      });
+      await service.handleIncoming({
+        entry: [
+          {
+            changes: [
+              {
+                value: {
+                  metadata: {},
+                  messages: [
+                    {
+                      from: '1234567890',
+                      id: 'msg123',
+                      type: 'text',
+                      text: { body: 'Hello' },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+      expect(incomingMessageOrchestrator.handle).not.toHaveBeenCalled();
     });
   });
 });

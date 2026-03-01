@@ -7,8 +7,8 @@ import {
 import { CHANNEL_TYPES } from '../shared/channel-type.constants';
 import { IncomingMessageOrchestrator } from '../../agent/incoming-message.orchestrator';
 import { IncomingChannelEvent } from '../shared/incoming-channel-event.interface';
-import { AgentRoutingService } from '../shared/agent-routing.service';
 import { decryptRecord } from '../../database/utils/crypto.util';
+import { ClientAgentRepository } from '../../database/repositories/client-agent.repository';
 
 @Injectable()
 export class WhatsappService {
@@ -17,7 +17,7 @@ export class WhatsappService {
 
   constructor(
     private readonly incomingMessageOrchestrator: IncomingMessageOrchestrator,
-    private readonly agentRoutingService: AgentRoutingService,
+    private readonly clientAgentRepository: ClientAgentRepository,
   ) {
     this.config = loadWhatsAppConfig();
   }
@@ -44,18 +44,25 @@ export class WhatsappService {
     }
 
     const phoneNumberId = value.metadata?.phone_number_id;
+    const senderId = message.from;
+    const messageId = message.id;
+    const text = message.text?.body;
+
+    if (!phoneNumberId || !senderId || !messageId || !text) {
+      this.logger.warn('[WhatsApp] Invalid text payload. Missing required fields.');
+      return;
+    }
 
     this.logger.log(
-      `[WhatsApp] Incoming message metdata: ${JSON.stringify(value.metadata)}`,
+      `[WhatsApp] Incoming message phoneNumberId=${phoneNumberId}`,
     );
-    this.logger.log(`[WhatsApp] Extracted phoneNumberId: ${phoneNumberId}`);
 
     const event: IncomingChannelEvent = {
       channelId: CHANNEL_TYPES.WHATSAPP,
       routeChannelIdentifier: phoneNumberId,
-      channelIdentifier: message.from,
-      messageId: message.id,
-      text: message.text.body,
+      channelIdentifier: senderId,
+      messageId,
+      text,
       rawPayload: payload,
     };
 
@@ -75,25 +82,35 @@ export class WhatsappService {
     this.logger.log(
       `[WhatsApp] Sending to ${event.channelIdentifier}: ${output.reply.text}`,
     );
-    await this.sendMessage(event.channelIdentifier, output.reply.text, credentials);
+
+    try {
+      await this.sendMessage(
+        event.channelIdentifier,
+        output.reply.text,
+        credentials,
+      );
+    } catch (error) {
+      this.logger.error(
+        `[WhatsApp] Failed to send reply: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   private async resolveOutboundCredentials(
     event: IncomingChannelEvent,
   ): Promise<{ phoneNumberId: string; accessToken: string } | undefined> {
-    const routeDecision = await this.agentRoutingService.resolveRoute({
-      routeChannelIdentifier: event.routeChannelIdentifier,
-      channelIdentifier: event.channelIdentifier,
-      incomingText: event.text,
-      channelType: CHANNEL_TYPES.WHATSAPP,
-    });
+    const clientAgents =
+      await this.clientAgentRepository.findActiveByPhoneNumberId(
+        event.routeChannelIdentifier,
+      );
 
-    const channelConfig =
-      routeDecision.kind === 'resolved'
-        ? routeDecision.candidate.channelConfig
-        : routeDecision.kind === 'ambiguous'
-          ? routeDecision.candidates[0]?.channelConfig
-          : undefined;
+    const channelConfig = clientAgents
+      .flatMap((clientAgent) => clientAgent.channels)
+      .find(
+        (channel) =>
+          channel.status === 'active' &&
+          channel.phoneNumberId === event.routeChannelIdentifier,
+      );
 
     if (!channelConfig?.credentials) {
       return undefined;
