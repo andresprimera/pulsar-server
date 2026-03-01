@@ -4,7 +4,11 @@ import { MessageSchema } from './message.schema';
 describe('MessageSchema', () => {
   const MessageValidationModel =
     models.MessageValidationHarness ||
-    model('MessageValidationHarness', MessageSchema, 'messages_validation_harness');
+    model(
+      'MessageValidationHarness',
+      MessageSchema,
+      'messages_validation_harness',
+    );
 
   it('should fail validation for user message without contactId', async () => {
     const message = new MessageValidationModel({

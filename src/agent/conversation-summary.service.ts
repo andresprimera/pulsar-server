@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Types } from 'mongoose';
-import { MessageRepository } from '../database/repositories/message.repository';
+import { MessageRepository } from '@database/repositories/message.repository';
 import { generateText } from 'ai';
 import { createLLMModel } from './llm/llm.factory';
 import { AgentContext } from './contracts/agent-context';
@@ -51,7 +51,9 @@ export class ConversationSummaryService {
     } catch (error) {
       // Log error but don't throw - this is async background processing
       this.logger.error(
-        `Error in checkAndSummarizeIfNeeded: ${error instanceof Error ? error.message : String(error)}`,
+        `Error in checkAndSummarizeIfNeeded: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       );
     }
   }
@@ -112,7 +114,9 @@ export class ConversationSummaryService {
       );
     } catch (error) {
       this.logger.error(
-        `Error generating summary: ${error instanceof Error ? error.message : String(error)}`,
+        `Error generating summary: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       );
     }
   }

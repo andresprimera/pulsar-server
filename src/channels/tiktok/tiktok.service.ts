@@ -1,13 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { decryptRecord } from '../../database/utils/crypto.util';
+import { decryptRecord } from '@database/utils/crypto.util';
 import {
   buildMessagesUrl,
   loadTikTokConfig,
   TikTokServerConfig,
 } from './tiktok.config';
-import { CHANNEL_TYPES } from '../shared/channel-type.constants';
-import { IncomingMessageOrchestrator } from '../../agent/incoming-message.orchestrator';
-import { IncomingChannelEvent } from '../shared/incoming-channel-event.interface';
+import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
+import { IncomingMessageOrchestrator } from '@agent/incoming-message.orchestrator';
+import { IncomingChannelEvent } from '@channels/shared/incoming-channel-event.interface';
 
 @Injectable()
 export class TiktokService {
@@ -91,9 +91,7 @@ export class TiktokService {
       return;
     }
 
-    this.logger.log(
-      `[TikTok] Sending reply to sender=${data.sender.user_id}`,
-    );
+    this.logger.log(`[TikTok] Sending reply to sender=${data.sender.user_id}`);
 
     try {
       await this.sendMessage({
@@ -105,7 +103,9 @@ export class TiktokService {
       this.logger.log(`[TikTok] Reply sent successfully.`);
     } catch (error) {
       this.logger.error(
-        `[TikTok] Failed to send reply: ${error instanceof Error ? error.message : String(error)}`,
+        `[TikTok] Failed to send reply: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       );
     }
   }

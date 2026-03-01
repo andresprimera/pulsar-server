@@ -4,11 +4,11 @@ import {
   buildMessagesUrl,
   loadWhatsAppConfig,
 } from './whatsapp.config';
-import { CHANNEL_TYPES } from '../shared/channel-type.constants';
-import { IncomingMessageOrchestrator } from '../../agent/incoming-message.orchestrator';
-import { IncomingChannelEvent } from '../shared/incoming-channel-event.interface';
-import { decryptRecord } from '../../database/utils/crypto.util';
-import { ClientAgentRepository } from '../../database/repositories/client-agent.repository';
+import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
+import { IncomingMessageOrchestrator } from '@agent/incoming-message.orchestrator';
+import { IncomingChannelEvent } from '@channels/shared/incoming-channel-event.interface';
+import { decryptRecord } from '@database/utils/crypto.util';
+import { ClientAgentRepository } from '@database/repositories/client-agent.repository';
 
 @Injectable()
 export class WhatsappService {
@@ -49,7 +49,9 @@ export class WhatsappService {
     const text = message.text?.body;
 
     if (!phoneNumberId || !senderId || !messageId || !text) {
-      this.logger.warn('[WhatsApp] Invalid text payload. Missing required fields.');
+      this.logger.warn(
+        '[WhatsApp] Invalid text payload. Missing required fields.',
+      );
       return;
     }
 
@@ -91,7 +93,9 @@ export class WhatsappService {
       );
     } catch (error) {
       this.logger.error(
-        `[WhatsApp] Failed to send reply: ${error instanceof Error ? error.message : String(error)}`,
+        `[WhatsApp] Failed to send reply: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       );
     }
   }
@@ -117,7 +121,10 @@ export class WhatsappService {
     }
 
     const decryptedCredentials = decryptRecord(channelConfig.credentials);
-    if (!decryptedCredentials.phoneNumberId || !decryptedCredentials.accessToken) {
+    if (
+      !decryptedCredentials.phoneNumberId ||
+      !decryptedCredentials.accessToken
+    ) {
       return undefined;
     }
 
@@ -157,8 +164,14 @@ export class WhatsappService {
     } catch (error) {
       const cause = error instanceof Error ? (error as any).cause : undefined;
       this.logger.error(
-        `[WhatsApp] fetch failed for ${url}: ${error instanceof Error ? error.message : String(error)}` +
-          (cause ? ` | cause: ${cause instanceof Error ? cause.message : String(cause)}` : ''),
+        `[WhatsApp] fetch failed for ${url}: ${
+          error instanceof Error ? error.message : String(error)
+        }` +
+          (cause
+            ? ` | cause: ${
+                cause instanceof Error ? cause.message : String(cause)
+              }`
+            : ''),
       );
       throw error;
     }

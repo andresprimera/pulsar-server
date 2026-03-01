@@ -5,7 +5,7 @@ import { AgentInput } from './contracts/agent-input';
 import { AgentOutput } from './contracts/agent-output';
 import { AgentContext } from './contracts/agent-context';
 import { createLLMModel } from './llm/llm.factory';
-import { MessagePersistenceService } from '../channels/shared/message-persistence.service';
+import { MessagePersistenceService } from '@channels/shared/message-persistence.service';
 import { MetadataExposureService } from './metadata-exposure.service';
 
 @Injectable()
@@ -17,10 +17,7 @@ export class AgentService {
     private readonly metadataExposureService: MetadataExposureService,
   ) {}
 
-  async run(
-    input: AgentInput,
-    context: AgentContext,
-  ): Promise<AgentOutput> {
+  async run(input: AgentInput, context: AgentContext): Promise<AgentOutput> {
     this.logger.log(
       `Processing ${context.agentId} for client ${context.clientId} ` +
         `using provider=${context.llmConfig.provider} model=${context.llmConfig.model}`,
@@ -58,7 +55,11 @@ export class AgentService {
       // Validate conversation history if provided
       if (conversationHistory && conversationHistory.length > 0) {
         for (const msg of conversationHistory) {
-          if (!msg.content || typeof msg.content !== 'string' || !msg.content.trim()) {
+          if (
+            !msg.content ||
+            typeof msg.content !== 'string' ||
+            !msg.content.trim()
+          ) {
             this.logger.warn(
               `Invalid conversation history message detected: empty or non-string content`,
             );
@@ -140,7 +141,10 @@ export class AgentService {
       );
     }
 
-    if (typeof safeMetadata.firstName === 'string' && safeMetadata.firstName.trim()) {
+    if (
+      typeof safeMetadata.firstName === 'string' &&
+      safeMetadata.firstName.trim()
+    ) {
       contextLines.push(
         `If you greet the contact, you may use their first name: ${safeMetadata.firstName.trim()}.`,
       );

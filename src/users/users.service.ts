@@ -5,8 +5,8 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { Types } from 'mongoose';
-import { User } from '../database/schemas/user.schema';
-import { UserRepository } from '../database/repositories/user.repository';
+import { User } from '@database/schemas/user.schema';
+import { UserRepository } from '@database/repositories/user.repository';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model, Types } from 'mongoose';
-import { Channel } from '../schemas/channel.schema';
+import { Channel } from '@database/schemas/channel.schema';
 
 @Injectable()
 export class ChannelRepository {

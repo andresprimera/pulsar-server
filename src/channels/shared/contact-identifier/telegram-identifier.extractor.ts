@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { CHANNEL_TYPES } from '../channel-type.constants';
-import { ChannelType } from '../channel-type.type';
+import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
+import { ChannelType } from '@channels/shared/channel-type.type';
 import {
   ContactIdentifierType,
   RawCapableContactIdentifierExtractor,

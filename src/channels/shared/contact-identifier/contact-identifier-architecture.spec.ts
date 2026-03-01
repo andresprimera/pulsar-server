@@ -1,7 +1,7 @@
 import { Types } from 'mongoose';
 import { Logger } from '@nestjs/common';
-import { ContactRepository } from '../../../database/repositories/contact.repository';
-import { CHANNEL_TYPES } from '../channel-type.constants';
+import { ContactRepository } from '@database/repositories/contact.repository';
+import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
 import { ContactIdentifierExtractorRegistry } from './contact-identifier-extractor.registry';
 import { WhatsappIdentifierExtractor } from './whatsapp-identifier.extractor';
 import { InstagramIdentifierExtractor } from './instagram-identifier.extractor';
@@ -52,20 +52,30 @@ class InMemoryContactModel {
         return all;
       }
 
-      return all.filter((item) => item.clientId.toString() === filter.clientId.toString());
+      return all.filter(
+        (item) => item.clientId.toString() === filter.clientId.toString(),
+      );
     });
   }
 
   findOne(filter: any): Query<any | null> {
     return this.wrap(() => {
-      const key = this.key(filter.clientId, filter.channelId, filter.externalId);
+      const key = this.key(
+        filter.clientId,
+        filter.channelId,
+        filter.externalId,
+      );
       return this.store.get(key) ?? null;
     });
   }
 
   findOneAndUpdate(filter: any, update: any): Query<any> {
     return this.wrap(() => {
-      const key = this.key(filter.clientId, filter.channelId, filter.externalId);
+      const key = this.key(
+        filter.clientId,
+        filter.channelId,
+        filter.externalId,
+      );
       const existing = this.store.get(key);
       if (existing) {
         return existing;
@@ -98,16 +108,14 @@ describe('Contact Identifier Architecture', () => {
   beforeEach(() => {
     model = new InMemoryContactModel();
     repository = new ContactRepository(model as any);
-    registry = new ContactIdentifierExtractorRegistry(
-      [
-        new WhatsappIdentifierExtractor(),
-        new InstagramIdentifierExtractor(),
-        new TelegramIdentifierExtractor(),
-        new TiktokIdentifierExtractor(),
-        new WebIdentifierExtractor(),
-        new ApiIdentifierExtractor(),
-      ],
-    );
+    registry = new ContactIdentifierExtractorRegistry([
+      new WhatsappIdentifierExtractor(),
+      new InstagramIdentifierExtractor(),
+      new TelegramIdentifierExtractor(),
+      new TiktokIdentifierExtractor(),
+      new WebIdentifierExtractor(),
+      new ApiIdentifierExtractor(),
+    ]);
   });
 
   it('creates different contacts for same phone across different channels', async () => {
@@ -143,7 +151,9 @@ describe('Contact Identifier Architecture', () => {
       'Same User Other Channel',
     );
 
-    expect(whatsappContact._id.toString()).not.toEqual(instagramContact._id.toString());
+    expect(whatsappContact._id.toString()).not.toEqual(
+      instagramContact._id.toString(),
+    );
   });
 
   it('creates only one contact for same identifier on same channel and same client', async () => {
@@ -363,9 +373,7 @@ describe('Contact Identifier Architecture', () => {
       expect.stringContaining('event=contact_identifier_validation_failed'),
     );
     expect(
-      warnSpy.mock.calls.some((call) =>
-        String(call[0]).includes('+-()'),
-      ),
+      warnSpy.mock.calls.some((call) => String(call[0]).includes('+-()')),
     ).toBe(false);
 
     warnSpy.mockRestore();

@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Types } from 'mongoose';
 import { ContactIdentityResolver } from './contact-identity.resolver';
-import { ContactRepository } from '../../database/repositories/contact.repository';
+import { ContactRepository } from '@database/repositories/contact.repository';
 import { ContactIdentifierExtractorRegistry } from './contact-identifier/contact-identifier-extractor.registry';
 
 describe('ContactIdentityResolver', () => {
@@ -30,7 +30,9 @@ describe('ContactIdentityResolver', () => {
 
     service = module.get(ContactIdentityResolver);
     contactRepository = module.get(ContactRepository);
-    identifierExtractorRegistry = module.get(ContactIdentifierExtractorRegistry);
+    identifierExtractorRegistry = module.get(
+      ContactIdentifierExtractorRegistry,
+    );
   });
 
   it('should resolve and upsert contact using normalized identifier', async () => {
@@ -60,7 +62,9 @@ describe('ContactIdentityResolver', () => {
       { sender: { id: 'user_123' } },
     );
 
-    expect(contactRepository.findOrCreateByExternalIdentity).toHaveBeenCalledWith(
+    expect(
+      contactRepository.findOrCreateByExternalIdentity,
+    ).toHaveBeenCalledWith(
       clientId,
       channelId,
       'user_123',

@@ -1,10 +1,10 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Types } from 'mongoose';
-import { MessageRepository } from '../../database/repositories/message.repository';
-import { ConversationSummaryService } from '../../agent/conversation-summary.service';
-import { AgentContext } from '../../agent/contracts/agent-context';
+import { MessageRepository } from '@database/repositories/message.repository';
+import { ConversationSummaryService } from '@agent/conversation-summary.service';
+import { AgentContext } from '@agent/contracts/agent-context';
 import { ConversationService } from './conversation.service';
-import { Conversation } from '../../database/schemas/conversation.schema';
+import { Conversation } from '@database/schemas/conversation.schema';
 
 export interface MessagePersistenceContext {
   channelId: Types.ObjectId | string;
@@ -164,15 +164,9 @@ export class MessagePersistenceService {
     agentContext: AgentContext,
   ): void {
     this.conversationSummaryService
-      .checkAndSummarizeIfNeeded(
-        conversationId,
-        agentId,
-        agentContext,
-      )
+      .checkAndSummarizeIfNeeded(conversationId, agentId, agentContext)
       .catch((err) => {
-        this.logger.error(
-          `Background summary check failed: ${err.message}`,
-        );
+        this.logger.error(`Background summary check failed: ${err.message}`);
       });
   }
 
@@ -192,9 +186,7 @@ export class MessagePersistenceService {
     // Trigger async summarization check
     const resolvedConversationId =
       conversationId ||
-      (
-        await this.resolveConversation(context, contactId)
-      )._id;
+      (await this.resolveConversation(context, contactId))._id;
 
     this.triggerSummarization(
       resolvedConversationId as Types.ObjectId,

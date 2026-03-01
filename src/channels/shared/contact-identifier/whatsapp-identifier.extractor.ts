@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { CHANNEL_TYPES } from '../channel-type.constants';
-import { ChannelType } from '../channel-type.type';
+import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
+import { ChannelType } from '@channels/shared/channel-type.type';
 import {
   ContactIdentifierType,
   RawCapableContactIdentifierExtractor,
@@ -20,7 +20,8 @@ export class WhatsappIdentifierExtractor
   extractRaw(payload: unknown): string {
     const source = payload as any;
     const from =
-      source?.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.from ?? source?.from;
+      source?.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.from ??
+      source?.from;
 
     if (typeof from !== 'string') {
       this.logger.warn(
@@ -54,7 +55,9 @@ export class WhatsappIdentifierExtractor
       this.logger.warn(
         `event=contact_identifier_validation_failed channelType=whatsapp reason=invalid_length length=${normalized.length}`,
       );
-      throw new InvalidIdentifierException('invalid-whatsapp-identifier-length');
+      throw new InvalidIdentifierException(
+        'invalid-whatsapp-identifier-length',
+      );
     }
 
     return normalized;

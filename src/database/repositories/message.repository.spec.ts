@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
 import { MessageRepository } from './message.repository';
-import { Message } from '../schemas/message.schema';
+import { Message } from '@database/schemas/message.schema';
 import { Types } from 'mongoose';
 
 describe('MessageRepository', () => {
@@ -118,7 +118,9 @@ describe('MessageRepository', () => {
     it('should return all messages sorted by creation date', async () => {
       mockModel.find.mockReturnValue({
         sort: jest.fn().mockReturnValue({
-          exec: jest.fn().mockResolvedValue([mockUserMessage, mockAgentMessage]),
+          exec: jest
+            .fn()
+            .mockResolvedValue([mockUserMessage, mockAgentMessage]),
         }),
       });
 
@@ -292,12 +294,9 @@ describe('MessageRepository', () => {
         exec: jest.fn().mockResolvedValue(updatedMessage),
       });
 
-      const result = await repository.update(
-        mockUserMessage._id.toString(),
-        {
-          content: 'Updated content',
-        },
-      );
+      const result = await repository.update(mockUserMessage._id.toString(), {
+        content: 'Updated content',
+      });
 
       expect(mockModel.findByIdAndUpdate).toHaveBeenCalledWith(
         mockUserMessage._id.toString(),
@@ -372,7 +371,9 @@ describe('MessageRepository', () => {
         { ...mockAgentMessage, content: 'Hi there how are you' }, // 5 words
       ];
 
-      jest.spyOn(repository, 'findConversationContext').mockResolvedValue(messages as any);
+      jest
+        .spyOn(repository, 'findConversationContext')
+        .mockResolvedValue(messages as any);
 
       const result = await repository.countTokensInConversation(
         mockConversationId,

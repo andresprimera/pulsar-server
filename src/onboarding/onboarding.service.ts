@@ -6,14 +6,14 @@ import {
 import { InjectConnection } from '@nestjs/mongoose';
 import { Connection, Types } from 'mongoose';
 import { RegisterAndHireDto } from './dto/register-and-hire.dto';
-import { ClientRepository } from '../database/repositories/client.repository';
-import { UserRepository } from '../database/repositories/user.repository';
-import { AgentRepository } from '../database/repositories/agent.repository';
-import { ChannelRepository } from '../database/repositories/channel.repository';
-import { ClientAgentRepository } from '../database/repositories/client-agent.repository';
+import { ClientRepository } from '@database/repositories/client.repository';
+import { UserRepository } from '@database/repositories/user.repository';
+import { AgentRepository } from '@database/repositories/agent.repository';
+import { ChannelRepository } from '@database/repositories/channel.repository';
+import { ClientAgentRepository } from '@database/repositories/client-agent.repository';
 
-import { ClientPhoneRepository } from '../database/repositories/client-phone.repository';
-import { encryptRecord, encrypt } from '../database/utils/crypto.util';
+import { ClientPhoneRepository } from '@database/repositories/client-phone.repository';
+import { encryptRecord, encrypt } from '@database/utils/crypto.util';
 
 export interface RegisterAndHireResult {
   user: {

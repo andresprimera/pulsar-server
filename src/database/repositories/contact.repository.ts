@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model, Types } from 'mongoose';
-import { Contact } from '../schemas/contact.schema';
-import { ContactIdentifierType } from '../schemas/contact.schema';
+import { Contact } from '@database/schemas/contact.schema';
+import { ContactIdentifierType } from '@database/schemas/contact.schema';
 
 @Injectable()
 export class ContactRepository {
@@ -26,9 +26,7 @@ export class ContactRepository {
     channelId: Types.ObjectId,
     externalId: string,
   ): Promise<Contact | null> {
-    return this.model
-      .findOne({ clientId, channelId, externalId })
-      .exec();
+    return this.model.findOne({ clientId, channelId, externalId }).exec();
   }
 
   async findOrCreateByExternalIdentity(
@@ -84,7 +82,10 @@ export class ContactRepository {
           `event=contact_duplicate_key_retry clientId=${clientId.toString()} channelId=${channelId.toString()}`,
         );
 
-        const existing = await this.model.findOne(filter).session(session).exec();
+        const existing = await this.model
+          .findOne(filter)
+          .session(session)
+          .exec();
         if (existing) {
           return existing;
         }
@@ -95,6 +96,10 @@ export class ContactRepository {
   }
 
   private isDuplicateKeyError(error: unknown): boolean {
-    return typeof error === 'object' && error !== null && (error as any).code === 11000;
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      (error as any).code === 11000
+    );
   }
 }

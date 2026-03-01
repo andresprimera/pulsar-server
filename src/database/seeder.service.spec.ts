@@ -10,7 +10,7 @@ import { ChannelRepository } from './repositories/channel.repository';
 import { ClientRepository } from './repositories/client.repository';
 import { ClientAgentRepository } from './repositories/client-agent.repository';
 import { ClientPhoneRepository } from './repositories/client-phone.repository';
-import { OnboardingService } from '../onboarding/onboarding.service';
+import { OnboardingService } from '@onboarding/onboarding.service';
 import { BadRequestException, Logger } from '@nestjs/common';
 import * as SEED_DATA from './data/seed-data.json';
 
@@ -244,7 +244,9 @@ describe('SeederService', () => {
       await service.onApplicationBootstrap();
 
       // Verify agents creation (both agents should be created)
-      expect(mockAgentModel.create).toHaveBeenCalledTimes(SEED_DATA.agents.length);
+      expect(mockAgentModel.create).toHaveBeenCalledTimes(
+        SEED_DATA.agents.length,
+      );
       expect(mockAgentModel.create).toHaveBeenCalledWith(
         expect.objectContaining({
           name: SEED_DATA.agents[0].name,
@@ -330,9 +332,10 @@ describe('SeederService', () => {
       mockUserRepository.findByEmail.mockResolvedValue(null);
       // Existing agents found
       mockAgentModel.findOne.mockReturnValue({
-        exec: jest
-          .fn()
-          .mockResolvedValue({ _id: mockAgentId, name: SEED_DATA.agents[0].name }),
+        exec: jest.fn().mockResolvedValue({
+          _id: mockAgentId,
+          name: SEED_DATA.agents[0].name,
+        }),
       });
 
       // Mock Channel resolutions
@@ -403,9 +406,10 @@ describe('SeederService', () => {
               channelId: 'instagram-channel-id',
               provider: 'instagram',
               credentials: expect.objectContaining({
-                instagramAccountId:
-                  (SEED_DATA.users[0].agentHirings[0].channels[1].credentials as any)
-                    .instagramAccountId,
+                instagramAccountId: (
+                  SEED_DATA.users[0].agentHirings[0].channels[1]
+                    .credentials as any
+                ).instagramAccountId,
               }),
             }),
           ]),

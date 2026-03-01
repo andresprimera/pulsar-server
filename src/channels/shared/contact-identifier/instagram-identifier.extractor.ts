@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { CHANNEL_TYPES } from '../channel-type.constants';
-import { ChannelType } from '../channel-type.type';
+import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
+import { ChannelType } from '@channels/shared/channel-type.type';
 import {
   ContactIdentifierType,
   RawCapableContactIdentifierExtractor,
@@ -17,7 +17,8 @@ export class InstagramIdentifierExtractor
 
   extractRaw(payload: unknown): string {
     const source = payload as any;
-    const sender = source?.entry?.[0]?.messaging?.[0]?.sender?.id ?? source?.sender?.id;
+    const sender =
+      source?.entry?.[0]?.messaging?.[0]?.sender?.id ?? source?.sender?.id;
 
     if (typeof sender !== 'string') {
       throw new InvalidIdentifierException('missing-instagram-identifier');

@@ -1,6 +1,6 @@
 import { IsEnum, IsString, IsOptional, ValidateNested } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
-import { LlmProvider } from '../../agent/llm/provider.enum';
+import { LlmProvider } from '@agent/llm/provider.enum';
 
 class LlmOverrideDto {
   @Transform(({ value }) => value?.toLowerCase().trim())

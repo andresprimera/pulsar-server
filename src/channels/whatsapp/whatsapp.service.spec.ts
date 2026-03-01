@@ -1,10 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException, Logger } from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
-import { IncomingMessageOrchestrator } from '../../agent/incoming-message.orchestrator';
-import { CHANNEL_TYPES } from '../shared/channel-type.constants';
-import { encrypt } from '../../database/utils/crypto.util';
-import { ClientAgentRepository } from '../../database/repositories/client-agent.repository';
+import { IncomingMessageOrchestrator } from '@agent/incoming-message.orchestrator';
+import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
+import { encrypt } from '@database/utils/crypto.util';
+import { ClientAgentRepository } from '@database/repositories/client-agent.repository';
 
 describe('WhatsappService', () => {
   let service: WhatsappService;
@@ -169,7 +169,9 @@ describe('WhatsappService', () => {
         text: jest.fn().mockResolvedValue('Internal Error'),
       } as unknown as Response);
 
-      await expect(service.handleIncoming(createPayload())).resolves.not.toThrow();
+      await expect(
+        service.handleIncoming(createPayload()),
+      ).resolves.not.toThrow();
       expect(loggerErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining('[WhatsApp] Failed to send reply'),
       );

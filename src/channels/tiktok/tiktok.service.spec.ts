@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
 import { TiktokService } from './tiktok.service';
-import { IncomingMessageOrchestrator } from '../../agent/incoming-message.orchestrator';
-import { encrypt } from '../../database/utils/crypto.util';
+import { IncomingMessageOrchestrator } from '@agent/incoming-message.orchestrator';
+import { encrypt } from '@database/utils/crypto.util';
 
 describe('TiktokService', () => {
   let service: TiktokService;
@@ -12,7 +12,8 @@ describe('TiktokService', () => {
   let fetchSpy: jest.SpyInstance;
 
   beforeEach(async () => {
-    process.env.TIKTOK_API_BASE_URL = 'https://business-api.tiktok.com/open_api/v1.2';
+    process.env.TIKTOK_API_BASE_URL =
+      'https://business-api.tiktok.com/open_api/v1.2';
     fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
       text: jest.fn().mockResolvedValue('ok'),
@@ -68,10 +69,18 @@ describe('TiktokService', () => {
     });
 
     it('returns early for invalid payload shapes', async () => {
-      await service.handleIncoming(createPayload({ root: { event: 'other_event' } }));
-      await service.handleIncoming(createPayload({ message: { type: 'image' } }));
-      await service.handleIncoming(createPayload({ recipient: { user_id: undefined } }));
-      await service.handleIncoming(createPayload({ sender: { user_id: undefined } }));
+      await service.handleIncoming(
+        createPayload({ root: { event: 'other_event' } }),
+      );
+      await service.handleIncoming(
+        createPayload({ message: { type: 'image' } }),
+      );
+      await service.handleIncoming(
+        createPayload({ recipient: { user_id: undefined } }),
+      );
+      await service.handleIncoming(
+        createPayload({ sender: { user_id: undefined } }),
+      );
 
       expect(incomingMessageOrchestrator.handle).not.toHaveBeenCalled();
       expect(loggerWarnSpy).toHaveBeenCalled();
@@ -121,7 +130,9 @@ describe('TiktokService', () => {
         text: jest.fn().mockResolvedValue('Bad Request'),
       } as unknown as Response);
 
-      await expect(service.handleIncoming(createPayload())).resolves.not.toThrow();
+      await expect(
+        service.handleIncoming(createPayload()),
+      ).resolves.not.toThrow();
       expect(loggerErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining('Failed to send reply'),
       );

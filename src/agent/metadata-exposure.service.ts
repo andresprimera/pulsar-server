@@ -10,9 +10,7 @@ export class MetadataExposureService {
     'tags',
   ] as const;
 
-  extractSafeMetadata(
-    metadata: Record<string, any> = {},
-  ): Record<string, any> {
+  extractSafeMetadata(metadata: Record<string, any> = {}): Record<string, any> {
     const safeMetadata: Record<string, any> = {};
 
     for (const key of MetadataExposureService.ALLOWED_KEYS) {

@@ -33,8 +33,7 @@ describe('ContactSchema', () => {
 
     const hasLegacyUniqueIndex = indexes.some(
       ([fields, options]) =>
-        (fields as any).channelIdentifier === 1 &&
-        options?.unique === true,
+        (fields as any).channelIdentifier === 1 && options?.unique === true,
     );
 
     expect(hasRequiredCompoundIndex).toBe(true);

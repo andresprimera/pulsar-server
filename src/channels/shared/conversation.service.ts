@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Types } from 'mongoose';
-import { Conversation } from '../../database/schemas/conversation.schema';
-import { ConversationRepository } from '../../database/repositories/conversation.repository';
+import { Conversation } from '@database/schemas/conversation.schema';
+import { ConversationRepository } from '@database/repositories/conversation.repository';
 import { WHATSAPP_CONVERSATION_TIMEOUT_MS } from './conversation.constants';
 
 interface MongoDuplicateKeyError {
@@ -31,7 +31,10 @@ export class ConversationService {
         lookupParams,
       );
 
-    if (!existingOpenConversation || existingOpenConversation.status !== 'open') {
+    if (
+      !existingOpenConversation ||
+      existingOpenConversation.status !== 'open'
+    ) {
       return this.createOpenConversationWithDuplicateRecovery(
         params,
         lookupParams,

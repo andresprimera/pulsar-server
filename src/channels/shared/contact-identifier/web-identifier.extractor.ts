@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { CHANNEL_TYPES } from '../channel-type.constants';
-import { ChannelType } from '../channel-type.type';
+import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
+import { ChannelType } from '@channels/shared/channel-type.type';
 import {
   ContactIdentifierType,
   RawCapableContactIdentifierExtractor,
@@ -16,7 +16,8 @@ export class WebIdentifierExtractor
 
   extractRaw(payload: unknown): string {
     const source = payload as any;
-    const rawEmail = source?.email ?? source?.contact?.email ?? source?.user?.email;
+    const rawEmail =
+      source?.email ?? source?.contact?.email ?? source?.user?.email;
 
     if (typeof rawEmail !== 'string') {
       throw new Error('missing-web-identifier');

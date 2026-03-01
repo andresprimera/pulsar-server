@@ -99,7 +99,13 @@ describe('Concurrent Channels (e2e)', () => {
         .collection('agents')
         .deleteMany({ _id: { $in: [agentIdObj] } });
       await connection.collection('channels').deleteMany({
-        _id: { $in: [whatsappChannelIdObj, tiktokChannelIdObj, instagramChannelIdObj] },
+        _id: {
+          $in: [
+            whatsappChannelIdObj,
+            tiktokChannelIdObj,
+            instagramChannelIdObj,
+          ],
+        },
       });
     }
 
@@ -194,7 +200,13 @@ describe('Concurrent Channels (e2e)', () => {
         .collection('agents')
         .deleteMany({ _id: { $in: [agentIdObj] } });
       await connection.collection('channels').deleteMany({
-        _id: { $in: [whatsappChannelIdObj, tiktokChannelIdObj, instagramChannelIdObj] },
+        _id: {
+          $in: [
+            whatsappChannelIdObj,
+            tiktokChannelIdObj,
+            instagramChannelIdObj,
+          ],
+        },
       });
     }
     await app.close();

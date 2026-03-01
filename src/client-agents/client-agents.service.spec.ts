@@ -5,11 +5,11 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { ClientAgentsService } from './client-agents.service';
-import { ClientAgentRepository } from '../database/repositories/client-agent.repository';
-import { ClientsService } from '../clients/clients.service';
-import { AgentsService } from '../agents/agents.service';
-import { ChannelRepository } from '../database/repositories/channel.repository';
-import { ClientPhoneRepository } from '../database/repositories/client-phone.repository';
+import { ClientAgentRepository } from '@database/repositories/client-agent.repository';
+import { ClientsService } from '@clients/clients.service';
+import { AgentsService } from '@agents/agents.service';
+import { ChannelRepository } from '@database/repositories/channel.repository';
+import { ClientPhoneRepository } from '@database/repositories/client-phone.repository';
 
 describe('ClientAgentsService', () => {
   let service: ClientAgentsService;
@@ -128,7 +128,9 @@ describe('ClientAgentsService', () => {
 
       const result = await service.create(baseDto as any);
 
-      expect(mockClientsService.findById).toHaveBeenCalledWith(baseDto.clientId);
+      expect(mockClientsService.findById).toHaveBeenCalledWith(
+        baseDto.clientId,
+      );
       expect(mockAgentsService.findOne).toHaveBeenCalledWith(baseDto.agentId);
       expect(
         mockClientAgentRepository.findByClientAndAgent,
@@ -250,10 +252,7 @@ describe('ClientAgentsService', () => {
 
       const dto = {
         ...baseDto,
-        channels: [
-          { ...baseDto.channels[0] },
-          { ...baseDto.channels[0] },
-        ],
+        channels: [{ ...baseDto.channels[0] }, { ...baseDto.channels[0] }],
       };
 
       const createPromise = service.create(dto as any);
@@ -307,7 +306,9 @@ describe('ClientAgentsService', () => {
         ],
       };
 
-      await expect(service.create(dto as any)).rejects.toThrow(ConflictException);
+      await expect(service.create(dto as any)).rejects.toThrow(
+        ConflictException,
+      );
       expect(mockClientPhoneRepository.resolveOrCreate).toHaveBeenCalledWith(
         baseDto.clientId,
         'phone-1',

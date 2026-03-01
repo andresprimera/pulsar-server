@@ -7,14 +7,14 @@ import {
 import { getConnectionToken } from '@nestjs/mongoose';
 import { Types } from 'mongoose';
 import { OnboardingService } from './onboarding.service';
-import { ClientRepository } from '../database/repositories/client.repository';
-import { UserRepository } from '../database/repositories/user.repository';
-import { AgentRepository } from '../database/repositories/agent.repository';
-import { ChannelRepository } from '../database/repositories/channel.repository';
-import { ClientAgentRepository } from '../database/repositories/client-agent.repository';
-import { ClientPhoneRepository } from '../database/repositories/client-phone.repository';
-import { LlmProvider } from '../agent/llm/provider.enum';
-import { ChannelProvider } from '../channels/channel-provider.enum';
+import { ClientRepository } from '@database/repositories/client.repository';
+import { UserRepository } from '@database/repositories/user.repository';
+import { AgentRepository } from '@database/repositories/agent.repository';
+import { ChannelRepository } from '@database/repositories/channel.repository';
+import { ClientAgentRepository } from '@database/repositories/client-agent.repository';
+import { ClientPhoneRepository } from '@database/repositories/client-phone.repository';
+import { LlmProvider } from '@agent/llm/provider.enum';
+import { ChannelProvider } from '@channels/channel-provider.enum';
 
 describe('OnboardingService', () => {
   let service: OnboardingService;

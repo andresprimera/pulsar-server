@@ -15,7 +15,12 @@
       "@agent/*": ["src/agent/*"],
       "@database/*": ["src/database/*"],
       "@domain/*": ["src/domain/*"],
-      "@shared/*": ["src/shared/*"]
+      "@shared/*": ["src/shared/*"],
+      "@agents/*": ["src/agents/*"],
+      "@clients/*": ["src/clients/*"],
+      "@client-agents/*": ["src/client-agents/*"],
+      "@users/*": ["src/users/*"],
+      "@onboarding/*": ["src/onboarding/*"]
     },
     "incremental": true,
     "skipLibCheck": true,

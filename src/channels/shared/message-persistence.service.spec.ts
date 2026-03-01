@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { MessagePersistenceService } from './message-persistence.service';
-import { MessageRepository } from '../../database/repositories/message.repository';
-import { ConversationSummaryService } from '../../agent/conversation-summary.service';
+import { MessageRepository } from '@database/repositories/message.repository';
+import { ConversationSummaryService } from '@agent/conversation-summary.service';
 import { Types } from 'mongoose';
 import { ConversationService } from './conversation.service';
 
@@ -105,7 +105,11 @@ describe('MessagePersistenceService', () => {
     it('should save a user message with correct parameters', async () => {
       messageRepository.create.mockResolvedValue({} as any);
 
-      await service.createUserMessage('Hello!', mockContext, mockContact._id as Types.ObjectId);
+      await service.createUserMessage(
+        'Hello!',
+        mockContext,
+        mockContact._id as Types.ObjectId,
+      );
 
       expect(messageRepository.create).toHaveBeenCalledWith({
         content: 'Hello!',
@@ -143,7 +147,11 @@ describe('MessagePersistenceService', () => {
       });
 
       await expect(
-        service.createUserMessage('Hello!', mockContext, mockContact._id as Types.ObjectId),
+        service.createUserMessage(
+          'Hello!',
+          mockContext,
+          mockContact._id as Types.ObjectId,
+        ),
       ).rejects.toThrow('conversationId is required');
 
       expect(messageRepository.create).toHaveBeenCalledTimes(1);
@@ -154,7 +162,11 @@ describe('MessagePersistenceService', () => {
     it('should save an agent message with correct parameters', async () => {
       messageRepository.create.mockResolvedValue({} as any);
 
-      await service.saveAgentMessage('Response!', mockContext, mockContact._id as Types.ObjectId);
+      await service.saveAgentMessage(
+        'Response!',
+        mockContext,
+        mockContact._id as Types.ObjectId,
+      );
 
       expect(messageRepository.create).toHaveBeenCalledWith({
         content: 'Response!',
@@ -183,7 +195,9 @@ describe('MessagePersistenceService', () => {
 
   describe('getConversationContextByConversationId', () => {
     it('should retrieve and format conversation context', async () => {
-      messageRepository.findConversationContext.mockResolvedValue(mockMessages as any);
+      messageRepository.findConversationContext.mockResolvedValue(
+        mockMessages as any,
+      );
 
       const result = await service.getConversationContextByConversationId(
         mockConversationId,
@@ -235,7 +249,9 @@ describe('MessagePersistenceService', () => {
     });
 
     it('should throw when contactId does not match context.contactId', async () => {
-      const mismatchedContactId = new Types.ObjectId('507f1f77bcf86cd799439099');
+      const mismatchedContactId = new Types.ObjectId(
+        '507f1f77bcf86cd799439099',
+      );
 
       await expect(
         service.createUserMessage('Hello!', mockContext, mismatchedContactId),
@@ -267,9 +283,11 @@ describe('MessagePersistenceService', () => {
       );
 
       // Wait a bit for async call
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
-      expect(conversationSummaryService.checkAndSummarizeIfNeeded).toHaveBeenCalled();
+      expect(
+        conversationSummaryService.checkAndSummarizeIfNeeded,
+      ).toHaveBeenCalled();
     });
   });
 

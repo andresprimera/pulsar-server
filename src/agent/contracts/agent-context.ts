@@ -1,4 +1,4 @@
-import { LlmProvider } from '../llm/provider.enum';
+import { LlmProvider } from '@agent/llm/provider.enum';
 
 export interface AgentContext {
   agentId: string;

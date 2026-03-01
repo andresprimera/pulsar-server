@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 import { LlmConfig, LlmConfigSchema } from './llm-config.schema';
-import { ChannelProvider } from '../../channels/channel-provider.enum';
+import { ChannelProvider } from '@channels/channel-provider.enum';
 
 @Schema({ _id: false })
 export class HireChannelConfig {

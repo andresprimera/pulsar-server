@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { LlmProvider } from '../../agent/llm/provider.enum';
+import { LlmProvider } from '@agent/llm/provider.enum';
 
 @Schema({ _id: false })
 export class LlmConfig {

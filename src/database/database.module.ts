@@ -25,7 +25,7 @@ import {
   ConversationSchema,
 } from './schemas/conversation.schema';
 import { ConversationRepository } from './repositories/conversation.repository';
-import { OnboardingModule } from '../onboarding/onboarding.module';
+import { OnboardingModule } from '@onboarding/onboarding.module';
 
 const repositories = [
   ClientRepository,

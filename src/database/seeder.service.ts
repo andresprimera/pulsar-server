@@ -12,7 +12,7 @@ import { Agent } from './schemas/agent.schema';
 
 import { ClientPhone } from './schemas/client-phone.schema';
 import { ClientAgent } from './schemas/client-agent.schema';
-import { OnboardingService } from '../onboarding/onboarding.service';
+import { OnboardingService } from '@onboarding/onboarding.service';
 import { ChannelRepository } from './repositories/channel.repository';
 import { ClientAgentRepository } from './repositories/client-agent.repository';
 import { ClientPhoneRepository } from './repositories/client-phone.repository';
@@ -51,9 +51,10 @@ export class SeederService implements OnApplicationBootstrap {
     const isProd = nodeEnv === 'production';
     const isTest = nodeEnv === 'test';
 
-    const startSeed = isProd || isTest
-      ? process.env.SEED_DB === 'true' // Prod/Test: Must be explicit
-      : process.env.SEED_DB !== 'false'; // Dev: Default on, explicit off
+    const startSeed =
+      isProd || isTest
+        ? process.env.SEED_DB === 'true' // Prod/Test: Must be explicit
+        : process.env.SEED_DB !== 'false'; // Dev: Default on, explicit off
 
     if (!startSeed) {
       this.logger.log(
@@ -174,9 +175,7 @@ export class SeederService implements OnApplicationBootstrap {
           userSeed.email,
         );
         if (existingUserCheck) {
-          this.logger.log(
-            `User "${userSeed.email}" already exists. Skipping.`,
-          );
+          this.logger.log(`User "${userSeed.email}" already exists. Skipping.`);
           continue;
         }
 
@@ -283,7 +282,8 @@ export class SeederService implements OnApplicationBootstrap {
               }
 
               const provider =
-                channelSeed.provider || channelInfo.channel.supportedProviders[0];
+                channelSeed.provider ||
+                channelInfo.channel.supportedProviders[0];
 
               // Handle phone number for WhatsApp channels
               let phoneNumberId: string | undefined;
@@ -362,13 +362,14 @@ export class SeederService implements OnApplicationBootstrap {
             this.logger.log(
               `Hiring additional agent "${additionalHiring.agentName}" for client "${result.client._id}"...`,
             );
-            const additionalClientAgent = await this.clientAgentRepository.create({
-              clientId: result.client._id,
-              agentId: additionalAgent._id.toString(),
-              price: additionalHiring.price,
-              status: 'active',
-              channels: additionalChannels,
-            });
+            const additionalClientAgent =
+              await this.clientAgentRepository.create({
+                clientId: result.client._id,
+                agentId: additionalAgent._id.toString(),
+                price: additionalHiring.price,
+                status: 'active',
+                channels: additionalChannels,
+              });
 
             this.logger.log(
               `  - Additional ClientAgent: ${additionalClientAgent._id}`,
@@ -398,7 +399,9 @@ export class SeederService implements OnApplicationBootstrap {
 
         const delayMs = attempt * 250;
         this.logger.warn(
-          `Transient transaction error during onboarding. Retrying (${attempt + 1}/${this.onboardingRetryAttempts}) in ${delayMs}ms...`,
+          `Transient transaction error during onboarding. Retrying (${
+            attempt + 1
+          }/${this.onboardingRetryAttempts}) in ${delayMs}ms...`,
         );
         await this.sleep(delayMs);
       }
@@ -414,7 +417,9 @@ export class SeederService implements OnApplicationBootstrap {
     return (
       labels.includes('TransientTransactionError') ||
       labels.includes('UnknownTransactionCommitResult') ||
-      message.includes('Please retry your operation or multi-document transaction') ||
+      message.includes(
+        'Please retry your operation or multi-document transaction',
+      ) ||
       message.includes('TransientTransactionError')
     );
   }

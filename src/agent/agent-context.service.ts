@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AgentContext } from './contracts/agent-context';
-import { ClientRepository } from '../database/repositories/client.repository';
+import { ClientRepository } from '@database/repositories/client.repository';
 
 @Injectable()
 export class AgentContextService {
@@ -31,9 +31,10 @@ export class AgentContextService {
       );
     }
 
-    const enrichedPrompt = contextLines.length > 0
-      ? `${context.systemPrompt}\n\n${contextLines.join(' ')}`
-      : context.systemPrompt;
+    const enrichedPrompt =
+      contextLines.length > 0
+        ? `${context.systemPrompt}\n\n${contextLines.join(' ')}`
+        : context.systemPrompt;
 
     return {
       ...context,

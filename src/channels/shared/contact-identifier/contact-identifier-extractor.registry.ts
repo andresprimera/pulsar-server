@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ChannelType } from '../channel-type.type';
+import { ChannelType } from '@channels/shared/channel-type.type';
 import {
   CONTACT_IDENTIFIER_EXTRACTORS,
   ContactIdentifierExtractor,
@@ -23,8 +23,13 @@ export class ContactIdentifierExtractorRegistry {
     this.extractors = extractors;
   }
 
-  resolve(channelType: ChannelType, payload: unknown): ExtractedContactIdentifier {
-    const extractor = this.extractors.find((item) => item.supports(channelType));
+  resolve(
+    channelType: ChannelType,
+    payload: unknown,
+  ): ExtractedContactIdentifier {
+    const extractor = this.extractors.find((item) =>
+      item.supports(channelType),
+    );
 
     if (!extractor) {
       this.logger.error(
@@ -48,9 +53,13 @@ export class ContactIdentifierExtractorRegistry {
       }
 
       this.logger.error(
-        `event=contact_identifier_extraction_failed reason=extractor_error channelType=${channelType} message=${error instanceof Error ? error.message : String(error)}`,
+        `event=contact_identifier_extraction_failed reason=extractor_error channelType=${channelType} message=${
+          error instanceof Error ? error.message : String(error)
+        }`,
       );
-      throw new InvalidIdentifierException('unable-to-extract-contact-identifier');
+      throw new InvalidIdentifierException(
+        'unable-to-extract-contact-identifier',
+      );
     }
 
     const normalizedRaw = externalIdRaw.trim();

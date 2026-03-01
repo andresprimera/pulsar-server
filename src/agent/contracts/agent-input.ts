@@ -1,4 +1,4 @@
-import { ChannelType } from '../../channels/shared/channel-type.type';
+import { ChannelType } from '@channels/shared/channel-type.type';
 
 export interface AgentInput {
   channel: ChannelType;

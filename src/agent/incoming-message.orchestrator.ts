@@ -5,15 +5,18 @@ import { AgentOutput } from './contracts/agent-output';
 import { AgentInput } from './contracts/agent-input';
 import { AgentContext } from './contracts/agent-context';
 import { AgentContextService } from './agent-context.service';
-import { AgentRepository } from '../database/repositories/agent.repository';
-import { ClientRepository } from '../database/repositories/client.repository';
-import { decrypt, decryptRecord } from '../database/utils/crypto.util';
-import { CHANNEL_TYPES } from '../channels/shared/channel-type.constants';
-import { ContactIdentityResolver } from '../channels/shared/contact-identity.resolver';
-import { IncomingChannelEvent } from '../channels/shared/incoming-channel-event.interface';
-import { AgentRoutingService, RouteCandidate } from '../channels/shared/agent-routing.service';
-import { ConversationService } from '../channels/shared/conversation.service';
-import { ChannelType } from '../channels/shared/channel-type.type';
+import { AgentRepository } from '@database/repositories/agent.repository';
+import { ClientRepository } from '@database/repositories/client.repository';
+import { decrypt, decryptRecord } from '@database/utils/crypto.util';
+import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
+import { ContactIdentityResolver } from '@channels/shared/contact-identity.resolver';
+import { IncomingChannelEvent } from '@channels/shared/incoming-channel-event.interface';
+import {
+  AgentRoutingService,
+  RouteCandidate,
+} from '@channels/shared/agent-routing.service';
+import { ConversationService } from '@channels/shared/conversation.service';
+import { ChannelType } from '@channels/shared/channel-type.type';
 
 @Injectable()
 export class IncomingMessageOrchestrator {

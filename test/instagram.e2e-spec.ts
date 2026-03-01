@@ -232,7 +232,8 @@ describe('Instagram Channel (e2e)', () => {
   });
 
   it('should ignore unknown instagram account id', async () => {
-    const callsBeforeRequest = (mockAgentService.run as jest.Mock).mock.calls.length;
+    const callsBeforeRequest = (mockAgentService.run as jest.Mock).mock.calls
+      .length;
 
     await request(app.getHttpServer())
       .post('/instagram/webhook')

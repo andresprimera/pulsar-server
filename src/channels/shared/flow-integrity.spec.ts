@@ -24,8 +24,12 @@ describe('FlowIntegrity', () => {
     const agentServiceSource = read('src/agent/agent.service.ts');
 
     expect(agentServiceSource).toContain('MessagePersistenceService');
-    expect(agentServiceSource).toContain('messagePersistenceService.createUserMessage');
-    expect(agentServiceSource).toContain('messagePersistenceService.handleOutgoingMessage');
+    expect(agentServiceSource).toContain(
+      'messagePersistenceService.createUserMessage',
+    );
+    expect(agentServiceSource).toContain(
+      'messagePersistenceService.handleOutgoingMessage',
+    );
     expect(agentServiceSource).not.toContain('MessageRepository');
     expect(agentServiceSource).not.toContain('messageRepository.');
   });

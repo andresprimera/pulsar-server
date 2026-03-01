@@ -1,4 +1,4 @@
-import { ChannelType } from '../channel-type.type';
+import { ChannelType } from '@channels/shared/channel-type.type';
 
 export const CONTACT_IDENTIFIER_EXTRACTORS = Symbol(
   'CONTACT_IDENTIFIER_EXTRACTORS',

@@ -2,14 +2,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
 import { IncomingMessageOrchestrator } from './incoming-message.orchestrator';
 import { AgentService } from './agent.service';
-import { AgentRepository } from '../database/repositories/agent.repository';
-import { ClientRepository } from '../database/repositories/client.repository';
+import { AgentRepository } from '@database/repositories/agent.repository';
+import { ClientRepository } from '@database/repositories/client.repository';
 import { LlmProvider } from './llm/provider.enum';
-import { AgentRoutingService } from '../channels/shared/agent-routing.service';
+import { AgentRoutingService } from '@channels/shared/agent-routing.service';
 import { AgentContextService } from './agent-context.service';
-import { ContactIdentityResolver } from '../channels/shared/contact-identity.resolver';
-import { CHANNEL_TYPES } from '../channels/shared/channel-type.constants';
-import { ConversationService } from '../channels/shared/conversation.service';
+import { ContactIdentityResolver } from '@channels/shared/contact-identity.resolver';
+import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
+import { ConversationService } from '@channels/shared/conversation.service';
 
 describe('IncomingMessageOrchestrator', () => {
   let service: IncomingMessageOrchestrator;
@@ -27,7 +27,9 @@ describe('IncomingMessageOrchestrator', () => {
     messageId: 'msg123',
     text: 'Hello',
     rawPayload: {
-      entry: [{ changes: [{ value: { metadata: { phone_number_id: 'phone123' } } }] }],
+      entry: [
+        { changes: [{ value: { metadata: { phone_number_id: 'phone123' } } }] },
+      ],
     },
     ...overrides,
   });
@@ -50,7 +52,9 @@ describe('IncomingMessageOrchestrator', () => {
         },
         {
           provide: ClientRepository,
-          useValue: { findById: jest.fn().mockResolvedValue({ name: 'Test Client' }) },
+          useValue: {
+            findById: jest.fn().mockResolvedValue({ name: 'Test Client' }),
+          },
         },
         {
           provide: ContactIdentityResolver,
@@ -61,7 +65,9 @@ describe('IncomingMessageOrchestrator', () => {
         {
           provide: AgentContextService,
           useValue: {
-            enrichContext: jest.fn().mockImplementation((ctx) => Promise.resolve(ctx)),
+            enrichContext: jest
+              .fn()
+              .mockImplementation((ctx) => Promise.resolve(ctx)),
           },
         },
         {
@@ -74,7 +80,9 @@ describe('IncomingMessageOrchestrator', () => {
       ],
     }).compile();
 
-    service = module.get<IncomingMessageOrchestrator>(IncomingMessageOrchestrator);
+    service = module.get<IncomingMessageOrchestrator>(
+      IncomingMessageOrchestrator,
+    );
     agentService = module.get(AgentService);
     agentRoutingService = module.get(AgentRoutingService);
     agentRepository = module.get(AgentRepository);
@@ -103,7 +111,10 @@ describe('IncomingMessageOrchestrator', () => {
           channelId: '507f1f77bcf86cd799439014',
           status: 'active',
           provider: 'meta',
-          credentials: { phoneNumberId: 'phone123', accessToken: 'sk-wa-token' },
+          credentials: {
+            phoneNumberId: 'phone123',
+            accessToken: 'sk-wa-token',
+          },
           llmConfig: {
             provider: LlmProvider.OpenAI,
             apiKey: 'sk-mock-key',
@@ -172,16 +183,24 @@ describe('IncomingMessageOrchestrator', () => {
 
       const output = await service.handle(createEvent());
 
-      expect(output?.reply?.text).toContain('We have a few specialists ready to help you:');
+      expect(output?.reply?.text).toContain(
+        'We have a few specialists ready to help you:',
+      );
       expect(agentService.run).not.toHaveBeenCalled();
       expect(conversationService.touch).not.toHaveBeenCalled();
     });
 
     it('returns agent output and touches conversation once', async () => {
-      agentRoutingService.resolveRoute.mockResolvedValue(mockResolvedRoute as any);
+      agentRoutingService.resolveRoute.mockResolvedValue(
+        mockResolvedRoute as any,
+      );
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
-      contactIdentityResolver.resolveContact.mockResolvedValue(mockContact as any);
-      conversationService.resolveOrCreate.mockResolvedValue(mockConversation as any);
+      contactIdentityResolver.resolveContact.mockResolvedValue(
+        mockContact as any,
+      );
+      conversationService.resolveOrCreate.mockResolvedValue(
+        mockConversation as any,
+      );
       agentService.run.mockResolvedValue({
         reply: { type: 'text', text: 'Hello' },
       });
@@ -207,10 +226,16 @@ describe('IncomingMessageOrchestrator', () => {
     });
 
     it('touches conversation and rethrows when agent run fails', async () => {
-      agentRoutingService.resolveRoute.mockResolvedValue(mockResolvedRoute as any);
+      agentRoutingService.resolveRoute.mockResolvedValue(
+        mockResolvedRoute as any,
+      );
       agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
-      contactIdentityResolver.resolveContact.mockResolvedValue(mockContact as any);
-      conversationService.resolveOrCreate.mockResolvedValue(mockConversation as any);
+      contactIdentityResolver.resolveContact.mockResolvedValue(
+        mockContact as any,
+      );
+      conversationService.resolveOrCreate.mockResolvedValue(
+        mockConversation as any,
+      );
       agentService.run.mockRejectedValue(new Error('run failed'));
 
       await expect(service.handle(createEvent())).rejects.toThrow('run failed');

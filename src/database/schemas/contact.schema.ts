@@ -91,7 +91,10 @@ export function throwsIfExternalIdMutation(update: Record<string, any>): void {
     return;
   }
 
-  const directMutation = Object.prototype.hasOwnProperty.call(update, 'externalId');
+  const directMutation = Object.prototype.hasOwnProperty.call(
+    update,
+    'externalId',
+  );
   const setMutation =
     !!update.$set &&
     Object.prototype.hasOwnProperty.call(update.$set, 'externalId');

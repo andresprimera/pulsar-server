@@ -126,12 +126,10 @@ describe('Seeder (e2e)', () => {
       expect(customerServiceAgent.status).toBe('active');
       expect(customerServiceAgent.createdBySeeder).toBe(true);
 
-      const salesAgent = await connection
-        .collection('agents')
-        .findOne({
-          name: 'Lead Qualifier & Sales Agent',
-          createdBySeeder: true,
-        });
+      const salesAgent = await connection.collection('agents').findOne({
+        name: 'Lead Qualifier & Sales Agent',
+        createdBySeeder: true,
+      });
 
       expect(salesAgent).toBeDefined();
       expect(salesAgent.systemPrompt).toContain('sales and lead qualification');
@@ -242,12 +240,10 @@ describe('Seeder (e2e)', () => {
         .collection('agents')
         .findOne({ name: seedUser1.agentHirings[0].agentName });
 
-      const clientAgent = await connection
-        .collection('client_agents')
-        .findOne({
-          clientId: user.clientId.toString(),
-          agentId: agent._id.toString(),
-        });
+      const clientAgent = await connection.collection('client_agents').findOne({
+        clientId: user.clientId.toString(),
+        agentId: agent._id.toString(),
+      });
 
       const expectedChannelNames = seedUser1.agentHirings[0].channels.map(
         (c) => c.channelName,
@@ -310,12 +306,10 @@ describe('Seeder (e2e)', () => {
         .collection('agents')
         .findOne({ name: seedUser2.agentHirings[0].agentName });
 
-      const clientAgent = await connection
-        .collection('client_agents')
-        .findOne({
-          clientId: user.clientId.toString(),
-          agentId: agent._id.toString(),
-        });
+      const clientAgent = await connection.collection('client_agents').findOne({
+        clientId: user.clientId.toString(),
+        agentId: agent._id.toString(),
+      });
 
       const expectedChannelNames = seedUser2.agentHirings[0].channels.map(
         (c) => c.channelName,
@@ -386,12 +380,10 @@ describe('Seeder (e2e)', () => {
         .collection('agents')
         .findOne({ name: seedUser3.agentHirings[0].agentName });
 
-      const clientAgent = await connection
-        .collection('client_agents')
-        .findOne({
-          clientId: user.clientId.toString(),
-          agentId: agent._id.toString(),
-        });
+      const clientAgent = await connection.collection('client_agents').findOne({
+        clientId: user.clientId.toString(),
+        agentId: agent._id.toString(),
+      });
 
       expect(clientAgent).toBeDefined();
       expect(clientAgent.status).toBe('active');
@@ -406,12 +398,10 @@ describe('Seeder (e2e)', () => {
         .collection('agents')
         .findOne({ name: seedUser3.agentHirings[1].agentName });
 
-      const clientAgent = await connection
-        .collection('client_agents')
-        .findOne({
-          clientId: user.clientId.toString(),
-          agentId: agent._id.toString(),
-        });
+      const clientAgent = await connection.collection('client_agents').findOne({
+        clientId: user.clientId.toString(),
+        agentId: agent._id.toString(),
+      });
 
       expect(clientAgent).toBeDefined();
       expect(clientAgent.status).toBe('active');
@@ -442,9 +432,7 @@ describe('Seeder (e2e)', () => {
       const expectedCounts = seedUser3.agentHirings
         .map((h) => h.channels.length)
         .sort();
-      const channelCounts = clientAgents
-        .map((ca) => ca.channels.length)
-        .sort();
+      const channelCounts = clientAgents.map((ca) => ca.channels.length).sort();
       expect(channelCounts).toEqual(expectedCounts);
 
       const flattenedChannelIds = clientAgents.flatMap((ca) =>
@@ -467,18 +455,14 @@ describe('Seeder (e2e)', () => {
         .collection('agents')
         .findOne({ name: seedUser3.agentHirings[1].agentName });
 
-      const hiring1 = await connection
-        .collection('client_agents')
-        .findOne({
-          clientId: user.clientId.toString(),
-          agentId: hiring1Agent._id.toString(),
-        });
-      const hiring2 = await connection
-        .collection('client_agents')
-        .findOne({
-          clientId: user.clientId.toString(),
-          agentId: hiring2Agent._id.toString(),
-        });
+      const hiring1 = await connection.collection('client_agents').findOne({
+        clientId: user.clientId.toString(),
+        agentId: hiring1Agent._id.toString(),
+      });
+      const hiring2 = await connection.collection('client_agents').findOne({
+        clientId: user.clientId.toString(),
+        agentId: hiring2Agent._id.toString(),
+      });
 
       const hiring1Phone = hiring1.channels.find(
         (channel) => channel.phoneNumberId,

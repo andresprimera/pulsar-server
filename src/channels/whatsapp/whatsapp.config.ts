@@ -23,11 +23,9 @@ export interface WhatsAppServerConfig {
  */
 export function loadWhatsAppConfig(): WhatsAppServerConfig {
   return {
-    apiHost:
-      process.env.WHATSAPP_API_HOST || 'https://graph.facebook.com',
+    apiHost: process.env.WHATSAPP_API_HOST || 'https://graph.facebook.com',
     apiVersion: process.env.WHATSAPP_API_VERSION || 'v18.0',
-    webhookVerifyToken:
-      process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || 'dev',
+    webhookVerifyToken: process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || 'dev',
   };
 }
 

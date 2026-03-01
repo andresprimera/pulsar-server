@@ -5,22 +5,20 @@ module.exports = {
     tsconfigRootDir: __dirname,
     sourceType: 'module',
   },
-  plugins: ['@typescript-eslint', 'boundaries', 'import'],
-  extends: [
-    'plugin:@typescript-eslint/recommended',
-    'plugin:prettier/recommended',
-  ],
+  plugins: ['boundaries', 'import'],
   root: true,
   env: {
     node: true,
     jest: true,
   },
-  ignorePatterns: ['.eslintrc.js'],
-
+  ignorePatterns: ['.eslintrc.js', '.eslintrc.architecture.js'],
   settings: {
     'boundaries/elements': [
       { type: 'channels', pattern: 'src/channels/**' },
-      { type: 'orchestrator', pattern: 'src/agent/incoming-message.orchestrator.ts' },
+      {
+        type: 'orchestrator',
+        pattern: 'src/agent/incoming-message.orchestrator.ts',
+      },
       { type: 'agent', pattern: 'src/agent/**' },
       { type: 'database', pattern: 'src/database/**' },
       { type: 'domain', pattern: 'src/domain/**' },
@@ -31,24 +29,16 @@ module.exports = {
       },
     },
   },
-
   rules: {
-    '@typescript-eslint/interface-name-prefix': 'off',
-    '@typescript-eslint/explicit-function-return-type': 'off',
-    '@typescript-eslint/explicit-module-boundary-types': 'off',
-    '@typescript-eslint/no-explicit-any': 'off',
-
-    // Prevent circular dependencies
     'import/no-cycle': ['error', { maxDepth: 1 }],
-
-    // Force alias usage and block parent-relative imports
     'no-restricted-imports': [
       'error',
       {
         patterns: [
           {
             group: ['src/**'],
-            message: 'Use path aliases (@agent, @database, etc.) instead of raw src imports.',
+            message:
+              'Use path aliases (@agent, @database, etc.) instead of raw src imports.',
           },
           {
             group: ['../*', '../../*', '../../../*', '../../../../*', '../../../../../*'],
@@ -58,8 +48,6 @@ module.exports = {
         ],
       },
     ],
-
-    // Enforce layer architecture
     'boundaries/element-types': [
       'error',
       {
@@ -68,12 +56,10 @@ module.exports = {
       },
     ],
   },
-
   overrides: [
     {
       files: ['test/**/*.ts', '**/*.spec.ts'],
       rules: {
-        // Tests may import fixtures/helpers from parent paths.
         'no-restricted-imports': [
           'error',
           {

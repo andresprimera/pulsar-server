@@ -1,14 +1,14 @@
 import { Injectable, ForbiddenException, Logger } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'crypto';
-import { decryptRecord } from '../../database/utils/crypto.util';
+import { decryptRecord } from '@database/utils/crypto.util';
 import {
   InstagramServerConfig,
   loadInstagramConfig,
   buildMessagesUrl,
 } from './instagram.config';
-import { CHANNEL_TYPES } from '../shared/channel-type.constants';
-import { IncomingMessageOrchestrator } from '../../agent/incoming-message.orchestrator';
-import { IncomingChannelEvent } from '../shared/incoming-channel-event.interface';
+import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
+import { IncomingMessageOrchestrator } from '@agent/incoming-message.orchestrator';
+import { IncomingChannelEvent } from '@channels/shared/incoming-channel-event.interface';
 
 @Injectable()
 export class InstagramService {
@@ -48,8 +48,14 @@ export class InstagramService {
       .update(body)
       .digest('hex');
 
-    const provided = Buffer.from(providedDigest, 'utf8') as unknown as Uint8Array;
-    const expected = Buffer.from(expectedDigest, 'utf8') as unknown as Uint8Array;
+    const provided = Buffer.from(
+      providedDigest,
+      'utf8',
+    ) as unknown as Uint8Array;
+    const expected = Buffer.from(
+      expectedDigest,
+      'utf8',
+    ) as unknown as Uint8Array;
 
     if (provided.length !== expected.length) {
       return false;
@@ -155,7 +161,9 @@ export class InstagramService {
           rawPayload: event,
         };
 
-        const output = await this.incomingMessageOrchestrator.handle(incomingEvent);
+        const output = await this.incomingMessageOrchestrator.handle(
+          incomingEvent,
+        );
         if (!output?.reply) {
           continue;
         }

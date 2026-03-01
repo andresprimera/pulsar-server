@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model } from 'mongoose';
-import { Client } from '../schemas/client.schema';
+import { Client } from '@database/schemas/client.schema';
 
 @Injectable()
 export class ClientRepository {

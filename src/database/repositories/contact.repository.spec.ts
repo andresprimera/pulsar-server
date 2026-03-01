@@ -149,9 +149,12 @@ describe('ContactRepository', () => {
   });
 
   it('retries by reading existing contact when duplicate key error occurs', async () => {
-    const duplicateError = Object.assign(new Error('E11000 duplicate key error'), {
-      code: 11000,
-    });
+    const duplicateError = Object.assign(
+      new Error('E11000 duplicate key error'),
+      {
+        code: 11000,
+      },
+    );
 
     const existing = {
       _id: new Types.ObjectId(),

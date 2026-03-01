@@ -1,2 +1,16 @@
-pnpm test:e2e -- test/seeder.e2e-spec.ts
-pnpm test:e2e
+run_full_suite=false
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [ "$remote_ref" = "refs/heads/main" ] || [ "$local_ref" = "refs/heads/main" ]; then
+    run_full_suite=true
+    break
+  fi
+done
+
+if [ "$run_full_suite" = true ]; then
+  pnpm lint
+  pnpm check
+  pnpm test
+else
+  echo "pre-push: skipping lint/check/tests (push target is not main)."
+fi

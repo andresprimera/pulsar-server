@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model } from 'mongoose';
-import { ClientAgent } from '../schemas/client-agent.schema';
+import { ClientAgent } from '@database/schemas/client-agent.schema';
 
 @Injectable()
 export class ClientAgentRepository {
@@ -71,7 +71,9 @@ export class ClientAgentRepository {
   /**
    * Find all active ClientAgents by WhatsApp phoneNumberId within embedded channels.
    */
-  async findActiveByPhoneNumberId(phoneNumberId: string): Promise<ClientAgent[]> {
+  async findActiveByPhoneNumberId(
+    phoneNumberId: string,
+  ): Promise<ClientAgent[]> {
     return this.model
       .find({
         status: 'active',
@@ -122,7 +124,9 @@ export class ClientAgentRepository {
   async findOneByInstagramAccountId(
     instagramAccountId: string,
   ): Promise<ClientAgent | null> {
-    const matches = await this.findActiveByInstagramAccountId(instagramAccountId);
+    const matches = await this.findActiveByInstagramAccountId(
+      instagramAccountId,
+    );
     return matches[0] ?? null;
   }
 
@@ -145,5 +149,4 @@ export class ClientAgentRepository {
       .select('+channels.credentials +channels.llmConfig.apiKey')
       .exec();
   }
-
 }

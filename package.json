@@ -15,6 +15,9 @@
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --max-warnings=0",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "typecheck": "tsc --noEmit",
+    "typecheck:architecture": "eslint --no-eslintrc -c .eslintrc.architecture.js \"{src,apps,libs,test}/**/*.ts\" --max-warnings=0",
+    "lint:architecture": "pnpm run typecheck:architecture",
+    "check": "pnpm run typecheck && pnpm run typecheck:architecture",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
@@ -53,6 +56,9 @@
     "@typescript-eslint/parser": "^5.0.0",
     "eslint": "^8.0.1",
     "eslint-config-prettier": "^8.3.0",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-boundaries": "^5.4.0",
+    "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-prettier": "^4.0.0",
     "husky": "^9.1.7",
     "jest": "29.5.0",
@@ -75,6 +81,18 @@
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "moduleNameMapper": {
+      "^@channels/(.*)$": "<rootDir>/channels/$1",
+      "^@agent/(.*)$": "<rootDir>/agent/$1",
+      "^@database/(.*)$": "<rootDir>/database/$1",
+      "^@domain/(.*)$": "<rootDir>/domain/$1",
+      "^@shared/(.*)$": "<rootDir>/shared/$1",
+      "^@agents/(.*)$": "<rootDir>/agents/$1",
+      "^@clients/(.*)$": "<rootDir>/clients/$1",
+      "^@client-agents/(.*)$": "<rootDir>/client-agents/$1",
+      "^@users/(.*)$": "<rootDir>/users/$1",
+      "^@onboarding/(.*)$": "<rootDir>/onboarding/$1"
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"

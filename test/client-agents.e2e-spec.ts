@@ -169,7 +169,9 @@ describe('ClientAgents (e2e)', () => {
     expect(saved?.channels).toHaveLength(1);
     expect(saved?.channels[0].channelId.toString()).toBe(channelId);
     expect(saved?.channels[0].provider).toBe('instagram');
-    expect(saved?.channels[0].instagramAccountId).toBe(`1784140000000${suffix}`);
+    expect(saved?.channels[0].instagramAccountId).toBe(
+      `1784140000000${suffix}`,
+    );
   });
 
   it('should return 400 when no channels are provided', async () => {

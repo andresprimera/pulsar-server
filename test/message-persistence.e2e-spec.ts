@@ -50,9 +50,15 @@ describe('Message Persistence (e2e)', () => {
       // Clean up first
       await connection.collection('clients').deleteOne({ _id: clientIdObj });
       await connection.collection('agents').deleteOne({ _id: agentIdObj });
-      await connection.collection('client_agents').deleteOne({ _id: clientAgentIdObj });
-      await connection.collection('messages').deleteMany({ channelId: channelIdObj });
-      await connection.collection('contacts').deleteMany({ externalId: userPhone.replace(/[^\d]/g, '') });
+      await connection
+        .collection('client_agents')
+        .deleteOne({ _id: clientAgentIdObj });
+      await connection
+        .collection('messages')
+        .deleteMany({ channelId: channelIdObj });
+      await connection
+        .collection('contacts')
+        .deleteMany({ externalId: userPhone.replace(/[^\d]/g, '') });
     }
 
     // Create Client
@@ -101,17 +107,27 @@ describe('Message Persistence (e2e)', () => {
     if (connection) {
       await connection.collection('clients').deleteOne({ _id: clientIdObj });
       await connection.collection('agents').deleteOne({ _id: agentIdObj });
-      await connection.collection('client_agents').deleteOne({ _id: clientAgentIdObj });
-      await connection.collection('messages').deleteMany({ channelId: channelIdObj });
-      await connection.collection('contacts').deleteMany({ externalId: userPhone.replace(/[^\d]/g, '') });
+      await connection
+        .collection('client_agents')
+        .deleteOne({ _id: clientAgentIdObj });
+      await connection
+        .collection('messages')
+        .deleteMany({ channelId: channelIdObj });
+      await connection
+        .collection('contacts')
+        .deleteMany({ externalId: userPhone.replace(/[^\d]/g, '') });
     }
     await app.close();
   });
 
   beforeEach(async () => {
     // Clean up messages before each test
-    await connection.collection('messages').deleteMany({ channelId: channelIdObj });
-    await connection.collection('contacts').deleteMany({ externalId: userPhone.replace(/[^\d]/g, '') });
+    await connection
+      .collection('messages')
+      .deleteMany({ channelId: channelIdObj });
+    await connection
+      .collection('contacts')
+      .deleteMany({ externalId: userPhone.replace(/[^\d]/g, '') });
     jest.clearAllMocks();
   });
 
@@ -144,7 +160,7 @@ describe('Message Persistence (e2e)', () => {
       await whatsappService.handleIncoming(payload);
 
       // Wait a bit for async operations
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Assert - Check contact was created
       const contact = await connection
@@ -200,7 +216,7 @@ describe('Message Persistence (e2e)', () => {
       };
 
       await whatsappService.handleIncoming(payload1);
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Act - Send second message
       const payload2 = {
@@ -226,7 +242,7 @@ describe('Message Persistence (e2e)', () => {
       };
 
       await whatsappService.handleIncoming(payload2);
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Assert - Should have 4 messages total (2 user + 2 agent)
       const messageCount = await connection
@@ -271,7 +287,10 @@ describe('Message Persistence (e2e)', () => {
       });
 
       // Insert messages that will exceed token threshold
-      const longMessage = 'This is a long message with many words to increase token count. '.repeat(10);
+      const longMessage =
+        'This is a long message with many words to increase token count. '.repeat(
+          10,
+        );
 
       for (let i = 0; i < 3; i++) {
         await connection.collection('messages').insertOne({
@@ -323,7 +342,7 @@ describe('Message Persistence (e2e)', () => {
       await whatsappService.handleIncoming(payload);
 
       // Wait for async summarization
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       // Assert - Check if a summary message was created
       const summaryMessage = await connection
@@ -335,7 +354,9 @@ describe('Message Persistence (e2e)', () => {
         expect(summaryMessage).toBeDefined();
         expect(summaryMessage.type).toBe('summary');
         expect(summaryMessage.content).toBeTruthy();
-        expect(summaryMessage.contactId.toString()).toBe(contactResult.insertedId.toString());
+        expect(summaryMessage.contactId.toString()).toBe(
+          contactResult.insertedId.toString(),
+        );
         expect(summaryMessage.agentId.toString()).toBe(agentId);
       } else {
         // Even if summary wasn't created, messages should be persisted
@@ -372,7 +393,7 @@ describe('Message Persistence (e2e)', () => {
       };
 
       await whatsappService.handleIncoming(payload);
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const contact = await connection
         .collection('contacts')
@@ -410,7 +431,7 @@ describe('Message Persistence (e2e)', () => {
       };
 
       await whatsappService.handleIncoming(payload1);
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const contactCountAfterFirst = await connection
         .collection('contacts')
@@ -440,7 +461,7 @@ describe('Message Persistence (e2e)', () => {
       };
 
       await whatsappService.handleIncoming(payload2);
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const contactCountAfterSecond = await connection
         .collection('contacts')

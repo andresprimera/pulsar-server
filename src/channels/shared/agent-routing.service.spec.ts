@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Types } from 'mongoose';
-import { AgentRepository } from '../../database/repositories/agent.repository';
-import { ClientAgentRepository } from '../../database/repositories/client-agent.repository';
-import { MessageRepository } from '../../database/repositories/message.repository';
-import { ContactRepository } from '../../database/repositories/contact.repository';
+import { AgentRepository } from '@database/repositories/agent.repository';
+import { ClientAgentRepository } from '@database/repositories/client-agent.repository';
+import { MessageRepository } from '@database/repositories/message.repository';
+import { ContactRepository } from '@database/repositories/contact.repository';
 import { AgentRoutingService } from './agent-routing.service';
 
 describe('AgentRoutingService', () => {
@@ -166,7 +166,9 @@ describe('AgentRoutingService', () => {
 
     expect(result.kind).toBe('ambiguous');
     if (result.kind === 'ambiguous') {
-      expect(result.prompt).toContain('Please reply with the number or name of the agent');
+      expect(result.prompt).toContain(
+        'Please reply with the number or name of the agent',
+      );
     }
   });
 });

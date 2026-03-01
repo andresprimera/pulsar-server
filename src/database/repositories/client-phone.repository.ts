@@ -1,7 +1,7 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model, Types } from 'mongoose';
-import { ClientPhone } from '../schemas/client-phone.schema';
+import { ClientPhone } from '@database/schemas/client-phone.schema';
 
 export interface CreateClientPhoneData {
   clientId: Types.ObjectId | string;

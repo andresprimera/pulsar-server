@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { MessagePersistenceService } from './message-persistence.service';
-import { ConversationSummaryService } from '../../agent/conversation-summary.service';
+import { ConversationSummaryService } from '@agent/conversation-summary.service';
 import { AgentRoutingService } from './agent-routing.service';
 import { ConfigModule } from '@nestjs/config';
-import { DatabaseModule } from '../../database/database.module';
+import { DatabaseModule } from '@database/database.module';
 import { ContactIdentifierExtractorRegistry } from './contact-identifier/contact-identifier-extractor.registry';
 import { ContactIdentityResolver } from './contact-identity.resolver';
 import { WhatsappIdentifierExtractor } from './contact-identifier/whatsapp-identifier.extractor';

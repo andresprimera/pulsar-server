@@ -1,13 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { generateText } from 'ai';
-import { AgentRepository } from '../../database/repositories/agent.repository';
-import { ClientAgentRepository } from '../../database/repositories/client-agent.repository';
-import { MessageRepository } from '../../database/repositories/message.repository';
-import { ContactRepository } from '../../database/repositories/contact.repository';
-import { ClientAgent, HireChannelConfig } from '../../database/schemas/client-agent.schema';
-import { createLLMModel } from '../../agent/llm/llm.factory';
-import { LlmProvider } from '../../agent/llm/provider.enum';
+import { AgentRepository } from '@database/repositories/agent.repository';
+import { ClientAgentRepository } from '@database/repositories/client-agent.repository';
+import { MessageRepository } from '@database/repositories/message.repository';
+import { ContactRepository } from '@database/repositories/contact.repository';
+import {
+  ClientAgent,
+  HireChannelConfig,
+} from '@database/schemas/client-agent.schema';
+import { createLLMModel } from '@agent/llm/llm.factory';
+import { LlmProvider } from '@agent/llm/provider.enum';
 import { ChannelType } from './channel-type.type';
 import { CHANNEL_TYPES } from './channel-type.constants';
 
@@ -57,8 +60,7 @@ export class AgentRoutingService {
     private readonly messageRepository: MessageRepository,
     private readonly agentRepository: AgentRepository,
   ) {
-    this.enableSemanticRouting =
-      process.env.ENABLE_SEMANTIC_ROUTING === 'true';
+    this.enableSemanticRouting = process.env.ENABLE_SEMANTIC_ROUTING === 'true';
   }
 
   /**
@@ -91,7 +93,10 @@ export class AgentRoutingService {
       return { kind: 'resolved', candidate: candidates[0] };
     }
 
-    const explicit = this.resolveExplicitSelection(candidates, context.incomingText);
+    const explicit = this.resolveExplicitSelection(
+      candidates,
+      context.incomingText,
+    );
     if (explicit) {
       return { kind: 'resolved', candidate: explicit };
     }
@@ -104,7 +109,10 @@ export class AgentRoutingService {
       return { kind: 'resolved', candidate: sticky };
     }
 
-    const keywordBased = this.resolveFromKeywordScore(candidates, context.incomingText);
+    const keywordBased = this.resolveFromKeywordScore(
+      candidates,
+      context.incomingText,
+    );
     if (keywordBased) {
       return { kind: 'resolved', candidate: keywordBased };
     }
@@ -144,7 +152,9 @@ export class AgentRoutingService {
       case CHANNEL_TYPES.TIKTOK:
         return this.clientAgentRepository.findActiveByTiktokUserId(identifier);
       case CHANNEL_TYPES.INSTAGRAM:
-        return this.clientAgentRepository.findActiveByInstagramAccountId(identifier);
+        return this.clientAgentRepository.findActiveByInstagramAccountId(
+          identifier,
+        );
       default:
         return [];
     }
@@ -162,7 +172,7 @@ export class AgentRoutingService {
       .map((clientAgent) => {
         const channelConfig = clientAgent.channels.find((channel) => {
           if (channel.status !== 'active') return false;
-          
+
           switch (channelType) {
             case CHANNEL_TYPES.WHATSAPP:
               return channel.phoneNumberId === identifier;
@@ -181,8 +191,13 @@ export class AgentRoutingService {
 
         return { clientAgent, channelConfig };
       })
-      .filter((candidate): candidate is { clientAgent: ClientAgent; channelConfig: HireChannelConfig } =>
-        Boolean(candidate),
+      .filter(
+        (
+          candidate,
+        ): candidate is {
+          clientAgent: ClientAgent;
+          channelConfig: HireChannelConfig;
+        } => Boolean(candidate),
       );
 
     const candidates = await Promise.all(
@@ -200,7 +215,9 @@ export class AgentRoutingService {
       }),
     );
 
-    return candidates.filter((candidate): candidate is RouteCandidate => Boolean(candidate));
+    return candidates.filter((candidate): candidate is RouteCandidate =>
+      Boolean(candidate),
+    );
   }
 
   private resolveExplicitSelection(
@@ -251,7 +268,8 @@ export class AgentRoutingService {
       byClient.set(key, list);
     }
 
-    let mostRecent: { createdAt: Date; candidate: RouteCandidate } | null = null;
+    let mostRecent: { createdAt: Date; candidate: RouteCandidate } | null =
+      null;
 
     for (const [clientId, clientCandidates] of byClient) {
       if (!Types.ObjectId.isValid(clientId)) {
@@ -311,7 +329,10 @@ export class AgentRoutingService {
         }
 
         if (!mostRecent || latestMessage.createdAt > mostRecent.createdAt) {
-          mostRecent = { createdAt: latestMessage.createdAt, candidate: matched };
+          mostRecent = {
+            createdAt: latestMessage.createdAt,
+            candidate: matched,
+          };
         }
       }
     }
@@ -376,7 +397,11 @@ export class AgentRoutingService {
       const agentDescriptions = candidates
         .map(
           (candidate, index) =>
-            `${index + 1}. ${candidate.agentName} (Handle queries about: ${this.inferAgentPurpose(candidate.agentName)})`,
+            `${index + 1}. ${
+              candidate.agentName
+            } (Handle queries about: ${this.inferAgentPurpose(
+              candidate.agentName,
+            )})`,
         )
         .join('\n');
 
@@ -398,7 +423,9 @@ Respond with ONLY the number of the most appropriate agent (1, 2, etc.). If no a
         const selectedIndex = Number(trimmed) - 1;
         if (selectedIndex >= 0 && selectedIndex < candidates.length) {
           this.logger.log(
-            `[AgentRouter] Semantic routing selected agent ${selectedIndex + 1}`,
+            `[AgentRouter] Semantic routing selected agent ${
+              selectedIndex + 1
+            }`,
           );
           return candidates[selectedIndex];
         }
@@ -407,7 +434,9 @@ Respond with ONLY the number of the most appropriate agent (1, 2, etc.). If no a
       return null;
     } catch (error) {
       this.logger.error(
-        `[AgentRouter] Semantic routing failed: ${error instanceof Error ? error.message : String(error)}`,
+        `[AgentRouter] Semantic routing failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       );
       return null;
     }

@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Types } from 'mongoose';
 import { ConversationService } from './conversation.service';
-import { ConversationRepository } from '../../database/repositories/conversation.repository';
+import { ConversationRepository } from '@database/repositories/conversation.repository';
 import { WHATSAPP_CONVERSATION_TIMEOUT_MS } from './conversation.constants';
 
 describe('ConversationService', () => {
@@ -39,10 +39,14 @@ describe('ConversationService', () => {
     const existing = {
       _id: existingConversationId,
       status: 'open',
-      lastMessageAt: new Date(now.getTime() - WHATSAPP_CONVERSATION_TIMEOUT_MS + 1000),
+      lastMessageAt: new Date(
+        now.getTime() - WHATSAPP_CONVERSATION_TIMEOUT_MS + 1000,
+      ),
     };
 
-    repository.findLatestOpenByClientContactAndChannel.mockResolvedValue(existing as any);
+    repository.findLatestOpenByClientContactAndChannel.mockResolvedValue(
+      existing as any,
+    );
 
     const result = await service.resolveOrCreate({
       clientId,
@@ -76,7 +80,10 @@ describe('ConversationService', () => {
       now,
     });
 
-    expect(repository.updateStatus).toHaveBeenCalledWith(existingConversationId, 'closed');
+    expect(repository.updateStatus).toHaveBeenCalledWith(
+      existingConversationId,
+      'closed',
+    );
     expect(repository.create).toHaveBeenCalledWith(
       expect.objectContaining({
         clientId,
@@ -132,7 +139,9 @@ describe('ConversationService', () => {
       now,
     });
 
-    expect(repository.findLatestOpenByClientContactAndChannel).toHaveBeenCalledWith({
+    expect(
+      repository.findLatestOpenByClientContactAndChannel,
+    ).toHaveBeenCalledWith({
       clientId,
       contactId,
       channelId,
@@ -172,7 +181,10 @@ describe('ConversationService', () => {
 
     await service.touch(existingConversationId, now);
 
-    expect(repository.updateLastMessageAt).toHaveBeenCalledWith(existingConversationId, now);
+    expect(repository.updateLastMessageAt).toHaveBeenCalledWith(
+      existingConversationId,
+      now,
+    );
   });
 
   it('handles concurrent resolveOrCreate calls safely when duplicate key is raised', async () => {
@@ -209,7 +221,9 @@ describe('ConversationService', () => {
     expect(resultA._id.toString()).toBe(newConversationId.toString());
     expect(resultB._id.toString()).toBe(newConversationId.toString());
     expect(repository.create).toHaveBeenCalledTimes(2);
-    expect(repository.findLatestOpenByClientContactAndChannel).toHaveBeenCalledTimes(3);
+    expect(
+      repository.findLatestOpenByClientContactAndChannel,
+    ).toHaveBeenCalledTimes(3);
     expect(resultA._id.toString()).toBe(resultB._id.toString());
   });
 
@@ -221,7 +235,9 @@ describe('ConversationService', () => {
     };
 
     for (let i = 0; i < 10; i++) {
-      repository.findLatestOpenByClientContactAndChannel.mockResolvedValueOnce(null);
+      repository.findLatestOpenByClientContactAndChannel.mockResolvedValueOnce(
+        null,
+      );
     }
     for (let i = 0; i < 9; i++) {
       repository.findLatestOpenByClientContactAndChannel.mockResolvedValueOnce(
