@@ -9,10 +9,10 @@ import {
   ClientAgent,
   HireChannelConfig,
 } from '@persistence/schemas/client-agent.schema';
-import { createLLMModel } from '@agent/llm/llm.factory';
-import { LlmProvider } from '@agent/llm/provider.enum';
-import { ChannelType } from '@channels/shared/channel-type.type';
-import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
+import { createLLMModel } from '@domain/llm/llm.factory';
+import { LlmProvider } from '@domain/llm/provider.enum';
+import { ChannelType } from '@domain/channels/channel-type.type';
+import { CHANNEL_TYPES } from '@domain/channels/channel-type.constants';
 
 export interface RouteCandidate {
   clientAgent: ClientAgent;

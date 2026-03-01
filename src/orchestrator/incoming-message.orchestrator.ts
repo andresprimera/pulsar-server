@@ -8,15 +8,15 @@ import { AgentContextService } from '@agent/agent-context.service';
 import { AgentRepository } from '@persistence/repositories/agent.repository';
 import { ClientRepository } from '@persistence/repositories/client.repository';
 import { decrypt, decryptRecord } from '@shared/crypto.util';
-import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
+import { CHANNEL_TYPES } from '@domain/channels/channel-type.constants';
+import { ChannelType } from '@domain/channels/channel-type.type';
+import { IncomingChannelEvent } from '@domain/channels/incoming-channel-event.interface';
 import { ContactIdentityResolver } from '@channels/shared/contact-identity.resolver';
-import { IncomingChannelEvent } from '@channels/shared/incoming-channel-event.interface';
 import {
   AgentRoutingService,
   RouteCandidate,
 } from '@domain/routing/agent-routing.service';
 import { ConversationService } from '@domain/conversation/conversation.service';
-import { ChannelType } from '@channels/shared/channel-type.type';
 
 @Injectable()
 export class IncomingMessageOrchestrator {

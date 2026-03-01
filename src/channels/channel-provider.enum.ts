@@ -1,6 +1,1 @@
-export enum ChannelProvider {
-  Meta = 'meta',
-  Twilio = 'twilio',
-  Tiktok = 'tiktok',
-  Instagram = 'instagram',
-}
+export { ChannelProvider } from '@domain/channels/channel-provider.enum';

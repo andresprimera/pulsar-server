@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { MessagePersistenceService } from '@persistence/message-persistence.service';
-import { ConversationSummaryService } from '@agent/conversation-summary.service';
 import { AgentRoutingService } from '@domain/routing/agent-routing.service';
 import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from '@persistence/database.module';
@@ -19,7 +18,6 @@ import { ConversationService } from '@domain/conversation/conversation.service';
   imports: [ConfigModule, DatabaseModule],
   providers: [
     MessagePersistenceService,
-    ConversationSummaryService,
     ConversationService,
     AgentRoutingService,
     ContactIdentityResolver,
@@ -59,7 +57,6 @@ import { ConversationService } from '@domain/conversation/conversation.service';
   ],
   exports: [
     MessagePersistenceService,
-    ConversationSummaryService,
     ConversationService,
     AgentRoutingService,
     ContactIdentityResolver,

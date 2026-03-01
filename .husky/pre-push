@@ -1,4 +1,5 @@
 pnpm lint:fix
 pnpm check
 pnpm test
+pnpm test:architecture
 pnpm test:e2e

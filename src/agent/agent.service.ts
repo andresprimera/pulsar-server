@@ -6,6 +6,7 @@ import { AgentOutput } from './contracts/agent-output';
 import { AgentContext } from './contracts/agent-context';
 import { createLLMModel } from './llm/llm.factory';
 import { MessagePersistenceService } from '@persistence/message-persistence.service';
+import { ConversationSummaryService } from './conversation-summary.service';
 import { MetadataExposureService } from './metadata-exposure.service';
 
 @Injectable()
@@ -14,6 +15,7 @@ export class AgentService {
 
   constructor(
     private readonly messagePersistenceService: MessagePersistenceService,
+    private readonly conversationSummaryService: ConversationSummaryService,
     private readonly metadataExposureService: MetadataExposureService,
   ) {}
 
@@ -94,14 +96,24 @@ export class AgentService {
 
       this.logger.log(`Response generated for ${context.agentId}`);
 
-      // Automatically handle outgoing message persistence
+      // Persist agent response
       await this.messagePersistenceService.handleOutgoingMessage(
         safeText,
         persistenceContext,
         contactId,
-        context,
         conversationId,
       );
+
+      // Trigger async summarization (fire-and-forget)
+      this.conversationSummaryService
+        .checkAndSummarizeIfNeeded(
+          conversationId,
+          new Types.ObjectId(context.agentId),
+          context,
+        )
+        .catch((err) => {
+          this.logger.error(`Background summary check failed: ${err.message}`);
+        });
 
       return {
         reply: {

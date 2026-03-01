@@ -4,12 +4,10 @@ import { WhatsappService } from './whatsapp.service';
 import { IncomingMessageOrchestrator } from '@orchestrator/incoming-message.orchestrator';
 import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
 import { encrypt } from '@shared/crypto.util';
-import { ClientAgentRepository } from '@persistence/repositories/client-agent.repository';
 
 describe('WhatsappService', () => {
   let service: WhatsappService;
   let incomingMessageOrchestrator: jest.Mocked<IncomingMessageOrchestrator>;
-  let clientAgentRepository: jest.Mocked<ClientAgentRepository>;
   let loggerLogSpy: jest.SpyInstance;
   let loggerErrorSpy: jest.SpyInstance;
   let fetchSpy: jest.SpyInstance;
@@ -29,16 +27,11 @@ describe('WhatsappService', () => {
           provide: IncomingMessageOrchestrator,
           useValue: { handle: jest.fn() },
         },
-        {
-          provide: ClientAgentRepository,
-          useValue: { findActiveByPhoneNumberId: jest.fn() },
-        },
       ],
     }).compile();
 
     service = module.get<WhatsappService>(WhatsappService);
     incomingMessageOrchestrator = module.get(IncomingMessageOrchestrator);
-    clientAgentRepository = module.get(ClientAgentRepository);
     loggerLogSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
     loggerErrorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
   });
@@ -116,21 +109,11 @@ describe('WhatsappService', () => {
       });
     });
 
-    it('sends outbound message when orchestrator returns reply', async () => {
+    it('sends outbound message when orchestrator returns reply with channelMeta', async () => {
       incomingMessageOrchestrator.handle.mockResolvedValue({
         reply: { type: 'text', text: 'Echo response' },
+        channelMeta: { encryptedCredentials },
       });
-      clientAgentRepository.findActiveByPhoneNumberId.mockResolvedValue([
-        {
-          channels: [
-            {
-              status: 'active',
-              phoneNumberId: 'phone123',
-              credentials: encryptedCredentials,
-            },
-          ],
-        } as any,
-      ]);
 
       await service.handleIncoming(createPayload());
 
@@ -151,18 +134,8 @@ describe('WhatsappService', () => {
     it('logs API error and does not throw', async () => {
       incomingMessageOrchestrator.handle.mockResolvedValue({
         reply: { type: 'text', text: 'Echo response' },
+        channelMeta: { encryptedCredentials },
       });
-      clientAgentRepository.findActiveByPhoneNumberId.mockResolvedValue([
-        {
-          channels: [
-            {
-              status: 'active',
-              phoneNumberId: 'phone123',
-              credentials: encryptedCredentials,
-            },
-          ],
-        } as any,
-      ]);
       fetchSpy.mockResolvedValueOnce({
         ok: false,
         status: 500,

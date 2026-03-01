@@ -13,8 +13,8 @@ import { AgentRepository } from '@persistence/repositories/agent.repository';
 import { ChannelRepository } from '@persistence/repositories/channel.repository';
 import { ClientAgentRepository } from '@persistence/repositories/client-agent.repository';
 import { ClientPhoneRepository } from '@persistence/repositories/client-phone.repository';
-import { LlmProvider } from '@agent/llm/provider.enum';
-import { ChannelProvider } from '@channels/channel-provider.enum';
+import { LlmProvider } from '@domain/llm/provider.enum';
+import { ChannelProvider } from '@domain/channels/channel-provider.enum';
 
 describe('OnboardingService', () => {
   let service: OnboardingService;

@@ -1,7 +1,1 @@
-export type ChannelType =
-  | 'whatsapp'
-  | 'telegram'
-  | 'web'
-  | 'api'
-  | 'tiktok'
-  | 'instagram';
+export { ChannelType } from '@domain/channels/channel-type.type';

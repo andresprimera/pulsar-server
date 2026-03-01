@@ -4,11 +4,11 @@ import { IncomingMessageOrchestrator } from './incoming-message.orchestrator';
 import { AgentService } from '@agent/agent.service';
 import { AgentRepository } from '@persistence/repositories/agent.repository';
 import { ClientRepository } from '@persistence/repositories/client.repository';
-import { LlmProvider } from '@agent/llm/provider.enum';
+import { LlmProvider } from '@domain/llm/provider.enum';
+import { CHANNEL_TYPES } from '@domain/channels/channel-type.constants';
 import { AgentRoutingService } from '@domain/routing/agent-routing.service';
 import { AgentContextService } from '@agent/agent-context.service';
 import { ContactIdentityResolver } from '@channels/shared/contact-identity.resolver';
-import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
 import { ConversationService } from '@domain/conversation/conversation.service';
 
 describe('IncomingMessageOrchestrator', () => {

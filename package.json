@@ -24,7 +24,9 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "prepare": "husky",
-    "seed": "ts-node src/persistence/seed.ts"
+    "seed": "ts-node src/persistence/seed.ts",
+    "test:architecture": "jest --config ./test/jest-architecture.json",
+    "check:cycles": "madge --circular src --extensions ts --ts-config ./tsconfig.json"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.34",
@@ -62,6 +64,7 @@
     "eslint-plugin-prettier": "^4.0.0",
     "husky": "^9.1.7",
     "jest": "29.5.0",
+    "madge": "^8.0.0",
     "prettier": "^2.3.2",
     "source-map-support": "^0.5.20",
     "supertest": "^6.1.3",

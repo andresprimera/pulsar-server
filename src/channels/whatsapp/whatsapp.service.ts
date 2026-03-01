@@ -8,7 +8,6 @@ import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
 import { IncomingMessageOrchestrator } from '@orchestrator/incoming-message.orchestrator';
 import { IncomingChannelEvent } from '@channels/shared/incoming-channel-event.interface';
 import { decryptRecord } from '@shared/crypto.util';
-import { ClientAgentRepository } from '@persistence/repositories/client-agent.repository';
 
 @Injectable()
 export class WhatsappService {
@@ -17,7 +16,6 @@ export class WhatsappService {
 
   constructor(
     private readonly incomingMessageOrchestrator: IncomingMessageOrchestrator,
-    private readonly clientAgentRepository: ClientAgentRepository,
   ) {
     this.config = loadWhatsAppConfig();
   }
@@ -73,7 +71,9 @@ export class WhatsappService {
       return;
     }
 
-    const credentials = await this.resolveOutboundCredentials(event);
+    const credentials = this.resolveCredentialsFromChannelMeta(
+      output.channelMeta?.encryptedCredentials,
+    );
     if (!credentials) {
       this.logger.warn(
         `[WhatsApp] Unable to send outbound message for phoneNumberId=${phoneNumberId}: missing credentials.`,
@@ -100,27 +100,21 @@ export class WhatsappService {
     }
   }
 
-  private async resolveOutboundCredentials(
-    event: IncomingChannelEvent,
-  ): Promise<{ phoneNumberId: string; accessToken: string } | undefined> {
-    const clientAgents =
-      await this.clientAgentRepository.findActiveByPhoneNumberId(
-        event.routeChannelIdentifier,
-      );
-
-    const channelConfig = clientAgents
-      .flatMap((clientAgent) => clientAgent.channels)
-      .find(
-        (channel) =>
-          channel.status === 'active' &&
-          channel.phoneNumberId === event.routeChannelIdentifier,
-      );
-
-    if (!channelConfig?.credentials) {
+  private resolveCredentialsFromChannelMeta(
+    encryptedCredentials: unknown,
+  ): { phoneNumberId: string; accessToken: string } | undefined {
+    if (
+      !encryptedCredentials ||
+      typeof encryptedCredentials !== 'object' ||
+      Array.isArray(encryptedCredentials)
+    ) {
       return undefined;
     }
 
-    const decryptedCredentials = decryptRecord(channelConfig.credentials);
+    const decryptedCredentials = decryptRecord(
+      encryptedCredentials as Record<string, any>,
+    );
+
     if (
       !decryptedCredentials.phoneNumberId ||
       !decryptedCredentials.accessToken

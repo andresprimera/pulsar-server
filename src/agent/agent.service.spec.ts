@@ -4,6 +4,7 @@ import { AgentInput } from './contracts/agent-input';
 import { AgentContext } from './contracts/agent-context';
 import { LlmProvider } from './llm/provider.enum';
 import { MessagePersistenceService } from '@persistence/message-persistence.service';
+import { ConversationSummaryService } from './conversation-summary.service';
 import { MetadataExposureService } from './metadata-exposure.service';
 import * as llmFactory from './llm/llm.factory';
 import * as ai from 'ai';
@@ -58,6 +59,12 @@ describe('AgentService', () => {
             createUserMessage: jest.fn(),
             getConversationContextByConversationId: jest.fn(),
             handleOutgoingMessage: jest.fn(),
+          },
+        },
+        {
+          provide: ConversationSummaryService,
+          useValue: {
+            checkAndSummarizeIfNeeded: jest.fn().mockResolvedValue(undefined),
           },
         },
         MetadataExposureService,
@@ -147,7 +154,6 @@ describe('AgentService', () => {
           contactId: '507f1f77bcf86cd799439012',
         },
         expect.anything(),
-        mockContext,
         expect.anything(),
       );
 

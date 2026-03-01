@@ -1,8 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { MessageRepository } from '@persistence/repositories/message.repository';
-import { ConversationSummaryService } from '@agent/conversation-summary.service';
-import { AgentContext } from '@agent/contracts/agent-context';
 import { ConversationService } from '@domain/conversation/conversation.service';
 import { Conversation } from '@persistence/schemas/conversation.schema';
 
@@ -21,7 +19,6 @@ export class MessagePersistenceService {
 
   constructor(
     private readonly messageRepository: MessageRepository,
-    private readonly conversationSummaryService: ConversationSummaryService,
     private readonly conversationService: ConversationService,
   ) {}
 
@@ -155,43 +152,14 @@ export class MessagePersistenceService {
   }
 
   /**
-   * Triggers async token counting and summary generation if needed
-   * This is fire-and-forget and will not block the response flow
-   */
-  triggerSummarization(
-    conversationId: Types.ObjectId,
-    agentId: Types.ObjectId,
-    agentContext: AgentContext,
-  ): void {
-    this.conversationSummaryService
-      .checkAndSummarizeIfNeeded(conversationId, agentId, agentContext)
-      .catch((err) => {
-        this.logger.error(`Background summary check failed: ${err.message}`);
-      });
-  }
-
-  /**
    * Complete message persistence flow for outgoing agent responses
    */
   async handleOutgoingMessage(
     content: string,
     context: MessagePersistenceContext,
     contactId: Types.ObjectId,
-    agentContext: AgentContext,
     conversationId?: Types.ObjectId,
   ): Promise<void> {
-    // Save agent message
     await this.saveAgentMessage(content, context, contactId, conversationId);
-
-    // Trigger async summarization check
-    const resolvedConversationId =
-      conversationId ||
-      (await this.resolveConversation(context, contactId))._id;
-
-    this.triggerSummarization(
-      resolvedConversationId as Types.ObjectId,
-      new Types.ObjectId(context.agentId),
-      agentContext,
-    );
   }
 }
