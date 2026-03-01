@@ -1,78 +1,18 @@
-# Credential & Encryption Rules
+# Credential Encryption Rules
 
-## Encryption at Rest
-- All API keys and credentials MUST be encrypted before storage using `encrypt()` / `encryptRecord()` from `src/database/utils/crypto.util.ts`
-- Credential fields in schemas MUST use `select: false` to prevent accidental exposure
-- Queries that need credentials MUST explicitly `.select('+fieldName')`
+`docs/rules/ARCHITECTURE_CONTRACT.md` has higher priority than this file.
 
-### Example — Schema
-```typescript
-@Prop({ type: Object, required: true, select: false })
-credentials: Record<string, any>;
+## Mandatory
+- Encrypt API keys and secret credentials at rest using the shared crypto utility.
+- Sensitive credential fields must default to `select: false`.
+- Any read path that needs credentials must explicitly opt in with `.select('+...')`.
+- Decrypt only at execution boundary where the secret is required.
 
-@Prop({ required: true, select: false })
-apiKey: string;
-```
+## Routing identifiers
+- Routing keys used for lookup/indexing may remain unencrypted.
+- Only non-secret identifiers are allowed in unencrypted routing fields.
+- Keep secret tokens/keys encrypted even when adjacent routing identifiers are plaintext.
 
-### Example — Repository query that needs credentials
-```typescript
-async findActiveByPhoneNumberId(phoneNumberId: string): Promise<ClientAgent[]> {
-  return this.model
-    .find({
-      status: 'active',
-      channels: { $elemMatch: { status: 'active', phoneNumberId } },
-    })
-    .select('+channels.credentials +channels.llmConfig.apiKey')
-    .exec();
-}
-```
-
-### Example — Encrypting before storage (service layer)
-```typescript
-channels.push({
-  credentials: encryptRecord(channelConfig.credentials),
-  llmConfig: {
-    ...channelConfig.llmConfig,
-    apiKey: encrypt(channelConfig.llmConfig.apiKey),
-  },
-});
-```
-
-## Unencrypted Routing Keys
-
-Channel routing identifiers are stored **unencrypted** alongside encrypted credentials for fast DB lookups. This is intentional — these keys are not secrets, they are identifiers needed for query indexing.
-
-- `phoneNumberId` — WhatsApp routing
-- `tiktokUserId` — TikTok routing
-- `instagramAccountId` — Instagram routing
-
-These are extracted from `credentials` **before** encryption and stored at the top level of the embedded `HireChannelConfig` document with `index: true`.
-
-### Example — Extracting routing keys before encryption
-```typescript
-let phoneNumberId: string | undefined;
-if (channelConfig.credentials && 'phoneNumberId' in channelConfig.credentials) {
-  phoneNumberId = channelConfig.credentials.phoneNumberId;
-}
-
-channels.push({
-  credentials: encryptRecord(channelConfig.credentials), // encrypted
-  phoneNumberId,  // unencrypted, indexed
-});
-```
-
-## Crypto Utility Reference
-
-**File:** `src/database/utils/crypto.util.ts`
-
-| Function | Purpose |
-|----------|---------|
-| `encrypt(text)` | Encrypt a single string (AES-256-GCM) |
-| `decrypt(payload)` | Decrypt a single string |
-| `encryptRecord(record)` | Encrypt all string values in an object (shallow) |
-| `decryptRecord(record)` | Decrypt values matching encrypted format |
-| `isEncryptedPayload(value)` | Check if a string looks like an encrypted payload |
-
-**Behavior by environment:**
-- `NODE_ENV !== 'production'` → returns plaintext (no encryption)
-- `NODE_ENV === 'production'` → encrypts using `SECRET_ENCRYPTION_KEY` env var
+## Environment behavior
+- Non-production may return plaintext for local/dev ergonomics.
+- Production must encrypt/decrypt using `SECRET_ENCRYPTION_KEY`.
