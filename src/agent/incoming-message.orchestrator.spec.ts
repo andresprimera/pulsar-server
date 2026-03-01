@@ -190,6 +190,9 @@ describe('IncomingMessageOrchestrator', () => {
 
       expect(output).toEqual({
         reply: { type: 'text', text: 'Hello' },
+        channelMeta: {
+          encryptedCredentials: mockClientAgent.channels[0].credentials,
+        },
       });
       expect(agentService.run).toHaveBeenCalledWith(
         expect.objectContaining({

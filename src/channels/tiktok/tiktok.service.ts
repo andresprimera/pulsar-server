@@ -1,24 +1,28 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { decryptRecord } from '../../database/utils/crypto.util';
-import { TIKTOK_API_BASE_URL } from './tiktok.config';
+import {
+  buildMessagesUrl,
+  loadTikTokConfig,
+  TikTokServerConfig,
+} from './tiktok.config';
 import { CHANNEL_TYPES } from '../shared/channel-type.constants';
 import { IncomingMessageOrchestrator } from '../../agent/incoming-message.orchestrator';
 import { IncomingChannelEvent } from '../shared/incoming-channel-event.interface';
-import { AgentRoutingService } from '../shared/agent-routing.service';
 
 @Injectable()
 export class TiktokService {
   private readonly logger = new Logger(TiktokService.name);
+  private readonly config: TikTokServerConfig;
 
   constructor(
     private readonly incomingMessageOrchestrator: IncomingMessageOrchestrator,
-    private readonly agentRoutingService: AgentRoutingService,
-  ) {}
+  ) {
+    this.config = loadTikTokConfig();
+  }
 
   async handleIncoming(payload: any): Promise<void> {
-    this.logger.log(
-      `[TikTok] Incoming payload: ${JSON.stringify(payload)}`,
-    );
+    // TODO (Phase C): Add idempotency guard using (channelId + messageId)
+    this.logger.log(`[TikTok] Incoming message event`);
 
     if (payload?.event !== 'message.received') {
       return;
@@ -41,16 +45,34 @@ export class TiktokService {
       return;
     }
 
+    const messageText = data.message?.text;
+    if (!messageText) {
+      this.logger.warn('[TikTok] Missing message.text in payload.');
+      return;
+    }
+
+    const conversationId = data.conversation_id;
+    if (!conversationId) {
+      this.logger.warn('[TikTok] Missing conversation_id in payload.');
+      return;
+    }
+
+    const messageId = data.message_id;
+    if (!messageId) {
+      this.logger.warn('[TikTok] Missing message_id in payload.');
+      return;
+    }
+
     this.logger.log(
-      `[TikTok] Incoming message from sender=${data.sender?.user_id} to recipient=${recipientUserId}`,
+      `[TikTok] Incoming message recipientUserId=${recipientUserId} senderUserId=${senderUserId} messageId=${messageId}`,
     );
 
     const incomingEvent: IncomingChannelEvent = {
       channelId: CHANNEL_TYPES.TIKTOK,
       routeChannelIdentifier: recipientUserId,
       channelIdentifier: senderUserId,
-      messageId: data.message_id,
-      text: data.message.text,
+      messageId,
+      text: messageText,
       rawPayload: payload,
     };
 
@@ -59,7 +81,9 @@ export class TiktokService {
       return;
     }
 
-    const accessToken = await this.resolveAccessToken(incomingEvent);
+    const accessToken = this.resolveAccessTokenFromChannelConfig(
+      output.channelMeta?.encryptedCredentials,
+    );
     if (!accessToken) {
       this.logger.warn(
         `[TikTok] Unable to send outbound message for tiktokUserId=${recipientUserId}: missing credentials.`,
@@ -73,39 +97,33 @@ export class TiktokService {
 
     try {
       await this.sendMessage({
-        recipientId: data.sender.user_id,
-        conversationId: data.conversation_id,
+        recipientId: senderUserId,
+        conversationId,
         text: output.reply.text,
         accessToken,
       });
       this.logger.log(`[TikTok] Reply sent successfully.`);
     } catch (error) {
-      this.logger.error(`[TikTok] Failed to send reply: ${error.message}`);
+      this.logger.error(
+        `[TikTok] Failed to send reply: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
-  private async resolveAccessToken(
-    event: IncomingChannelEvent,
-  ): Promise<string | undefined> {
-    const routeDecision = await this.agentRoutingService.resolveRoute({
-      routeChannelIdentifier: event.routeChannelIdentifier,
-      channelIdentifier: event.channelIdentifier,
-      incomingText: event.text,
-      channelType: CHANNEL_TYPES.TIKTOK,
-    });
-
-    const channelConfig =
-      routeDecision.kind === 'resolved'
-        ? routeDecision.candidate.channelConfig
-        : routeDecision.kind === 'ambiguous'
-          ? routeDecision.candidates[0]?.channelConfig
-          : undefined;
-
-    if (!channelConfig?.credentials) {
+  private resolveAccessTokenFromChannelConfig(
+    encryptedCredentials: unknown,
+  ): string | undefined {
+    if (
+      !encryptedCredentials ||
+      typeof encryptedCredentials !== 'object' ||
+      Array.isArray(encryptedCredentials)
+    ) {
       return undefined;
     }
 
-    const decryptedCredentials = decryptRecord(channelConfig.credentials);
+    const decryptedCredentials = decryptRecord(
+      encryptedCredentials as Record<string, any>,
+    );
     return decryptedCredentials.accessToken;
   }
 
@@ -117,7 +135,7 @@ export class TiktokService {
   }): Promise<void> {
     const { recipientId, conversationId, text, accessToken } = params;
 
-    const url = `${TIKTOK_API_BASE_URL}/message/send/`;
+    const url = buildMessagesUrl(this.config);
 
     const response = await fetch(url, {
       method: 'POST',

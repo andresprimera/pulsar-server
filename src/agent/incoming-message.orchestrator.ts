@@ -61,6 +61,9 @@ export class IncomingMessageOrchestrator {
           type: 'text',
           text: prompt,
         },
+        channelMeta: {
+          encryptedCredentials: fallback.channelConfig.credentials,
+        },
       };
     }
 
@@ -147,7 +150,16 @@ export class IncomingMessageOrchestrator {
       await this.conversationService.touch(conversation._id as Types.ObjectId);
     }
 
-    return output;
+    if (!output) {
+      return output;
+    }
+
+    return {
+      ...output,
+      channelMeta: {
+        encryptedCredentials: channelConfig.credentials,
+      },
+    };
   }
 
   private getLogPrefix(channelId: string): string {

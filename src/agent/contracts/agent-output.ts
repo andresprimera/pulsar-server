@@ -3,4 +3,7 @@ export interface AgentOutput {
     type: 'text';
     text: string;
   };
+  channelMeta?: {
+    encryptedCredentials?: unknown;
+  };
 }

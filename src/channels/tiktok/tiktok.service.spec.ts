@@ -2,13 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
 import { TiktokService } from './tiktok.service';
 import { IncomingMessageOrchestrator } from '../../agent/incoming-message.orchestrator';
-import { AgentRoutingService } from '../shared/agent-routing.service';
 import { encrypt } from '../../database/utils/crypto.util';
 
 describe('TiktokService', () => {
   let service: TiktokService;
   let incomingMessageOrchestrator: jest.Mocked<IncomingMessageOrchestrator>;
-  let agentRoutingService: jest.Mocked<AgentRoutingService>;
   let loggerWarnSpy: jest.SpyInstance;
   let loggerErrorSpy: jest.SpyInstance;
   let fetchSpy: jest.SpyInstance;
@@ -27,16 +25,11 @@ describe('TiktokService', () => {
           provide: IncomingMessageOrchestrator,
           useValue: { handle: jest.fn() },
         },
-        {
-          provide: AgentRoutingService,
-          useValue: { resolveRoute: jest.fn() },
-        },
       ],
     }).compile();
 
     service = module.get(TiktokService);
     incomingMessageOrchestrator = module.get(IncomingMessageOrchestrator);
-    agentRoutingService = module.get(AgentRoutingService);
 
     loggerWarnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
     loggerErrorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
@@ -91,13 +84,8 @@ describe('TiktokService', () => {
       };
       incomingMessageOrchestrator.handle.mockResolvedValue({
         reply: { text: 'Hello back!', type: 'text' },
+        channelMeta: { encryptedCredentials },
       });
-      agentRoutingService.resolveRoute.mockResolvedValue({
-        kind: 'resolved',
-        candidate: {
-          channelConfig: { credentials: encryptedCredentials },
-        },
-      } as any);
 
       await service.handleIncoming(createPayload());
 
@@ -125,13 +113,8 @@ describe('TiktokService', () => {
       };
       incomingMessageOrchestrator.handle.mockResolvedValue({
         reply: { text: 'Hello back!', type: 'text' },
+        channelMeta: { encryptedCredentials },
       });
-      agentRoutingService.resolveRoute.mockResolvedValue({
-        kind: 'resolved',
-        candidate: {
-          channelConfig: { credentials: encryptedCredentials },
-        },
-      } as any);
       fetchSpy.mockResolvedValueOnce({
         ok: false,
         status: 400,
