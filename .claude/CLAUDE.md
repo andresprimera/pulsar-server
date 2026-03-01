@@ -210,3 +210,16 @@ Success = minimal diff + zero regressions + full alignment.
 2. Check ARCHITECTURE_CONTRACT.md.
 3. Prefer consistency over creativity.
 4. If conflict appears, request clarification.
+
+---
+
+# 16. Mandatory Architecture Review (Final Step)
+
+Every implementation plan MUST include a final step that runs the architecture steward agent (`architecture-steward`) against the changes introduced by the plan.
+
+Rules:
+- After all code changes are complete and tests pass, run the architecture steward agent.
+- If the agent returns **REJECTED**, fix every violation it identifies.
+- Re-run the agent after fixes until it returns **APPROVED**.
+- Do NOT consider the plan complete until the architecture steward approves.
+- This step is non-negotiable and cannot be skipped.
