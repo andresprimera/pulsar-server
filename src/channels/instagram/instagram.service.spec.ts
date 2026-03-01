@@ -2,13 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException } from '@nestjs/common';
 import { InstagramService } from './instagram.service';
 import { IncomingMessageOrchestrator } from '../../agent/incoming-message.orchestrator';
-import { AgentRoutingService } from '../shared/agent-routing.service';
 import { encrypt } from '../../database/utils/crypto.util';
 
 describe('InstagramService', () => {
   let service: InstagramService;
   let incomingMessageOrchestrator: jest.Mocked<IncomingMessageOrchestrator>;
-  let agentRoutingService: jest.Mocked<AgentRoutingService>;
   let fetchSpy: jest.SpyInstance;
 
   beforeEach(async () => {
@@ -29,16 +27,11 @@ describe('InstagramService', () => {
           provide: IncomingMessageOrchestrator,
           useValue: { handle: jest.fn() },
         },
-        {
-          provide: AgentRoutingService,
-          useValue: { resolveRoute: jest.fn() },
-        },
       ],
     }).compile();
 
     service = module.get(InstagramService);
     incomingMessageOrchestrator = module.get(IncomingMessageOrchestrator);
-    agentRoutingService = module.get(AgentRoutingService);
   });
 
   afterEach(() => {
@@ -69,11 +62,8 @@ describe('InstagramService', () => {
 
     incomingMessageOrchestrator.handle.mockResolvedValue({
       reply: { type: 'text', text: 'Instagram reply' },
+      channelMeta: { encryptedCredentials: encryptedCreds },
     });
-    agentRoutingService.resolveRoute.mockResolvedValue({
-      kind: 'resolved',
-      candidate: { channelConfig: { credentials: encryptedCreds } },
-    } as any);
 
     await service.handleIncoming({
       entry: [

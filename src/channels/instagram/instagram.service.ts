@@ -9,7 +9,6 @@ import {
 import { CHANNEL_TYPES } from '../shared/channel-type.constants';
 import { IncomingMessageOrchestrator } from '../../agent/incoming-message.orchestrator';
 import { IncomingChannelEvent } from '../shared/incoming-channel-event.interface';
-import { AgentRoutingService } from '../shared/agent-routing.service';
 
 @Injectable()
 export class InstagramService {
@@ -19,7 +18,6 @@ export class InstagramService {
 
   constructor(
     private readonly incomingMessageOrchestrator: IncomingMessageOrchestrator,
-    private readonly agentRoutingService: AgentRoutingService,
   ) {
     this.config = loadInstagramConfig();
   }
@@ -162,7 +160,9 @@ export class InstagramService {
           continue;
         }
 
-        const accessToken = await this.resolveAccessToken(incomingEvent);
+        const accessToken = this.resolveAccessTokenFromChannelMeta(
+          output.channelMeta?.encryptedCredentials,
+        );
         if (!accessToken) {
           this.logger.warn(
             `[Instagram] Unable to send outbound message for instagramAccountId=${instagramAccountId}: missing credentials.`,
@@ -180,28 +180,20 @@ export class InstagramService {
     }
   }
 
-  private async resolveAccessToken(
-    event: IncomingChannelEvent,
-  ): Promise<string | undefined> {
-    const routeDecision = await this.agentRoutingService.resolveRoute({
-      routeChannelIdentifier: event.routeChannelIdentifier,
-      channelIdentifier: event.channelIdentifier,
-      incomingText: event.text,
-      channelType: CHANNEL_TYPES.INSTAGRAM,
-    });
-
-    const channelConfig =
-      routeDecision.kind === 'resolved'
-        ? routeDecision.candidate.channelConfig
-        : routeDecision.kind === 'ambiguous'
-          ? routeDecision.candidates[0]?.channelConfig
-          : undefined;
-
-    if (!channelConfig?.credentials) {
+  private resolveAccessTokenFromChannelMeta(
+    encryptedCredentials: unknown,
+  ): string | undefined {
+    if (
+      !encryptedCredentials ||
+      typeof encryptedCredentials !== 'object' ||
+      Array.isArray(encryptedCredentials)
+    ) {
       return undefined;
     }
 
-    const decryptedCredentials = decryptRecord(channelConfig.credentials);
+    const decryptedCredentials = decryptRecord(
+      encryptedCredentials as Record<string, any>,
+    );
     return decryptedCredentials.accessToken;
   }
 }
