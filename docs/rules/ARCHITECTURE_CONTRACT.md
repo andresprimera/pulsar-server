@@ -7,6 +7,7 @@ These rules are mechanically enforced via:
 - Path aliases
 - CI lint checks
 - Import restrictions
+- Architecture tests
 
 No change may violate this contract.
 
@@ -16,17 +17,27 @@ No change may violate this contract.
 
 The system is divided into five strict layers:
 
-1. Transport Layer (channels/)
-2. Application Layer (orchestrator/)
-3. LLM Execution Layer (agent/)
-4. Domain Layer (domain/)
-5. Persistence Layer (persistence/)
+1. Transport Layer (`channels/`)
+2. Coordination Layer (`orchestrator/`)
+3. LLM Execution Layer (`agent/`)
+4. Domain Layer (`domain/`)
+5. Persistence Layer (`persistence/`)
 
-Dependency flow is strictly downward:
+## Allowed Dependency Flow
 
-channels → orchestrator → agent → domain → persistence
+channels → orchestrator
 
-Upward imports are forbidden.
+orchestrator → domain  
+orchestrator → agent  
+orchestrator → persistence (idempotency only)
+
+agent → domain  
+agent → persistence  
+
+Domain → (no outward dependencies)  
+Persistence → (no outward dependencies)
+
+Upward or sideways imports are forbidden.
 
 ---
 
@@ -38,10 +49,9 @@ Responsibilities:
 - Payload parsing
 - Construct IncomingChannelEvent
 - Call IncomingMessageOrchestrator
-- Decrypt credentials
-- Send outbound transport messages
+- Send outbound platform messages
 
-Transport layer MUST NOT:
+Transport MUST NOT:
 - Import repositories
 - Import persistence layer
 - Import AgentService
@@ -50,19 +60,22 @@ Transport layer MUST NOT:
 - Persist messages
 - Build AgentContext
 
-Transport is I/O only.
+Transport is pure I/O.
 
 ---
 
-# 3. Application Layer (orchestrator/)
+# 3. Coordination Layer (orchestrator/)
 
 Responsibilities:
+- Enforce event idempotency (Phase C)
 - Resolve routing
 - Resolve contact identity
 - Resolve or create conversation
 - Build AgentContext
 - Call AgentService
 - Return reply + encrypted channel metadata
+
+Orchestrator owns event lifecycle.
 
 Orchestrator MUST NOT:
 - Send outbound HTTP requests
@@ -77,8 +90,9 @@ Orchestrator MUST NOT:
 Responsibilities:
 - Execute LLM calls
 - Persist messages via MessagePersistenceService
-- Trigger summarization
+- Trigger conversation summarization
 - Apply metadata exposure filtering
+- Maintain bounded conversation memory
 
 Agent MUST NOT:
 - Access transport layer
@@ -93,8 +107,8 @@ Agent MUST NOT:
 Responsibilities:
 - Conversation lifecycle logic
 - Routing logic
-- Contact business rules
-- Pure business invariants
+- Contact business invariants
+- Pure business rules
 
 Domain MUST NOT:
 - Call LLM
@@ -102,7 +116,7 @@ Domain MUST NOT:
 - Send HTTP requests
 - Directly write to database
 
-Domain is business logic only.
+Domain is framework-agnostic logic.
 
 ---
 
@@ -112,35 +126,50 @@ Responsibilities:
 - Database writes
 - Repository access
 - Idempotency enforcement (Phase C)
-- Token counting
+- Message storage
+- Conversation storage
 - Summary storage
 
 Persistence MUST NOT:
 - Call LLM
-- Access transport layer
+- Access transport
 - Import orchestrator
-- Import agent layer
+- Import agent
 
-Persistence owns data integrity.
-
----
-
-# 7. Summary Compression Rules (Phase D)
-
-- Summary stored as type="summary"
-- Only messages AFTER last summary are used for context
-- Summarization must be asynchronous
-- No channel awareness of summaries
-- No blocking LLM response on summarization
+Persistence owns data integrity and atomic guarantees.
 
 ---
 
-# 8. Idempotency Rules (Phase C – Future)
+# 7. Idempotency (Phase C – Active)
 
-- Enforced at persistence layer
-- Unique constraint: (channelId + messageId)
-- Duplicate insert prevents LLM execution
-- Channels remain stateless
+Idempotency is mandatory.
+
+Rules:
+- Unique compound index: (channel, messageId)
+- Enforced before routing
+- Duplicate events must NOT:
+  - Call AgentService
+  - Persist messages
+  - Trigger summary
+  - Touch conversation
+- In-memory deduplication is forbidden
+
+Exactly-once semantics per inbound message are required.
+
+---
+
+# 8. Summary Compression (Phase D – Active)
+
+Conversation memory must remain bounded.
+
+Rules:
+- Summary stored at conversation level
+- Only messages after last summary are sent to LLM
+- Summarization must run asynchronously
+- LLM responses must not block on summarization
+- Channels must not know summaries exist
+
+This guarantees long-term memory stability.
 
 ---
 
@@ -161,7 +190,7 @@ Relative parent imports across layers are forbidden.
 
 # 10. Architectural Violations
 
-The following are considered violations:
+Violations include:
 
 - Channel importing repository
 - Agent importing channel
@@ -169,6 +198,7 @@ The following are considered violations:
 - Direct LLM call outside AgentService
 - Transport API call outside channels
 - Circular dependency between layers
+- Bypassing idempotency
 
 Violations must fail lint and CI.
 
@@ -178,14 +208,11 @@ Violations must fail lint and CI.
 
 Before implementing a change:
 
-1. Identify the target layer.
-2. Confirm no upward dependencies are introduced.
-3. Confirm imports use aliases.
-4. Confirm ESLint passes.
-5. Confirm no boundary rules are violated.
-
-If multiple layers must change, justification is required.
-
----
+1. Identify target layer.
+2. Confirm dependency direction is valid.
+3. Confirm aliases are used.
+4. Confirm lint passes.
+5. Confirm architecture tests pass.
+6. Confirm idempotency and summary rules remain intact.
 
 This contract is mandatory.

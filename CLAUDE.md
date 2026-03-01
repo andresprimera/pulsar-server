@@ -1,100 +1,212 @@
-# Project Coding Rules & Architecture Guardrails
+# Pulsar Coding Rules & Guardrails
 
-NestJS + MongoDB (Mongoose) backend. Follow established patterns. Do not break existing behavior.
+This document defines implementation discipline.
 
-## 1. Layered Architecture (DO NOT VIOLATE)
+ARCHITECTURE_CONTRACT.md is the source of truth for structural rules.
+If any conflict exists, ARCHITECTURE_CONTRACT.md wins.
 
-**Controller** → HTTP only, no logic, delegates to services
-**Service** → Business logic, lifecycle enforcement, uses repositories only
-**Repository** → ONLY layer that accesses Mongoose models, pure data access
+Do not redefine architecture here.
 
-❌ Do NOT skip layers ❌ Do NOT access models outside repositories ❌ Do NOT add logic to controllers
+---
 
-## 2. Database & Lifecycle
+# 1. Architectural Authority
 
-- Schemas: `src/database/schemas` | Repositories: `src/database/repositories`
-- `DatabaseModule` is `@Global()` — registers all repos, no need to import in feature modules
-- **No hard deletes** — use `status: active | inactive | archived`
-- Archived entities: cannot be modified, cannot change status, must remain readable
-- Lifecycle rules enforced in **services**, not controllers
-- Service `create()` MUST explicitly set `status: 'active'`
+All structural rules are defined in:
 
-## 3. Validation & DTOs
+- ARCHITECTURE_CONTRACT.md
+- architectural-layers.md
 
-- All input via DTOs with `class-validator` decorators, co-located with feature module
-- `@Transform` MUST appear before `@IsEnum` (normalize provider strings to lowercase)
-- Use NestJS `ValidationPipe()` with default options — do NOT change config
+You must:
 
-❌ Do NOT validate manually in controllers ❌ Do NOT trust raw input
+- Respect layer boundaries
+- Use path aliases
+- Preserve idempotency rules
+- Preserve conversation lifecycle rules
+- Preserve summary compression rules
 
-## 4. Modules & Registration
+If unsure, read ARCHITECTURE_CONTRACT.md before implementing.
 
-- Each feature has its own module (controller + service)
-- Repositories registered ONLY in `DatabaseModule`
-- Use NestJS `Logger` class (not `console.log`): `private readonly logger = new Logger(ClassName.name)`
+---
 
-❌ Do NOT register repositories in feature modules ❌ Do NOT create circular dependencies
+# 2. Controllers
 
-## 5. API Design
+Controllers are HTTP transport only.
 
-- RESTful conventions, thin controllers
-- `PATCH /:id` → update fields | `PATCH /:id/status` → lifecycle only
+They:
+- Validate input via DTO
+- Delegate to services
+- Do not contain business logic
 
-## 6. Error Handling
+Do not:
+- Access repositories
+- Call Mongoose models
+- Perform lifecycle validation
+- Perform routing logic
 
-- Use NestJS exceptions (`NotFoundException`, `BadRequestException`, `ConflictException`)
-- Repositories return `null` for not-found — services decide whether to throw
+---
 
-❌ Do NOT return null/false for errors ❌ Do NOT swallow exceptions
+# 3. Services
 
-## 7. Credential Security
+Services:
+- Contain business logic
+- Enforce lifecycle invariants
+- Use repositories only for data access
+- Never access models directly
 
-- Encrypt all API keys/credentials before storage: `encrypt()` / `encryptRecord()` from `src/database/utils/crypto.util.ts`
-- Schema credential fields MUST use `select: false` — queries `.select('+field')` when needed
-- Routing keys (`phoneNumberId`, `tiktokUserId`, `instagramAccountId`) stored **unencrypted** for indexed lookups
+Service create() must explicitly set `status: 'active'`.
 
-→ Details: `docs/rules/credential-encryption.md`
+Lifecycle rules are enforced in services, not controllers.
 
-## 8. Channel Integration
+---
 
-- Follow `src/channels/whatsapp/` pattern: `config.ts` + `service.ts` + `controller.ts` + `module.ts`
-- MUST use `AgentRoutingService.resolveRoute()` — handle `resolved`, `ambiguous`, `unroutable`
-- MUST call `AgentContextService.enrichContext()` before `AgentService.run()` — enriches system prompt with client/agent identity
-- Do NOT persist messages manually — `AgentService.run()` handles it via `MessagePersistenceService`
-- LLM calls via Vercel AI SDK (`generateText`) through `createLLMModel()` — never import provider SDKs directly
+# 4. Repositories
 
-→ Details: `docs/rules/channel-integration.md` | `docs/rules/context-enrichment.md`
+Repositories:
+- Are the only layer allowed to access Mongoose models
+- Contain pure data access logic
+- Return `null` for not-found
+- Never throw HTTP exceptions
 
-## 9. Data Modeling
+Services decide whether to throw.
 
-- Embedded subdocuments: `@Schema({ _id: false })` + `SchemaFactory.createForClass()`
-- Indexes: `index: true` on queried fields, compound indexes for routing, unique for business constraints
-- Atomic multi-document writes: use MongoDB transactions with `session` parameter
+---
 
-→ Details: `docs/rules/data-modeling.md`
+# 5. Database & Lifecycle Rules
 
-## 10. Guardrails
+- No hard deletes.
+- Use `status: active | inactive | archived`.
+- Archived entities:
+  - Cannot be modified
+  - Cannot change status
+  - Must remain readable
 
-- **Backward compatibility**: Do NOT break endpoints, rename fields, or change behavior unless requested
-- **Scope discipline**: Implement ONLY what is requested — no "nice to have" improvements
-- **Code style**: Follow existing naming, small functions, no commented-out code, no deep nesting
-- **When uncertain**: Infer from existing code, mirror similar features (e.g. Agents CRUD)
+Multi-document writes must use transactions.
 
-## 11. Summary Rule (MOST IMPORTANT)
+---
 
-Do not be creative with architecture. Be boring, consistent, and predictable.
+# 6. DTO & Validation
 
-Success = minimal diff + zero regressions + full alignment with existing patterns
+- All input must use DTOs with `class-validator`.
+- DTOs must be colocated with feature module.
+- Use NestJS ValidationPipe with default configuration.
+- Do not manually validate in controllers.
+- Do not trust raw input.
 
-## Reference Docs (read when working on related features)
+---
 
-**Rules (how to write code):**
-- `docs/rules/credential-encryption.md` — encryption patterns, routing keys, crypto utility
-- `docs/rules/channel-integration.md` — new channel blueprint, routing, message flow
-- `docs/rules/context-enrichment.md` — AgentContextService, system prompt enrichment, adding new context
-- `docs/rules/data-modeling.md` — schemas, indexes, transactions, repository conventions
-- `docs/rules/configuration.md` — ValidationPipe, Logger, DatabaseModule, LLM SDK
+# 7. Logging
 
-**System documentation (how the system works):**
-- `docs/AGENT_ROUTING.md` — multi-agent routing strategies, cascade logic, architecture diagrams
-- `docs/MESSAGE_PERSISTENCE.md` — message flow, conversation context, automatic summarization
+- Use NestJS Logger.
+- Never use console.log.
+- Logging must be structured and consistent.
+
+---
+
+# 8. Error Handling
+
+Use NestJS exceptions:
+- NotFoundException
+- BadRequestException
+- ConflictException
+- ForbiddenException
+
+Do not:
+- Return null/false for errors
+- Swallow exceptions silently
+
+---
+
+# 9. Credential Security
+
+- Encrypt all credentials before storage.
+- Credential schema fields must use `select: false`.
+- Use `.select('+field')` when explicitly needed.
+- Decrypt only at execution boundary (channels or LLM boundary).
+
+Routing identifiers (phoneNumberId, instagramAccountId, etc.) remain plaintext for indexing.
+
+See:
+docs/rules/credential-encryption.md
+
+---
+
+# 10. Channel Integration (Current Pattern)
+
+Channels are pure transport.
+
+They must:
+- Validate webhook
+- Parse payload
+- Construct IncomingChannelEvent
+- Call IncomingMessageOrchestrator
+- Send outbound message using returned metadata
+
+Channels must NOT:
+- Perform routing
+- Resolve conversation
+- Persist messages
+- Call AgentService directly
+- Access repositories
+
+All inbound message lifecycle must pass through orchestrator.
+
+---
+
+# 11. Idempotency (Phase C – Active)
+
+Inbound messages must be idempotent.
+
+Rules:
+- Unique constraint on (channel, messageId)
+- Duplicate events must not:
+  - Call LLM
+  - Persist messages
+  - Trigger summary
+  - Touch conversation
+
+Never bypass idempotency guard.
+
+---
+
+# 12. Conversation & Summary (Phase D – Active)
+
+Conversation memory must remain bounded.
+
+Rules:
+- Conversation stores summary.
+- Only messages after last summary are sent to LLM.
+- Summarization must not block user response.
+- Channels must not know summary exists.
+
+---
+
+# 13. Data Modeling
+
+- Use explicit collection names.
+- Add indexes for queried fields.
+- Add compound indexes for routing.
+- Add unique indexes for invariants.
+- Use `_id: false` for embedded schemas.
+
+See:
+docs/rules/data-modeling.md
+
+---
+
+# 14. Scope Discipline
+
+- Implement only what is requested.
+- Do not refactor unrelated code.
+- Do not rename fields without explicit instruction.
+- Preserve backward compatibility.
+
+Success = minimal diff + zero regressions + full alignment.
+
+---
+
+# 15. When Uncertain
+
+1. Mirror existing patterns.
+2. Check ARCHITECTURE_CONTRACT.md.
+3. Prefer consistency over creativity.
+4. If conflict appears, request clarification.

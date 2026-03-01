@@ -3,3 +3,39 @@ pnpm check
 pnpm test
 pnpm test:architecture
 pnpm test:e2e
+
+# Architecture Steward Review
+if [ "$SKIP_ARCH_REVIEW" = "1" ]; then
+  echo "Skipping architecture review (SKIP_ARCH_REVIEW=1)"
+else
+  MAIN_BRANCH="main"
+  DIFF=$(git diff "$MAIN_BRANCH"...HEAD)
+
+  if [ -z "$DIFF" ]; then
+    echo "No changes against $MAIN_BRANCH — skipping architecture review."
+  else
+    echo "Running architecture steward review..."
+
+    if ! command -v claude &> /dev/null; then
+      echo "Warning: claude CLI not found — skipping architecture review."
+    else
+      REVIEW_OUTPUT=$(echo "$DIFF" | claude --agent architecture-steward -p "Review the following git diff for architectural compliance. Output your full review with a Final Verdict." 2>&1) || {
+        echo "Warning: Architecture review failed to run — allowing push."
+        echo "$REVIEW_OUTPUT"
+        exit 0
+      }
+
+      echo "$REVIEW_OUTPUT"
+
+      if echo "$REVIEW_OUTPUT" | grep -q "REJECTED"; then
+        echo ""
+        echo "Push BLOCKED: Architecture steward rejected the changes."
+        echo "Fix the violations above and try again."
+        echo "To skip: SKIP_ARCH_REVIEW=1 git push"
+        exit 1
+      fi
+
+      echo "Architecture review passed."
+    fi
+  fi
+fi

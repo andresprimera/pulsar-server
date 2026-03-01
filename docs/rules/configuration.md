@@ -1,16 +1,26 @@
 # Configuration Rules
 
-`docs/rules/ARCHITECTURE_CONTRACT.md` has higher priority than this file.
+ARCHITECTURE_CONTRACT.md has higher priority.
 
-## Enforced defaults
-- Global validation pipe must remain `new ValidationPipe()` with default options unless explicitly requested.
-- Use NestJS `Logger`, not `console.log`.
-- Do not add direct SDK clients for LLM providers in feature code.
-- LLM calls must use the shared `ai` SDK flow and the central model factory in the agent layer.
+## Enforced Defaults
 
-## Module wiring
-- Persistence/repository providers are registered once in the global database/persistence module.
-- Feature modules should not duplicate imports of that global module unless required by a specific exception.
+- Use NestJS Logger (no console.log).
+- LLM calls must go through AgentService.
+- No direct provider SDK usage outside agent layer.
+- Global validation pipe remains default unless explicitly changed.
 
-## Allowed exception
-- `SeederService -> OnboardingService` cross-layer dependency is allowed only for startup seeding flow.
+## Module Wiring
+
+- Persistence module is global and registered once.
+- Feature modules must not duplicate persistence imports.
+- Orchestrator coordinates cross-layer interactions.
+
+## Event Lifecycle Integrity
+
+- All inbound channels must delegate to orchestrator.
+- Idempotency must execute before routing.
+- No feature may bypass orchestrator for inbound processing.
+
+## Allowed Exception
+
+- SeederService → OnboardingService cross-layer allowed only for startup seeding.

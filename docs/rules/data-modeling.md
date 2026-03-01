@@ -1,27 +1,40 @@
 # Data Modeling Rules
 
-`docs/rules/ARCHITECTURE_CONTRACT.md` has higher priority than this file.
+ARCHITECTURE_CONTRACT.md has higher priority than this file.
 
-## Schema shape
-- Use explicit `collection` names and `timestamps: true`.
-- Keep subdocuments embedded with `@Schema({ _id: false })` when they are not independent aggregates.
-- Use `Types.ObjectId` + `ref` for references.
+## Schema Shape
+- Use explicit collection names.
+- Use timestamps: true where lifecycle tracking is needed.
+- Use Types.ObjectId + ref for aggregates.
 
-## Status conventions
-- Status fields must use explicit enums with indexed values.
-- Service-layer create flows must explicitly set `status: 'active'` instead of relying only on schema defaults.
+## Status Conventions
+- Status fields must use explicit enums.
+- Service-layer create flows must set status explicitly.
 
 ## Indexing
 - Add indexes for frequent lookup fields.
-- Add compound indexes for routing and high-frequency filters.
+- Add compound indexes for routing filters.
 - Add unique indexes for business invariants.
-- Define compound/unique indexes after `SchemaFactory.createForClass(...)`.
+- Define indexes after SchemaFactory.createForClass().
+
+## Idempotency Modeling (Phase C)
+
+- ProcessedEvent must have unique index (channel, messageId).
+- Idempotency records are immutable.
+- No business logic may bypass idempotency check.
+- TTL index optional (if replay window desired).
+
+## Conversation Modeling (Phase D)
+
+- Conversation holds summary field.
+- Only messages after last summary are used in context.
+- Summary updates must not block user response.
 
 ## Transactions
-- Any multi-document write that must be atomic must use a MongoDB transaction.
-- Repositories participating in transactions must accept optional `session`.
-- Map duplicate key (`E11000`) to conflict semantics in service layer.
+- Multi-document atomic writes must use MongoDB transaction.
+- Duplicate key (E11000) maps to conflict semantics.
 
-## Repository behavior
-- Repository not-found returns `null`; service layer decides domain/API exception behavior.
-- Always execute Mongoose queries with `.exec()`.
+## Repository Behavior
+- Repository not-found returns null.
+- Service layer decides domain/API exception.
+- Always execute queries with .exec().
