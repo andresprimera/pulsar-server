@@ -10,6 +10,7 @@ import { AgentRoutingService } from '@domain/routing/agent-routing.service';
 import { AgentContextService } from '@agent/agent-context.service';
 import { ContactIdentityResolver } from '@channels/shared/contact-identity.resolver';
 import { ConversationService } from '@domain/conversation/conversation.service';
+import { EventIdempotencyService } from '@persistence/event-idempotency.service';
 
 describe('IncomingMessageOrchestrator', () => {
   let service: IncomingMessageOrchestrator;
@@ -18,6 +19,7 @@ describe('IncomingMessageOrchestrator', () => {
   let agentRepository: jest.Mocked<AgentRepository>;
   let contactIdentityResolver: jest.Mocked<ContactIdentityResolver>;
   let conversationService: jest.Mocked<ConversationService>;
+  let eventIdempotencyService: jest.Mocked<EventIdempotencyService>;
   let loggerWarnSpy: jest.SpyInstance;
 
   const createEvent = (overrides: any = {}) => ({
@@ -77,6 +79,12 @@ describe('IncomingMessageOrchestrator', () => {
             touch: jest.fn(),
           },
         },
+        {
+          provide: EventIdempotencyService,
+          useValue: {
+            registerIfFirst: jest.fn().mockResolvedValue(true),
+          },
+        },
       ],
     }).compile();
 
@@ -88,6 +96,7 @@ describe('IncomingMessageOrchestrator', () => {
     agentRepository = module.get(AgentRepository);
     contactIdentityResolver = module.get(ContactIdentityResolver);
     conversationService = module.get(ConversationService);
+    eventIdempotencyService = module.get(EventIdempotencyService);
 
     loggerWarnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
   });
@@ -223,6 +232,18 @@ describe('IncomingMessageOrchestrator', () => {
         expect.anything(),
       );
       expect(conversationService.touch).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns empty object and skips agent when event is duplicate', async () => {
+      eventIdempotencyService.registerIfFirst.mockResolvedValue(false);
+
+      const output = await service.handle(createEvent());
+
+      expect(output).toEqual({});
+      expect(agentService.run).not.toHaveBeenCalled();
+      expect(agentRoutingService.resolveRoute).not.toHaveBeenCalled();
+      expect(conversationService.resolveOrCreate).not.toHaveBeenCalled();
+      expect(conversationService.touch).not.toHaveBeenCalled();
     });
 
     it('touches conversation and rethrows when agent run fails', async () => {

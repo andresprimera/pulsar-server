@@ -1,0 +1,175 @@
+src
+├── agent
+│   ├── agent-context.service.spec.ts
+│   ├── agent-context.service.ts
+│   ├── agent.module.ts
+│   ├── agent.service.spec.ts
+│   ├── agent.service.ts
+│   ├── contracts
+│   │   ├── agent-context.ts
+│   │   ├── agent-input.ts
+│   │   ├── agent-output.ts
+│   ├── conversation-summary.service.spec.ts
+│   ├── conversation-summary.service.ts
+│   ├── llm
+│   │   ├── llm.factory.spec.ts
+│   │   ├── llm.factory.ts
+│   │   ├── provider.enum.ts
+│   ├── metadata-exposure.service.spec.ts
+│   ├── metadata-exposure.service.ts
+├── agents
+│   ├── agents.controller.spec.ts
+│   ├── agents.controller.ts
+│   ├── agents.module.ts
+│   ├── agents.service.spec.ts
+│   ├── agents.service.ts
+│   ├── dto
+│   │   ├── create-agent.dto.ts
+│   │   ├── update-agent-status.dto.ts
+│   │   ├── update-agent.dto.ts
+├── app.controller.ts
+├── app.module.ts
+├── channels
+│   ├── channel-provider.enum.ts
+│   ├── instagram
+│   │   ├── instagram.config.ts
+│   │   ├── instagram.controller.spec.ts
+│   │   ├── instagram.controller.ts
+│   │   ├── instagram.module.ts
+│   │   ├── instagram.service.spec.ts
+│   │   ├── instagram.service.ts
+│   ├── shared
+│   │   ├── channel-type.constants.ts
+│   │   ├── channel-type.type.ts
+│   │   ├── contact-identifier
+│   │   │   ├── api-identifier.extractor.ts
+│   │   │   ├── contact-identifier-architecture.spec.ts
+│   │   │   ├── contact-identifier-extractor.interface.ts
+│   │   │   ├── contact-identifier-extractor.registry.ts
+│   │   │   ├── contact-identifier.exceptions.ts
+│   │   │   ├── instagram-identifier.extractor.ts
+│   │   │   ├── telegram-identifier.extractor.ts
+│   │   │   ├── tiktok-identifier.extractor.ts
+│   │   │   ├── web-identifier.extractor.ts
+│   │   │   ├── whatsapp-identifier.extractor.ts
+│   │   ├── contact-identity.resolver.spec.ts
+│   │   ├── contact-identity.resolver.ts
+│   │   ├── flow-integrity.spec.ts
+│   │   ├── incoming-channel-event.interface.ts
+│   │   ├── shared.module.ts
+│   ├── tiktok
+│   │   ├── tiktok.config.ts
+│   │   ├── tiktok.controller.ts
+│   │   ├── tiktok.module.ts
+│   │   ├── tiktok.service.spec.ts
+│   │   ├── tiktok.service.ts
+│   ├── whatsapp
+│   │   ├── whatsapp.config.ts
+│   │   ├── whatsapp.controller.spec.ts
+│   │   ├── whatsapp.controller.ts
+│   │   ├── whatsapp.module.ts
+│   │   ├── whatsapp.service.spec.ts
+│   │   ├── whatsapp.service.ts
+├── client-agents
+│   ├── client-agents.controller.spec.ts
+│   ├── client-agents.controller.ts
+│   ├── client-agents.module.ts
+│   ├── client-agents.service.spec.ts
+│   ├── client-agents.service.ts
+│   ├── dto
+│   │   ├── create-client-agent.dto.ts
+│   │   ├── update-client-agent-status.dto.ts
+│   │   ├── update-client-agent.dto.ts
+├── clients
+│   ├── clients.controller.spec.ts
+│   ├── clients.controller.ts
+│   ├── clients.module.ts
+│   ├── clients.service.spec.ts
+│   ├── clients.service.ts
+│   ├── dto
+│   │   ├── create-client.dto.ts
+│   │   ├── update-client-status.dto.ts
+│   │   ├── update-client.dto.ts
+├── config
+│   ├── app.config.ts
+├── domain
+│   ├── channels
+│   │   ├── channel-provider.enum.ts
+│   │   ├── channel-type.constants.ts
+│   │   ├── channel-type.type.ts
+│   │   ├── incoming-channel-event.interface.ts
+│   ├── conversation
+│   │   ├── conversation.constants.ts
+│   │   ├── conversation.service.spec.ts
+│   │   ├── conversation.service.ts
+│   ├── llm
+│   │   ├── llm.factory.ts
+│   │   ├── provider.enum.ts
+│   ├── routing
+│   │   ├── agent-routing.service.spec.ts
+│   │   ├── agent-routing.service.ts
+├── main.ts
+├── onboarding
+│   ├── dto
+│   │   ├── register-and-hire.dto.ts
+│   ├── onboarding.controller.spec.ts
+│   ├── onboarding.controller.ts
+│   ├── onboarding.module.ts
+│   ├── onboarding.service.spec.ts
+│   ├── onboarding.service.ts
+├── orchestrator
+│   ├── incoming-message.orchestrator.spec.ts
+│   ├── incoming-message.orchestrator.ts
+├── persistence
+│   ├── data
+│   │   ├── seed-data.json
+│   ├── database.module.ts
+│   ├── entities
+│   │   ├── agent.entity.ts
+│   │   ├── channel.entity.ts
+│   │   ├── client-agent.entity.ts
+│   │   ├── client.entity.ts
+│   ├── message-persistence.service.spec.ts
+│   ├── message-persistence.service.ts
+│   ├── repositories
+│   │   ├── agent.repository.spec.ts
+│   │   ├── agent.repository.ts
+│   │   ├── channel.repository.ts
+│   │   ├── client-agent.repository.ts
+│   │   ├── client-phone.repository.ts
+│   │   ├── client.repository.ts
+│   │   ├── contact.repository.spec.ts
+│   │   ├── contact.repository.ts
+│   │   ├── conversation.repository.ts
+│   │   ├── message.repository.spec.ts
+│   │   ├── message.repository.ts
+│   │   ├── user.repository.spec.ts
+│   │   ├── user.repository.ts
+│   ├── schemas
+│   │   ├── agent.schema.ts
+│   │   ├── channel.schema.ts
+│   │   ├── client-agent.schema.ts
+│   │   ├── client-phone.schema.ts
+│   │   ├── client.schema.ts
+│   │   ├── contact.schema.spec.ts
+│   │   ├── contact.schema.ts
+│   │   ├── conversation.schema.spec.ts
+│   │   ├── conversation.schema.ts
+│   │   ├── llm-config.schema.ts
+│   │   ├── message.schema.spec.ts
+│   │   ├── message.schema.ts
+│   │   ├── user.schema.ts
+│   ├── seeder.service.spec.ts
+│   ├── seeder.service.ts
+├── shared
+│   ├── crypto.util.ts
+├── users
+│   ├── dto
+│   │   ├── create-user.dto.ts
+│   │   ├── update-user-status.dto.ts
+│   │   ├── update-user.dto.ts
+│   ├── users.controller.spec.ts
+│   ├── users.controller.ts
+│   ├── users.module.ts
+│   ├── users.service.spec.ts
+│   ├── users.service.ts

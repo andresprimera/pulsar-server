@@ -25,6 +25,12 @@ import {
   ConversationSchema,
 } from './schemas/conversation.schema';
 import { ConversationRepository } from './repositories/conversation.repository';
+import {
+  ProcessedEvent,
+  ProcessedEventSchema,
+} from './schemas/processed-event.schema';
+import { ProcessedEventRepository } from './repositories/processed-event.repository';
+import { EventIdempotencyService } from './event-idempotency.service';
 import { OnboardingModule } from '@onboarding/onboarding.module';
 
 const repositories = [
@@ -38,6 +44,7 @@ const repositories = [
   UserRepository,
   MessageRepository,
   ConversationRepository,
+  ProcessedEventRepository,
 ];
 
 @Global()
@@ -63,10 +70,11 @@ const repositories = [
       { name: User.name, schema: UserSchema },
       { name: Message.name, schema: MessageSchema },
       { name: Conversation.name, schema: ConversationSchema },
+      { name: ProcessedEvent.name, schema: ProcessedEventSchema },
     ]),
     forwardRef(() => OnboardingModule),
   ],
-  providers: [...repositories, SeederService],
-  exports: repositories,
+  providers: [...repositories, SeederService, EventIdempotencyService],
+  exports: [...repositories, EventIdempotencyService],
 })
 export class DatabaseModule {}

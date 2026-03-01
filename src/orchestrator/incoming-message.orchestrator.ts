@@ -17,6 +17,7 @@ import {
   RouteCandidate,
 } from '@domain/routing/agent-routing.service';
 import { ConversationService } from '@domain/conversation/conversation.service';
+import { EventIdempotencyService } from '@persistence/event-idempotency.service';
 
 @Injectable()
 export class IncomingMessageOrchestrator {
@@ -30,10 +31,23 @@ export class IncomingMessageOrchestrator {
     private readonly agentContextService: AgentContextService,
     private readonly contactIdentityResolver: ContactIdentityResolver,
     private readonly conversationService: ConversationService,
+    private readonly eventIdempotencyService: EventIdempotencyService,
   ) {}
 
   async handle(event: IncomingChannelEvent): Promise<AgentOutput | undefined> {
     const logPrefix = this.getLogPrefix(event.channelId);
+
+    const isFirst = await this.eventIdempotencyService.registerIfFirst({
+      channel: event.channelId,
+      messageId: event.messageId,
+    });
+
+    if (!isFirst) {
+      this.logger.log(
+        `[${logPrefix}] Duplicate event detected for channel=${event.channelId} messageId=${event.messageId}`,
+      );
+      return {};
+    }
 
     const routeDecision = await this.agentRoutingService.resolveRoute({
       routeChannelIdentifier: event.routeChannelIdentifier,
