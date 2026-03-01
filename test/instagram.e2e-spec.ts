@@ -41,6 +41,22 @@ describe('Instagram Channel (e2e)', () => {
     }
   };
 
+  const waitForSpyCalls = async (
+    spy: jest.SpyInstance,
+    expectedCalls: number,
+    timeoutMs = 5000,
+  ): Promise<void> => {
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < timeoutMs) {
+      if (spy.mock.calls.length >= expectedCalls) {
+        return;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  };
+
   beforeAll(async () => {
     fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
@@ -200,6 +216,8 @@ describe('Instagram Channel (e2e)', () => {
     const runArgs = (mockAgentService.run as jest.Mock).mock.calls[0][0];
     expect(runArgs.channel).toBe('instagram');
     expect(runArgs.message.text).toBe('Hello Instagram');
+
+    await waitForSpyCalls(fetchSpy, 1);
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining('/me/messages'),

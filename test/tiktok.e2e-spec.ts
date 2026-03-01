@@ -42,6 +42,22 @@ describe('TikTok Channel (e2e)', () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
   };
+
+  const waitForSpyCalls = async (
+    spy: jest.SpyInstance,
+    expectedCalls: number,
+    timeoutMs = 5000,
+  ): Promise<void> => {
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < timeoutMs) {
+      if (spy.mock.calls.length >= expectedCalls) {
+        return;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  };
   
   beforeAll(async () => {
     // 1. Mock global fetch
@@ -160,6 +176,8 @@ describe('TikTok Channel (e2e)', () => {
   });
 
   it('should process valid TikTok webhook message and send reply', async () => {
+    const fetchCallsBeforeRequest = fetchSpy.mock.calls.length;
+
     // Act
     await request(app.getHttpServer())
       .post('/tiktok/webhook')
@@ -192,6 +210,8 @@ describe('TikTok Channel (e2e)', () => {
     expect(runArgs.channel).toBe('tiktok');
     expect(runArgs.message.text).toBe('Hello TikTok');
 
+    await waitForSpyCalls(fetchSpy, fetchCallsBeforeRequest + 1);
+
     // Verify Outgoing Reply (Reply logic calls fetch)
     expect(fetchSpy).toHaveBeenCalledWith(
         expect.stringContaining('/message/send/'),
@@ -207,6 +227,7 @@ describe('TikTok Channel (e2e)', () => {
 
   it('should handle message for unregistered user (ignore)', async () => {
     const callsBeforeRequest = (mockAgentService.run as jest.Mock).mock.calls.length;
+    const fetchCallsBeforeRequest = fetchSpy.mock.calls.length;
 
     // Act
     await request(app.getHttpServer())
@@ -236,11 +257,6 @@ describe('TikTok Channel (e2e)', () => {
     expect((mockAgentService.run as jest.Mock).mock.calls.length).toBe(
       callsBeforeRequest,
     );
-    // Should verify fetch was NOT called for sending reply (fetch might be called if logging uses it? No, logging uses stdout/err)
-    // Wait, fetch is mocked globally. If handleIncoming returns early, sendMessage is not called.
-    expect(fetchSpy).not.toHaveBeenCalledWith(
-        expect.stringContaining('/message/send/'),
-        expect.anything()
-    );
+    expect(fetchSpy.mock.calls.length).toBe(fetchCallsBeforeRequest);
   });
 });

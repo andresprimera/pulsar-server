@@ -1,26 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Types } from 'mongoose';
-import { AgentService } from '../../agent/agent.service';
-import { AgentInput } from '../../agent/contracts/agent-input';
-import { AgentContext } from '../../agent/contracts/agent-context';
-import { AgentRepository } from '../../database/repositories/agent.repository';
-import { AgentRoutingService } from '../shared/agent-routing.service';
-import { AgentContextService } from '../../agent/agent-context.service';
-import { decryptRecord, decrypt } from '../../database/utils/crypto.util';
+import { decryptRecord } from '../../database/utils/crypto.util';
 import { TIKTOK_API_BASE_URL } from './tiktok.config';
-import { ContactIdentityResolver } from '../shared/contact-identity.resolver';
 import { CHANNEL_TYPES } from '../shared/channel-type.constants';
+import { IncomingMessageOrchestrator } from '../../agent/incoming-message.orchestrator';
+import { IncomingChannelEvent } from '../shared/incoming-channel-event.interface';
+import { AgentRoutingService } from '../shared/agent-routing.service';
 
 @Injectable()
 export class TiktokService {
   private readonly logger = new Logger(TiktokService.name);
 
   constructor(
-    private readonly agentService: AgentService,
+    private readonly incomingMessageOrchestrator: IncomingMessageOrchestrator,
     private readonly agentRoutingService: AgentRoutingService,
-    private readonly agentRepository: AgentRepository,
-    private readonly agentContextService: AgentContextService,
-    private readonly contactIdentityResolver: ContactIdentityResolver,
   ) {}
 
   async handleIncoming(payload: any): Promise<void> {
@@ -53,118 +45,68 @@ export class TiktokService {
       `[TikTok] Incoming message from sender=${data.sender?.user_id} to recipient=${recipientUserId}`,
     );
 
-    // Route: resolve which agent should handle this message
-    const routeDecision = await this.agentRoutingService.resolveRoute({
+    const incomingEvent: IncomingChannelEvent = {
+      channelId: CHANNEL_TYPES.TIKTOK,
       routeChannelIdentifier: recipientUserId,
       channelIdentifier: senderUserId,
-      incomingText: data.message.text,
-      channelType: CHANNEL_TYPES.TIKTOK,
-    });
+      messageId: data.message_id,
+      text: data.message.text,
+      rawPayload: payload,
+    };
 
-    if (routeDecision.kind === 'unroutable') {
+    const output = await this.incomingMessageOrchestrator.handle(incomingEvent);
+    if (!output?.reply) {
+      return;
+    }
+
+    const accessToken = await this.resolveAccessToken(incomingEvent);
+    if (!accessToken) {
       this.logger.warn(
-        `[TikTok] No active ClientAgent found for tiktokUserId=${recipientUserId}.`,
+        `[TikTok] Unable to send outbound message for tiktokUserId=${recipientUserId}: missing credentials.`,
       );
       return;
     }
 
-    if (routeDecision.kind === 'ambiguous') {
-      // TikTok doesn't support channel-agnostic sending from this context
-      // Future: implement ambiguity prompt via TikTok API
-      this.logger.warn(
-        `[TikTok] Multiple agents for tiktokUserId=${recipientUserId}, cannot send disambiguation prompt yet.`,
-      );
-      return;
-    }
-
-    const { clientAgent, channelConfig } = routeDecision.candidate;
-
-    // Guard: credentials may be undefined if select('+channels.credentials') was missed
-    if (!channelConfig.credentials) {
-      this.logger.error(
-        `[TikTok] Credentials missing for tiktokUserId=${recipientUserId}. Possible select('+channels.credentials') omission.`,
-      );
-      return;
-    }
-
-    const agent = await this.agentRepository.findActiveById(
-      clientAgent.agentId,
+    this.logger.log(
+      `[TikTok] Sending reply to sender=${data.sender.user_id}`,
     );
-    if (!agent) {
-      this.logger.warn(
-        `[TikTok] Agent ${clientAgent.agentId} is not active. Skipping message.`,
-      );
-      return;
+
+    try {
+      await this.sendMessage({
+        recipientId: data.sender.user_id,
+        conversationId: data.conversation_id,
+        text: output.reply.text,
+        accessToken,
+      });
+      this.logger.log(`[TikTok] Reply sent successfully.`);
+    } catch (error) {
+      this.logger.error(`[TikTok] Failed to send reply: ${error.message}`);
     }
+  }
 
-    const rawContext: AgentContext = {
-      agentId: clientAgent.agentId,
-      agentName: agent.name,
-      clientId: clientAgent.clientId,
-      channelId: channelConfig.channelId.toString(),
-      systemPrompt: agent.systemPrompt,
-      llmConfig: {
-        ...channelConfig.llmConfig,
-        // TODO: [HACK] REMOVE THIS IN PRODUCTION.
-        // Forcing 'openai' provider and system key for dev/testing ease.
-        // This bypasses client billing!
-        provider: (channelConfig.llmConfig.provider || 'openai') as any,
-        apiKey: decrypt(
-          channelConfig.llmConfig.apiKey &&
-            !channelConfig.llmConfig.apiKey.includes('REPLACE_ME')
-            ? channelConfig.llmConfig.apiKey
-            : process.env.OPENAI_API_KEY ?? '',
-        ),
-        model: channelConfig.llmConfig.model || 'gpt-4o',
-      },
-      channelConfig: decryptRecord(channelConfig.credentials),
-    };
-
-    const context = await this.agentContextService.enrichContext(rawContext);
-
-    const contact = await this.contactIdentityResolver.resolveContact({
+  private async resolveAccessToken(
+    event: IncomingChannelEvent,
+  ): Promise<string | undefined> {
+    const routeDecision = await this.agentRoutingService.resolveRoute({
+      routeChannelIdentifier: event.routeChannelIdentifier,
+      channelIdentifier: event.channelIdentifier,
+      incomingText: event.text,
       channelType: CHANNEL_TYPES.TIKTOK,
-      payload,
-      clientId: new Types.ObjectId(clientAgent.clientId),
-      channelId: new Types.ObjectId(channelConfig.channelId.toString()),
-      contactName: senderUserId,
     });
 
-    const input: AgentInput = {
-      channel: CHANNEL_TYPES.TIKTOK,
-      contactId: contact._id.toString(),
-      message: {
-        type: 'text',
-        text: data.message.text,
-      },
-      contactMetadata: contact.metadata,
-      contactSummary: contact.contactSummary,
-      metadata: {
-        messageId: data.message_id,
-        senderUsername: data.sender?.username,
-      },
-    };
+    const channelConfig =
+      routeDecision.kind === 'resolved'
+        ? routeDecision.candidate.channelConfig
+        : routeDecision.kind === 'ambiguous'
+          ? routeDecision.candidates[0]?.channelConfig
+          : undefined;
 
-    const output = await this.agentService.run(input, context);
-
-    if (output.reply) {
-      this.logger.log(
-        `[TikTok] Sending reply to sender=${data.sender.user_id}`,
-      );
-      const decryptedCredentials = decryptRecord(channelConfig.credentials);
-      
-      try {
-        await this.sendMessage({
-          recipientId: data.sender.user_id,
-          conversationId: data.conversation_id,
-          text: output.reply.text,
-          accessToken: decryptedCredentials.accessToken,
-        });
-        this.logger.log(`[TikTok] Reply sent successfully.`);
-      } catch (error) {
-        this.logger.error(`[TikTok] Failed to send reply: ${error.message}`);
-      }
+    if (!channelConfig?.credentials) {
+      return undefined;
     }
+
+    const decryptedCredentials = decryptRecord(channelConfig.credentials);
+    return decryptedCredentials.accessToken;
   }
 
   private async sendMessage(params: {
@@ -174,7 +116,7 @@ export class TiktokService {
     accessToken: string;
   }): Promise<void> {
     const { recipientId, conversationId, text, accessToken } = params;
-    
+
     const url = `${TIKTOK_API_BASE_URL}/message/send/`;
 
     const response = await fetch(url, {

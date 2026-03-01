@@ -212,4 +212,47 @@ describe('ConversationService', () => {
     expect(repository.findLatestOpenByClientContactAndChannel).toHaveBeenCalledTimes(3);
     expect(resultA._id.toString()).toBe(resultB._id.toString());
   });
+
+  it('handles 10 concurrent resolveOrCreate calls with a single open conversation', async () => {
+    const createdConversation = {
+      _id: newConversationId,
+      status: 'open',
+      lastMessageAt: now,
+    };
+
+    for (let i = 0; i < 10; i++) {
+      repository.findLatestOpenByClientContactAndChannel.mockResolvedValueOnce(null);
+    }
+    for (let i = 0; i < 9; i++) {
+      repository.findLatestOpenByClientContactAndChannel.mockResolvedValueOnce(
+        createdConversation as any,
+      );
+    }
+
+    repository.create.mockResolvedValueOnce(createdConversation as any);
+    for (let i = 0; i < 9; i++) {
+      repository.create.mockRejectedValueOnce({ code: 11000 });
+    }
+
+    const results = await Promise.all(
+      Array.from({ length: 10 }, () =>
+        service.resolveOrCreate({
+          clientId,
+          contactId,
+          channelId,
+          now,
+        }),
+      ),
+    );
+
+    expect(results).toHaveLength(10);
+    for (const result of results) {
+      expect(result._id.toString()).toBe(newConversationId.toString());
+    }
+
+    expect(repository.create).toHaveBeenCalledTimes(10);
+    expect(
+      repository.findLatestOpenByClientContactAndChannel,
+    ).toHaveBeenCalledTimes(19);
+  });
 });

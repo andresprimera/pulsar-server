@@ -59,7 +59,7 @@ export class ConversationService {
 
   async touch(
     conversationId: Types.ObjectId,
-    now: Date,
+    now: Date = new Date(),
   ): Promise<void> {
     await this.conversationRepository.updateLastMessageAt(conversationId, now);
   }

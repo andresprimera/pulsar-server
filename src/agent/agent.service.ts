@@ -34,14 +34,7 @@ export class AgentService {
         contactId: input.contactId,
       };
       const contactId = new Types.ObjectId(input.contactId);
-
-      const conversation =
-        await this.messagePersistenceService.resolveConversation(
-          persistenceContext,
-          contactId,
-        );
-
-      const conversationId = conversation._id as Types.ObjectId;
+      const conversationId = new Types.ObjectId(input.conversationId);
 
       const conversationHistory =
         await this.messagePersistenceService.getConversationContextByConversationId(
