@@ -1,18 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { generateText } from 'ai';
-import { AgentRepository } from '@database/repositories/agent.repository';
-import { ClientAgentRepository } from '@database/repositories/client-agent.repository';
-import { MessageRepository } from '@database/repositories/message.repository';
-import { ContactRepository } from '@database/repositories/contact.repository';
+import { AgentRepository } from '@persistence/repositories/agent.repository';
+import { ClientAgentRepository } from '@persistence/repositories/client-agent.repository';
+import { MessageRepository } from '@persistence/repositories/message.repository';
+import { ContactRepository } from '@persistence/repositories/contact.repository';
 import {
   ClientAgent,
   HireChannelConfig,
-} from '@database/schemas/client-agent.schema';
+} from '@persistence/schemas/client-agent.schema';
 import { createLLMModel } from '@agent/llm/llm.factory';
 import { LlmProvider } from '@agent/llm/provider.enum';
-import { ChannelType } from './channel-type.type';
-import { CHANNEL_TYPES } from './channel-type.constants';
+import { ChannelType } from '@channels/shared/channel-type.type';
+import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
 
 export interface RouteCandidate {
   clientAgent: ClientAgent;

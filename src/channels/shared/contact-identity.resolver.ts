@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Types } from 'mongoose';
-import { Contact } from '@database/schemas/contact.schema';
-import { ContactRepository } from '@database/repositories/contact.repository';
+import { Contact } from '@persistence/schemas/contact.schema';
+import { ContactRepository } from '@persistence/repositories/contact.repository';
 import { ChannelType } from './channel-type.type';
 import { ContactIdentifierExtractorRegistry } from './contact-identifier/contact-identifier-extractor.registry';
 

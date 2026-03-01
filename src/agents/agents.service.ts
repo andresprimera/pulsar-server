@@ -3,7 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { AgentRepository } from '@database/repositories/agent.repository';
+import { AgentRepository } from '@persistence/repositories/agent.repository';
 import { CreateAgentDto } from './dto/create-agent.dto';
 import { UpdateAgentDto } from './dto/update-agent.dto';
 import { UpdateAgentStatusDto } from './dto/update-agent-status.dto';

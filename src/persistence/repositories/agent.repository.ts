@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model } from 'mongoose';
-import { Agent } from '@database/schemas/agent.schema';
+import { Agent } from '@persistence/schemas/agent.schema';
 
 @Injectable()
 export class AgentRepository {

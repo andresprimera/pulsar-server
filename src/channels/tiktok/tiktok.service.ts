@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { decryptRecord } from '@database/utils/crypto.util';
+import { decryptRecord } from '@shared/crypto.util';
 import {
   buildMessagesUrl,
   loadTikTokConfig,
   TikTokServerConfig,
 } from './tiktok.config';
 import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
-import { IncomingMessageOrchestrator } from '@agent/incoming-message.orchestrator';
+import { IncomingMessageOrchestrator } from '@orchestrator/incoming-message.orchestrator';
 import { IncomingChannelEvent } from '@channels/shared/incoming-channel-event.interface';
 
 @Injectable()

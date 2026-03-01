@@ -17,10 +17,10 @@ module.exports = {
       { type: 'channels', pattern: 'src/channels/**' },
       {
         type: 'orchestrator',
-        pattern: 'src/agent/incoming-message.orchestrator.ts',
+        pattern: 'src/orchestrator/**',
       },
       { type: 'agent', pattern: 'src/agent/**' },
-      { type: 'database', pattern: 'src/database/**' },
+      { type: 'persistence', pattern: 'src/persistence/**' },
       { type: 'domain', pattern: 'src/domain/**' },
     ],
     'import/resolver': {
@@ -38,12 +38,12 @@ module.exports = {
           {
             group: ['src/**'],
             message:
-              'Use path aliases (@agent, @database, etc.) instead of raw src imports.',
+              'Use path aliases (@agent, @persistence, etc.) instead of raw src imports.',
           },
           {
             group: ['../*', '../../*', '../../../*', '../../../../*', '../../../../../*'],
             message:
-              'Parent-relative imports are forbidden in src/. Use aliases (@agent, @channels, @database, etc.) for cross-folder imports.',
+              'Parent-relative imports are forbidden in src/. Use aliases (@agent, @channels, @persistence, etc.) for cross-folder imports.',
           },
         ],
       },
@@ -67,7 +67,7 @@ module.exports = {
               {
                 group: ['src/**'],
                 message:
-                  'Use path aliases (@agent, @database, etc.) instead of raw src imports.',
+                  'Use path aliases (@agent, @persistence, etc.) instead of raw src imports.',
               },
             ],
           },

@@ -3,7 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { ClientRepository } from '@database/repositories/client.repository';
+import { ClientRepository } from '@persistence/repositories/client.repository';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 import { UpdateClientStatusDto } from './dto/update-client-status.dto';

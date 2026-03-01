@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
 import { ConversationSummaryService } from './conversation-summary.service';
-import { MessageRepository } from '@database/repositories/message.repository';
+import { MessageRepository } from '@persistence/repositories/message.repository';
 import { Types } from 'mongoose';
 import * as ai from 'ai';
 import * as llmFactory from './llm/llm.factory';

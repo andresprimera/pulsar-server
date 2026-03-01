@@ -1,10 +1,10 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Types } from 'mongoose';
-import { MessageRepository } from '@database/repositories/message.repository';
+import { MessageRepository } from '@persistence/repositories/message.repository';
 import { ConversationSummaryService } from '@agent/conversation-summary.service';
 import { AgentContext } from '@agent/contracts/agent-context';
-import { ConversationService } from './conversation.service';
-import { Conversation } from '@database/schemas/conversation.schema';
+import { ConversationService } from '@domain/conversation/conversation.service';
+import { Conversation } from '@persistence/schemas/conversation.schema';
 
 export interface MessagePersistenceContext {
   channelId: Types.ObjectId | string;

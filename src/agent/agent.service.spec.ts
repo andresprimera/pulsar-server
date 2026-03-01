@@ -3,7 +3,7 @@ import { AgentService } from './agent.service';
 import { AgentInput } from './contracts/agent-input';
 import { AgentContext } from './contracts/agent-context';
 import { LlmProvider } from './llm/provider.enum';
-import { MessagePersistenceService } from '@channels/shared/message-persistence.service';
+import { MessagePersistenceService } from '@persistence/message-persistence.service';
 import { MetadataExposureService } from './metadata-exposure.service';
 import * as llmFactory from './llm/llm.factory';
 import * as ai from 'ai';

@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ConflictException } from '@nestjs/common';
 import { AppModule } from '../src/app.module';
-import { ClientPhoneRepository } from '../src/database/repositories/client-phone.repository';
+import { ClientPhoneRepository } from '../src/persistence/repositories/client-phone.repository';
 import { Types } from 'mongoose';
 
 describe('ClientPhoneRepository (E2E)', () => {

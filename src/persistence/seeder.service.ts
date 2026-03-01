@@ -16,7 +16,7 @@ import { OnboardingService } from '@onboarding/onboarding.service';
 import { ChannelRepository } from './repositories/channel.repository';
 import { ClientAgentRepository } from './repositories/client-agent.repository';
 import { ClientPhoneRepository } from './repositories/client-phone.repository';
-import { encryptRecord, encrypt } from './utils/crypto.util';
+import { encryptRecord, encrypt } from '@shared/crypto.util';
 import * as SEED_DATA from './data/seed-data.json';
 import { ClientRepository } from './repositories/client.repository';
 

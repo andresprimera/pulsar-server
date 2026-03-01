@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model, Types } from 'mongoose';
-import { Contact } from '@database/schemas/contact.schema';
-import { ContactIdentifierType } from '@database/schemas/contact.schema';
+import { Contact } from '@persistence/schemas/contact.schema';
+import { ContactIdentifierType } from '@persistence/schemas/contact.schema';
 
 @Injectable()
 export class ContactRepository {

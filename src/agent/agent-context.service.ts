@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AgentContext } from './contracts/agent-context';
-import { ClientRepository } from '@database/repositories/client.repository';
+import { ClientRepository } from '@persistence/repositories/client.repository';
 
 @Injectable()
 export class AgentContextService {

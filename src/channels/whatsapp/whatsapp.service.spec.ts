@@ -1,10 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException, Logger } from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
-import { IncomingMessageOrchestrator } from '@agent/incoming-message.orchestrator';
+import { IncomingMessageOrchestrator } from '@orchestrator/incoming-message.orchestrator';
 import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
-import { encrypt } from '@database/utils/crypto.util';
-import { ClientAgentRepository } from '@database/repositories/client-agent.repository';
+import { encrypt } from '@shared/crypto.util';
+import { ClientAgentRepository } from '@persistence/repositories/client-agent.repository';
 
 describe('WhatsappService', () => {
   let service: WhatsappService;

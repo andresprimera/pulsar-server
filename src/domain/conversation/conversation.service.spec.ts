@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Types } from 'mongoose';
 import { ConversationService } from './conversation.service';
-import { ConversationRepository } from '@database/repositories/conversation.repository';
+import { ConversationRepository } from '@persistence/repositories/conversation.repository';
 import { WHATSAPP_CONVERSATION_TIMEOUT_MS } from './conversation.constants';
 
 describe('ConversationService', () => {

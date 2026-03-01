@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Types } from 'mongoose';
-import { MessageRepository } from '@database/repositories/message.repository';
+import { MessageRepository } from '@persistence/repositories/message.repository';
 import { generateText } from 'ai';
 import { createLLMModel } from './llm/llm.factory';
 import { AgentContext } from './contracts/agent-context';

@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException } from '@nestjs/common';
 import { InstagramService } from './instagram.service';
-import { IncomingMessageOrchestrator } from '@agent/incoming-message.orchestrator';
-import { encrypt } from '@database/utils/crypto.util';
+import { IncomingMessageOrchestrator } from '@orchestrator/incoming-message.orchestrator';
+import { encrypt } from '@shared/crypto.util';
 
 describe('InstagramService', () => {
   let service: InstagramService;

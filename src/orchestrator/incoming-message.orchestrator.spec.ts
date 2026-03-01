@@ -1,15 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
 import { IncomingMessageOrchestrator } from './incoming-message.orchestrator';
-import { AgentService } from './agent.service';
-import { AgentRepository } from '@database/repositories/agent.repository';
-import { ClientRepository } from '@database/repositories/client.repository';
-import { LlmProvider } from './llm/provider.enum';
-import { AgentRoutingService } from '@channels/shared/agent-routing.service';
-import { AgentContextService } from './agent-context.service';
+import { AgentService } from '@agent/agent.service';
+import { AgentRepository } from '@persistence/repositories/agent.repository';
+import { ClientRepository } from '@persistence/repositories/client.repository';
+import { LlmProvider } from '@agent/llm/provider.enum';
+import { AgentRoutingService } from '@domain/routing/agent-routing.service';
+import { AgentContextService } from '@agent/agent-context.service';
 import { ContactIdentityResolver } from '@channels/shared/contact-identity.resolver';
 import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
-import { ConversationService } from '@channels/shared/conversation.service';
+import { ConversationService } from '@domain/conversation/conversation.service';
 
 describe('IncomingMessageOrchestrator', () => {
   let service: IncomingMessageOrchestrator;

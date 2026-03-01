@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { getModelToken } from '@nestjs/mongoose';
 import { AgentRepository } from './agent.repository';
-import { Agent } from '@database/schemas/agent.schema';
+import { Agent } from '@persistence/schemas/agent.schema';
 
 describe('AgentRepository', () => {
   let repository: AgentRepository;

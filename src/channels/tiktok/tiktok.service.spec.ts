@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
 import { TiktokService } from './tiktok.service';
-import { IncomingMessageOrchestrator } from '@agent/incoming-message.orchestrator';
-import { encrypt } from '@database/utils/crypto.util';
+import { IncomingMessageOrchestrator } from '@orchestrator/incoming-message.orchestrator';
+import { encrypt } from '@shared/crypto.util';
 
 describe('TiktokService', () => {
   let service: TiktokService;

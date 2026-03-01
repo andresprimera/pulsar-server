@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model, Types } from 'mongoose';
-import { Message } from '@database/schemas/message.schema';
+import { Message } from '@persistence/schemas/message.schema';
 
 @Injectable()
 export class MessageRepository {

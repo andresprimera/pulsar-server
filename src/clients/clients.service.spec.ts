@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { ClientsService } from './clients.service';
-import { ClientRepository } from '@database/repositories/client.repository';
+import { ClientRepository } from '@persistence/repositories/client.repository';
 
 describe('ClientsService', () => {
   let service: ClientsService;

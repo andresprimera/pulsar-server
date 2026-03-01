@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Types } from 'mongoose';
 import { ContactIdentityResolver } from './contact-identity.resolver';
-import { ContactRepository } from '@database/repositories/contact.repository';
+import { ContactRepository } from '@persistence/repositories/contact.repository';
 import { ContactIdentifierExtractorRegistry } from './contact-identifier/contact-identifier-extractor.registry';
 
 describe('ContactIdentityResolver', () => {

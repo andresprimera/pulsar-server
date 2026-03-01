@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
 import { MessageRepository } from './message.repository';
-import { Message } from '@database/schemas/message.schema';
+import { Message } from '@persistence/schemas/message.schema';
 import { Types } from 'mongoose';
 
 describe('MessageRepository', () => {

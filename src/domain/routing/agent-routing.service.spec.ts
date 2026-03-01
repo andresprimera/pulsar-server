@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Types } from 'mongoose';
-import { AgentRepository } from '@database/repositories/agent.repository';
-import { ClientAgentRepository } from '@database/repositories/client-agent.repository';
-import { MessageRepository } from '@database/repositories/message.repository';
-import { ContactRepository } from '@database/repositories/contact.repository';
+import { AgentRepository } from '@persistence/repositories/agent.repository';
+import { ClientAgentRepository } from '@persistence/repositories/client-agent.repository';
+import { MessageRepository } from '@persistence/repositories/message.repository';
+import { ContactRepository } from '@persistence/repositories/contact.repository';
 import { AgentRoutingService } from './agent-routing.service';
 
 describe('AgentRoutingService', () => {

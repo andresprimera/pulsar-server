@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
 import { UserRepository } from './user.repository';
-import { User } from '@database/schemas/user.schema';
+import { User } from '@persistence/schemas/user.schema';
 import { Types } from 'mongoose';
 
 describe('UserRepository', () => {

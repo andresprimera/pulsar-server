@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AgentContextService } from './agent-context.service';
-import { ClientRepository } from '@database/repositories/client.repository';
+import { ClientRepository } from '@persistence/repositories/client.repository';
 import { AgentContext } from './contracts/agent-context';
 import { LlmProvider } from './llm/provider.enum';
 import { Logger } from '@nestjs/common';

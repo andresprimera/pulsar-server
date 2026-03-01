@@ -5,11 +5,11 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { ClientAgentsService } from './client-agents.service';
-import { ClientAgentRepository } from '@database/repositories/client-agent.repository';
+import { ClientAgentRepository } from '@persistence/repositories/client-agent.repository';
 import { ClientsService } from '@clients/clients.service';
 import { AgentsService } from '@agents/agents.service';
-import { ChannelRepository } from '@database/repositories/channel.repository';
-import { ClientPhoneRepository } from '@database/repositories/client-phone.repository';
+import { ChannelRepository } from '@persistence/repositories/channel.repository';
+import { ClientPhoneRepository } from '@persistence/repositories/client-phone.repository';
 
 describe('ClientAgentsService', () => {
   let service: ClientAgentsService;

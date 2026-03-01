@@ -9,7 +9,8 @@
   "moduleNameMapper": {
     "^@channels/(.*)$": "<rootDir>/../src/channels/$1",
     "^@agent/(.*)$": "<rootDir>/../src/agent/$1",
-    "^@database/(.*)$": "<rootDir>/../src/database/$1",
+    "^@orchestrator/(.*)$": "<rootDir>/../src/orchestrator/$1",
+    "^@persistence/(.*)$": "<rootDir>/../src/persistence/$1",
     "^@domain/(.*)$": "<rootDir>/../src/domain/$1",
     "^@shared/(.*)$": "<rootDir>/../src/shared/$1",
     "^@agents/(.*)$": "<rootDir>/../src/agents/$1",

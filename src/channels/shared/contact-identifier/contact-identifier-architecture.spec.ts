@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
 import { Logger } from '@nestjs/common';
-import { ContactRepository } from '@database/repositories/contact.repository';
+import { ContactRepository } from '@persistence/repositories/contact.repository';
 import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
 import { ContactIdentifierExtractorRegistry } from './contact-identifier-extractor.registry';
 import { WhatsappIdentifierExtractor } from './whatsapp-identifier.extractor';

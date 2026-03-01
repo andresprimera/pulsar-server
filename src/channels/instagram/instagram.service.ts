@@ -1,13 +1,13 @@
 import { Injectable, ForbiddenException, Logger } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'crypto';
-import { decryptRecord } from '@database/utils/crypto.util';
+import { decryptRecord } from '@shared/crypto.util';
 import {
   InstagramServerConfig,
   loadInstagramConfig,
   buildMessagesUrl,
 } from './instagram.config';
 import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
-import { IncomingMessageOrchestrator } from '@agent/incoming-message.orchestrator';
+import { IncomingMessageOrchestrator } from '@orchestrator/incoming-message.orchestrator';
 import { IncomingChannelEvent } from '@channels/shared/incoming-channel-event.interface';
 
 @Injectable()

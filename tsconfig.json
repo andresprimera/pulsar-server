@@ -13,7 +13,8 @@
     "paths": {
       "@channels/*": ["src/channels/*"],
       "@agent/*": ["src/agent/*"],
-      "@database/*": ["src/database/*"],
+      "@orchestrator/*": ["src/orchestrator/*"],
+      "@persistence/*": ["src/persistence/*"],
       "@domain/*": ["src/domain/*"],
       "@shared/*": ["src/shared/*"],
       "@agents/*": ["src/agents/*"],

@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
-import { DatabaseModule } from './database/database.module';
+import { DatabaseModule } from './persistence/database.module';
 import { WhatsappModule } from './channels/whatsapp/whatsapp.module';
 import { TiktokModule } from './channels/tiktok/tiktok.module';
 import { InstagramModule } from './channels/instagram/instagram.module';

@@ -5,10 +5,10 @@ import {
   loadWhatsAppConfig,
 } from './whatsapp.config';
 import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
-import { IncomingMessageOrchestrator } from '@agent/incoming-message.orchestrator';
+import { IncomingMessageOrchestrator } from '@orchestrator/incoming-message.orchestrator';
 import { IncomingChannelEvent } from '@channels/shared/incoming-channel-event.interface';
-import { decryptRecord } from '@database/utils/crypto.util';
-import { ClientAgentRepository } from '@database/repositories/client-agent.repository';
+import { decryptRecord } from '@shared/crypto.util';
+import { ClientAgentRepository } from '@persistence/repositories/client-agent.repository';
 
 @Injectable()
 export class WhatsappService {

@@ -5,7 +5,7 @@ import { AgentInput } from './contracts/agent-input';
 import { AgentOutput } from './contracts/agent-output';
 import { AgentContext } from './contracts/agent-context';
 import { createLLMModel } from './llm/llm.factory';
-import { MessagePersistenceService } from '@channels/shared/message-persistence.service';
+import { MessagePersistenceService } from '@persistence/message-persistence.service';
 import { MetadataExposureService } from './metadata-exposure.service';
 
 @Injectable()

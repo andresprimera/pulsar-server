@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { MessagePersistenceService } from './message-persistence.service';
-import { MessageRepository } from '@database/repositories/message.repository';
+import { MessageRepository } from '@persistence/repositories/message.repository';
 import { ConversationSummaryService } from '@agent/conversation-summary.service';
 import { Types } from 'mongoose';
-import { ConversationService } from './conversation.service';
+import { ConversationService } from '@domain/conversation/conversation.service';
 
 describe('MessagePersistenceService', () => {
   let service: MessagePersistenceService;
