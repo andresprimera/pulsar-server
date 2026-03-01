@@ -26,7 +26,9 @@
     "prepare": "husky",
     "seed": "ts-node src/persistence/seed.ts",
     "test:architecture": "jest --config ./test/jest-architecture.json",
-    "check:cycles": "madge --circular src --extensions ts --ts-config ./tsconfig.json"
+    "check:cycles": "madge --circular src --extensions ts --ts-config ./tsconfig.json",
+    "review:architecture": "git diff main...HEAD | claude --agent architecture-steward -p 'Review the following git diff for architectural compliance. Output your full review with a Final Verdict.'",
+    "dump:staged": "echo '# Staged Changes\n' > staged-changes.md && echo '```diff' >> staged-changes.md && git diff --cached >> staged-changes.md && echo '```' >> staged-changes.md"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.34",

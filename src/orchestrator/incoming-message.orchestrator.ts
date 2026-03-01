@@ -11,7 +11,7 @@ import { decrypt, decryptRecord } from '@shared/crypto.util';
 import { CHANNEL_TYPES } from '@domain/channels/channel-type.constants';
 import { ChannelType } from '@domain/channels/channel-type.type';
 import { IncomingChannelEvent } from '@domain/channels/incoming-channel-event.interface';
-import { ContactIdentityResolver } from '@channels/shared/contact-identity.resolver';
+import { ContactIdentityResolver } from './contact-identity.resolver';
 import {
   AgentRoutingService,
   RouteCandidate,

@@ -5,7 +5,6 @@ import { AgentContextService } from './agent-context.service';
 import { ConversationSummaryService } from './conversation-summary.service';
 import { MetadataExposureService } from './metadata-exposure.service';
 import { MessagePersistenceService } from '@persistence/message-persistence.service';
-import { ConversationService } from '@domain/conversation/conversation.service';
 
 @Module({
   imports: [ConfigModule],
@@ -15,7 +14,6 @@ import { ConversationService } from '@domain/conversation/conversation.service';
     ConversationSummaryService,
     MetadataExposureService,
     MessagePersistenceService,
-    ConversationService,
   ],
   exports: [AgentService, AgentContextService, MetadataExposureService],
 })

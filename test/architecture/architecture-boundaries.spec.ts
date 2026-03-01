@@ -31,10 +31,8 @@ function getFilesInLayer(files: string[], layer: string): string[] {
 describe('Architecture Boundaries', () => {
   const files = getAllFiles(SRC_ROOT);
 
-  it('Channel implementations must not import persistence layer', () => {
-    const channelFiles = getFilesInLayer(files, 'channels').filter(
-      (file) => !toPosixPath(file).includes('/channels/shared/'),
-    );
+  it('Channel layer must not import persistence layer', () => {
+    const channelFiles = getFilesInLayer(files, 'channels');
 
     for (const file of channelFiles) {
       const content = fs.readFileSync(file, 'utf8');
@@ -44,12 +42,8 @@ describe('Architecture Boundaries', () => {
     }
   });
 
-  it('Channel implementations must not import agent services directly', () => {
-    const channelFiles = getFilesInLayer(files, 'channels').filter(
-      (file) =>
-        !toPosixPath(file).includes('/channels/shared/') &&
-        !file.endsWith('.module.ts'),
-    );
+  it('Channel layer must not import agent layer directly', () => {
+    const channelFiles = getFilesInLayer(files, 'channels');
 
     for (const file of channelFiles) {
       const content = fs.readFileSync(file, 'utf8');
@@ -58,15 +52,35 @@ describe('Architecture Boundaries', () => {
     }
   });
 
-  it('Channels shared layer must not import agent layer', () => {
-    const sharedFiles = getFilesInLayer(files, 'channels').filter((file) =>
-      toPosixPath(file).includes('/channels/shared/'),
-    );
+  it('Orchestrator must not import channels', () => {
+    const orchestratorFiles = getFilesInLayer(files, 'orchestrator');
 
-    for (const file of sharedFiles) {
+    for (const file of orchestratorFiles) {
       const content = fs.readFileSync(file, 'utf8');
 
-      expect(content).not.toMatch(/@agent\//);
+      expect(content).not.toMatch(/@channels\//);
+    }
+  });
+
+  it('Domain must not import channels or orchestrator', () => {
+    const domainFiles = getFilesInLayer(files, 'domain');
+
+    for (const file of domainFiles) {
+      const content = fs.readFileSync(file, 'utf8');
+
+      expect(content).not.toMatch(/@channels\//);
+      expect(content).not.toMatch(/@orchestrator\//);
+    }
+  });
+
+  it('Persistence must not import orchestrator or channels', () => {
+    const persistenceFiles = getFilesInLayer(files, 'persistence');
+
+    for (const file of persistenceFiles) {
+      const content = fs.readFileSync(file, 'utf8');
+
+      expect(content).not.toMatch(/@orchestrator\//);
+      expect(content).not.toMatch(/@channels\//);
     }
   });
 

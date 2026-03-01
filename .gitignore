@@ -39,3 +39,6 @@ lerna-debug.log*
 
 # Environment variables
 .env
+
+# Claude Code
+.claude/agent-memory/

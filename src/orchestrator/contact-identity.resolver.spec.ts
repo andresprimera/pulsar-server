@@ -2,19 +2,22 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Types } from 'mongoose';
 import { ContactIdentityResolver } from './contact-identity.resolver';
 import { ContactRepository } from '@persistence/repositories/contact.repository';
-import { ContactIdentifierExtractorRegistry } from './contact-identifier/contact-identifier-extractor.registry';
+import {
+  CONTACT_IDENTIFIER_REGISTRY,
+  ContactIdentifierRegistry,
+} from '@domain/channels/contact-identifier.interface';
 
 describe('ContactIdentityResolver', () => {
   let service: ContactIdentityResolver;
   let contactRepository: jest.Mocked<ContactRepository>;
-  let identifierExtractorRegistry: jest.Mocked<ContactIdentifierExtractorRegistry>;
+  let identifierExtractorRegistry: jest.Mocked<ContactIdentifierRegistry>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ContactIdentityResolver,
         {
-          provide: ContactIdentifierExtractorRegistry,
+          provide: CONTACT_IDENTIFIER_REGISTRY,
           useValue: {
             resolve: jest.fn(),
           },
@@ -30,9 +33,7 @@ describe('ContactIdentityResolver', () => {
 
     service = module.get(ContactIdentityResolver);
     contactRepository = module.get(ContactRepository);
-    identifierExtractorRegistry = module.get(
-      ContactIdentifierExtractorRegistry,
-    );
+    identifierExtractorRegistry = module.get(CONTACT_IDENTIFIER_REGISTRY);
   });
 
   it('should resolve and upsert contact using normalized identifier', async () => {

@@ -1,9 +1,17 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { Types } from 'mongoose';
 import { Contact } from '@persistence/schemas/contact.schema';
 import { ContactRepository } from '@persistence/repositories/contact.repository';
-import { ChannelType } from './channel-type.type';
-import { ContactIdentifierExtractorRegistry } from './contact-identifier/contact-identifier-extractor.registry';
+import { ChannelType } from '@domain/channels/channel-type.type';
+import {
+  CONTACT_IDENTIFIER_REGISTRY,
+  ContactIdentifierRegistry,
+} from '@domain/channels/contact-identifier.interface';
 
 export interface ResolveContactIdentityParams {
   channelType: ChannelType;
@@ -19,7 +27,8 @@ export class ContactIdentityResolver {
   private readonly logger = new Logger(ContactIdentityResolver.name);
 
   constructor(
-    private readonly identifierExtractorRegistry: ContactIdentifierExtractorRegistry,
+    @Inject(CONTACT_IDENTIFIER_REGISTRY)
+    private readonly identifierExtractorRegistry: ContactIdentifierRegistry,
     private readonly contactRepository: ContactRepository,
   ) {}
 

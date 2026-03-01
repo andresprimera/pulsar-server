@@ -5,7 +5,7 @@ import { Connection, Types } from 'mongoose';
 import { getConnectionToken } from '@nestjs/mongoose';
 import { AgentService } from '../src/agent/agent.service';
 import * as request from 'supertest';
-import { ChannelProvider } from '../src/channels/channel-provider.enum';
+import { ChannelProvider } from '../src/domain/channels/channel-provider.enum';
 
 describe('TikTok Channel (e2e)', () => {
   let app: INestApplication;

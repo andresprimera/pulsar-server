@@ -1,7 +1,7 @@
 import { Types } from 'mongoose';
 import { Logger } from '@nestjs/common';
 import { ContactRepository } from '@persistence/repositories/contact.repository';
-import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
+import { CHANNEL_TYPES } from '@domain/channels/channel-type.constants';
 import { ContactIdentifierExtractorRegistry } from './contact-identifier-extractor.registry';
 import { WhatsappIdentifierExtractor } from './whatsapp-identifier.extractor';
 import { InstagramIdentifierExtractor } from './instagram-identifier.extractor';

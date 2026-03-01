@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 describe('FlowIntegrity', () => {
-  const workspaceRoot = path.resolve(__dirname, '../../..');
+  const workspaceRoot = path.resolve(__dirname, '../..');
 
   const read = (relativePath: string) =>
     fs.readFileSync(path.resolve(workspaceRoot, relativePath), 'utf8');

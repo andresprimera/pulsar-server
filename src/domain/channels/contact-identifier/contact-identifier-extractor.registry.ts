@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ChannelType } from '@channels/shared/channel-type.type';
+import { ChannelType } from '@domain/channels/channel-type.type';
 import {
   CONTACT_IDENTIFIER_EXTRACTORS,
   ContactIdentifierExtractor,

@@ -1,28 +1,28 @@
 import { Injectable } from '@nestjs/common';
-import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
-import { ChannelType } from '@channels/shared/channel-type.type';
+import { CHANNEL_TYPES } from '@domain/channels/channel-type.constants';
+import { ChannelType } from '@domain/channels/channel-type.type';
 import {
   ContactIdentifierType,
   RawCapableContactIdentifierExtractor,
 } from './contact-identifier-extractor.interface';
 
 @Injectable()
-export class TiktokIdentifierExtractor
+export class ApiIdentifierExtractor
   implements RawCapableContactIdentifierExtractor
 {
   supports(channelType: ChannelType): boolean {
-    return channelType === CHANNEL_TYPES.TIKTOK;
+    return channelType === CHANNEL_TYPES.API;
   }
 
   extractRaw(payload: unknown): string {
     const source = payload as any;
-    const sender = source?.data?.sender?.user_id ?? source?.sender?.user_id;
+    const rawId = source?.externalId ?? source?.contactId ?? source?.senderId;
 
-    if (typeof sender !== 'string') {
-      throw new Error('missing-tiktok-identifier');
+    if (typeof rawId !== 'string') {
+      throw new Error('missing-api-identifier');
     }
 
-    return sender;
+    return rawId;
   }
 
   extract(payload: unknown): string {

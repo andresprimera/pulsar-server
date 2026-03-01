@@ -6,9 +6,9 @@ import {
   loadInstagramConfig,
   buildMessagesUrl,
 } from './instagram.config';
-import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
+import { CHANNEL_TYPES } from '@domain/channels/channel-type.constants';
 import { IncomingMessageOrchestrator } from '@orchestrator/incoming-message.orchestrator';
-import { IncomingChannelEvent } from '@channels/shared/incoming-channel-event.interface';
+import { IncomingChannelEvent } from '@domain/channels/incoming-channel-event.interface';
 
 @Injectable()
 export class InstagramService {

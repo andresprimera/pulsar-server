@@ -8,7 +8,7 @@ import { LlmProvider } from '@domain/llm/provider.enum';
 import { CHANNEL_TYPES } from '@domain/channels/channel-type.constants';
 import { AgentRoutingService } from '@domain/routing/agent-routing.service';
 import { AgentContextService } from '@agent/agent-context.service';
-import { ContactIdentityResolver } from '@channels/shared/contact-identity.resolver';
+import { ContactIdentityResolver } from './contact-identity.resolver';
 import { ConversationService } from '@domain/conversation/conversation.service';
 import { EventIdempotencyService } from '@persistence/event-idempotency.service';
 

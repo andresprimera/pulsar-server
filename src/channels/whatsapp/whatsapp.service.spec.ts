@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException, Logger } from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
 import { IncomingMessageOrchestrator } from '@orchestrator/incoming-message.orchestrator';
-import { CHANNEL_TYPES } from '@channels/shared/channel-type.constants';
+import { CHANNEL_TYPES } from '@domain/channels/channel-type.constants';
 import { encrypt } from '@shared/crypto.util';
 
 describe('WhatsappService', () => {
