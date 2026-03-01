@@ -5,9 +5,10 @@ import { AgentContextService } from './agent-context.service';
 import { ConversationSummaryService } from './conversation-summary.service';
 import { MetadataExposureService } from './metadata-exposure.service';
 import { MessagePersistenceService } from '@persistence/message-persistence.service';
+import { DomainModule } from '@domain/domain.module';
 
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule, DomainModule],
   providers: [
     AgentService,
     AgentContextService,
