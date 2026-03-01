@@ -170,12 +170,18 @@ describe('TikTok Channel (e2e)', () => {
       await connection
         .collection('channels')
         .deleteMany({ _id: { $in: [tiktokChannelIdObj] } });
+      await connection
+        .collection('processed_events')
+        .deleteMany({ channel: 'tiktok' });
     }
     await app.close();
     fetchSpy.mockRestore();
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await connection
+      .collection('processed_events')
+      .deleteMany({ channel: 'tiktok' });
     jest.clearAllMocks();
   });
 

@@ -116,6 +116,9 @@ describe('Message Persistence (e2e)', () => {
       await connection
         .collection('contacts')
         .deleteMany({ externalId: userPhone.replace(/[^\d]/g, '') });
+      await connection
+        .collection('processed_events')
+        .deleteMany({ channel: 'whatsapp' });
     }
     await app.close();
   });
@@ -128,6 +131,9 @@ describe('Message Persistence (e2e)', () => {
     await connection
       .collection('contacts')
       .deleteMany({ externalId: userPhone.replace(/[^\d]/g, '') });
+    await connection
+      .collection('processed_events')
+      .deleteMany({ channel: 'whatsapp' });
     jest.clearAllMocks();
   });
 

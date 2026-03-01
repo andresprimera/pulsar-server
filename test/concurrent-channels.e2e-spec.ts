@@ -208,13 +208,15 @@ describe('Concurrent Channels (e2e)', () => {
           ],
         },
       });
+      await connection.collection('processed_events').deleteMany({});
     }
     await app.close();
     fetchSpy.mockRestore();
     delete process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN;
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await connection.collection('processed_events').deleteMany({});
     jest.clearAllMocks();
   });
 

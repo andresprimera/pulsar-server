@@ -164,13 +164,19 @@ describe('Instagram Channel (e2e)', () => {
       await connection
         .collection('channels')
         .deleteMany({ _id: { $in: [instagramChannelIdObj] } });
+      await connection
+        .collection('processed_events')
+        .deleteMany({ channel: 'instagram' });
     }
     await app.close();
     fetchSpy.mockRestore();
     delete process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN;
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await connection
+      .collection('processed_events')
+      .deleteMany({ channel: 'instagram' });
     jest.clearAllMocks();
   });
 
