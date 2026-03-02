@@ -1,225 +1,391 @@
-# Pulsar Coding Rules & Guardrails
+# Pulsar Architecture Contract
 
-This document defines implementation discipline.
+This document defines the mandatory architectural rules of the system.
 
-ARCHITECTURE_CONTRACT.md is the source of truth for structural rules.
-If any conflict exists, ARCHITECTURE_CONTRACT.md wins.
+These rules are mechanically enforced via:
 
-Do not redefine architecture here.
+-   ESLint boundaries
+-   Path aliases
+-   CI lint checks
+-   Import restrictions
+-   Architecture tests
 
----
+No change may violate this contract.
 
-# 1. Architectural Authority
+If any other document conflicts with this one, this document wins.
 
-All structural rules are defined in:
+------------------------------------------------------------------------
 
-- ARCHITECTURE_CONTRACT.md
-- architectural-layers.md
+# 1. Layer Overview
 
-You must:
+The system is divided into five strict layers:
 
-- Respect layer boundaries
-- Use path aliases
-- Preserve idempotency rules
-- Preserve conversation lifecycle rules
-- Preserve summary compression rules
+1.  Transport Layer (`channels/`)
+2.  Coordination Layer (`orchestrator/`)
+3.  LLM Execution Layer (`agent/`)
+4.  Domain Layer (`domain/`)
+5.  Persistence Layer (`persistence/`)
 
-If unsure, read ARCHITECTURE_CONTRACT.md before implementing.
+------------------------------------------------------------------------
 
----
+## 1.1 Allowed Dependency Flow
 
-# 2. Controllers
+channels → orchestrator
 
-Controllers are HTTP transport only.
+orchestrator → domain\
+orchestrator → agent\
+orchestrator → persistence (idempotency only)
 
-They:
-- Validate input via DTO
-- Delegate to services
-- Do not contain business logic
+agent → domain\
+agent → persistence
 
-Do not:
-- Access repositories
-- Call Mongoose models
-- Perform lifecycle validation
-- Perform routing logic
+domain → (no outward dependencies)\
+persistence → (no outward dependencies)
 
----
+Upward or sideways imports are forbidden.
 
-# 3. Services
+All cross-layer imports must use path aliases:
 
-Services:
-- Contain business logic
-- Enforce lifecycle invariants
-- Use repositories only for data access
-- Never access models directly
+@channels/* @orchestrator/* @agent/* @domain/* @persistence/* @shared/*
 
-Service create() must explicitly set `status: 'active'`.
+Relative parent imports across layers are forbidden.
 
-Lifecycle rules are enforced in services, not controllers.
+------------------------------------------------------------------------
 
----
+# 2. Transport Layer (`channels/`)
 
-# 4. Repositories
+## Responsibilities
 
-Repositories:
-- Are the only layer allowed to access Mongoose models
-- Contain pure data access logic
-- Return `null` for not-found
-- Never throw HTTP exceptions
+-   Webhook validation
+-   Signature verification
+-   Payload parsing
+-   Construct `IncomingChannelEvent`
+-   Call `IncomingMessageOrchestrator`
+-   Send outbound platform messages
 
-Services decide whether to throw.
+## Transport MUST NOT
 
----
+-   Import repositories
+-   Import persistence layer
+-   Import `AgentService`
+-   Resolve routing
+-   Resolve conversations
+-   Persist messages
+-   Build `AgentContext`
+-   Decrypt credentials outside outbound execution
 
-# 5. Database & Lifecycle Rules
+Transport is pure I/O.
 
-- No hard deletes.
-- Use `status: active | inactive | archived`.
-- Archived entities:
-  - Cannot be modified
-  - Cannot change status
-  - Must remain readable
+------------------------------------------------------------------------
 
-Multi-document writes must use transactions.
+# 3. Coordination Layer (`orchestrator/`)
 
----
+## Responsibilities
 
-# 6. DTO & Validation
+-   Enforce idempotency (Phase C)
+-   Resolve routing
+-   Resolve contact identity
+-   Resolve or create conversation
+-   Build `AgentContext`
+-   Call `AgentService`
+-   Return reply + encrypted channel metadata
 
-- All input must use DTOs with `class-validator`.
-- DTOs must be colocated with feature module.
-- Use NestJS ValidationPipe with default configuration.
-- Do not manually validate in controllers.
-- Do not trust raw input.
+Orchestrator owns inbound event lifecycle.
 
----
+## Orchestrator MUST NOT
 
-# 7. Logging
+-   Send outbound HTTP requests
+-   Decrypt credentials
+-   Directly persist messages
+-   Access transport APIs
 
-- Use NestJS Logger.
-- Never use console.log.
-- Logging must be structured and consistent.
+------------------------------------------------------------------------
 
----
+# 4. LLM Execution Layer (`agent/`)
 
-# 8. Error Handling
+## Responsibilities
 
-Use NestJS exceptions:
-- NotFoundException
-- BadRequestException
-- ConflictException
-- ForbiddenException
+-   Execute LLM calls
+-   Persist messages via `MessagePersistenceService`
+-   Trigger summary compression (Phase D)
+-   Apply metadata exposure filtering
+-   Maintain bounded conversation memory
 
-Do not:
-- Return null/false for errors
-- Swallow exceptions silently
+Agent owns AI execution and AI-related runtime concerns.
 
----
+## Agent MUST NOT
 
-# 9. Credential Security
+-   Access transport layer
+-   Send outbound platform messages
+-   Perform routing
+-   Resolve conversations directly
 
-- Encrypt all credentials before storage.
-- Credential schema fields must use `select: false`.
-- Use `.select('+field')` when explicitly needed.
-- Decrypt only at execution boundary (channels or LLM boundary).
+------------------------------------------------------------------------
 
-Routing identifiers (phoneNumberId, instagramAccountId, etc.) remain plaintext for indexing.
+# 5. Domain Layer (`domain/`)
 
-See:
-docs/rules/credential-encryption.md
+## Responsibilities
 
----
+-   Conversation lifecycle rules
+-   Routing logic
+-   Contact business invariants
+-   Pure business policies
 
-# 10. Channel Integration (Current Pattern)
+Domain defines business truth --- not execution mechanics.
 
-Channels are pure transport.
+## Domain MUST
 
-They must:
-- Validate webhook
-- Parse payload
-- Construct IncomingChannelEvent
-- Call IncomingMessageOrchestrator
-- Send outbound message using returned metadata
+-   Be framework-agnostic
+-   Contain no provider-specific code
+-   Contain no runtime execution logic
+-   Contain no infrastructure economics
 
-Channels must NOT:
-- Perform routing
-- Resolve conversation
-- Persist messages
-- Call AgentService directly
-- Access repositories
+## Domain MUST NOT
 
-All inbound message lifecycle must pass through orchestrator.
+-   Call LLM
+-   Access transport
+-   Send HTTP requests
+-   Import persistence
+-   Encode provider pricing
+-   Encode infrastructure cost logic
+-   Depend on execution-layer implementation details
 
----
+------------------------------------------------------------------------
 
-# 11. Idempotency (Phase C – Active)
+# 6. Persistence Layer (`persistence/`)
 
-Inbound messages must be idempotent.
+## Responsibilities
 
-Rules:
-- Unique constraint on (channel, messageId)
-- Duplicate events must not:
-  - Call LLM
-  - Persist messages
-  - Trigger summary
-  - Touch conversation
+-   Database writes
+-   Repository access
+-   Idempotency enforcement
+-   Message storage
+-   Conversation storage
+-   Summary storage
 
-Never bypass idempotency guard.
+Persistence owns data integrity and atomic guarantees.
 
----
+## Persistence MUST NOT
 
-# 12. Conversation & Summary (Phase D – Active)
+-   Call LLM
+-   Import orchestrator
+-   Import agent
+-   Import transport
+-   Contain business decision logic
+
+------------------------------------------------------------------------
+
+# 7. Idempotency (Phase C -- Active)
+
+Idempotency is mandatory.
+
+## Rules
+
+-   Unique compound index: `(channel, messageId)`
+-   Enforced before routing
+-   Duplicate events must NOT:
+    -   Call AgentService
+    -   Persist messages
+    -   Trigger summary
+    -   Touch conversation
+-   In-memory deduplication is forbidden
+
+Exactly-once semantics per inbound message are required.
+
+------------------------------------------------------------------------
+
+# 8. Summary Compression (Phase D -- Active)
 
 Conversation memory must remain bounded.
 
-Rules:
-- Conversation stores summary.
-- Only messages after last summary are sent to LLM.
-- Summarization must not block user response.
-- Channels must not know summary exists.
+## Rules
 
----
+-   Summary stored at conversation level
+-   Only messages after last summary are sent to LLM
+-   Summarization runs asynchronously
+-   LLM responses must not block on summarization
+-   Channels must not know summaries exist
 
-# 13. Data Modeling
+This guarantees long-term memory stability.
 
-- Use explicit collection names.
-- Add indexes for queried fields.
-- Add compound indexes for routing.
-- Add unique indexes for invariants.
-- Use `_id: false` for embedded schemas.
+------------------------------------------------------------------------
 
-See:
-docs/rules/data-modeling.md
+# 9. Cross-Cutting Concern Placement Framework
 
----
+When introducing a new concept, you MUST determine its correct layer
+using the following classification tests.
 
-# 14. Scope Discipline
+This framework governs architectural purity.
 
-- Implement only what is requested.
-- Do not refactor unrelated code.
-- Do not rename fields without explicit instruction.
-- Preserve backward compatibility.
+## 9.1 Business Invariant Test
 
-Success = minimal diff + zero regressions + full alignment.
+Does this concept define business truth, lifecycle rules, or domain
+policies?
 
----
+If YES → it belongs in `domain/`.
 
-# 15. When Uncertain
+If NO → it MUST NOT live in `domain/`.
 
-1. Mirror existing patterns.
-2. Check ARCHITECTURE_CONTRACT.md.
-3. Prefer consistency over creativity.
-4. If conflict appears, request clarification.
+## 9.2 Execution Concern Test
 
----
+Does this concept exist because of:
 
-# 16. Mandatory Architecture Review (Final Step)
+-   LLM execution?
+-   Provider integration?
+-   Runtime AI behavior?
+-   Token accounting?
+-   Cost estimation?
+-   Model selection?
 
-Every implementation plan MUST include a final step that runs the architecture steward agent (`architecture-steward`) against the changes introduced by the plan.
+If YES → it belongs in `agent/`.
 
-Rules:
-- After all code changes are complete and tests pass, run the architecture steward agent.
-- If the agent returns **REJECTED**, fix every violation it identifies.
-- Re-run the agent after fixes until it returns **APPROVED**.
-- Do NOT consider the plan complete until the architecture steward approves.
-- This step is non-negotiable and cannot be skipped.
+## 9.3 Coordination Concern Test
+
+Does this concept coordinate:
+
+-   Event ordering?
+-   Idempotency?
+-   Conversation resolution?
+-   Cross-service sequencing?
+
+If YES → it belongs in `orchestrator/`.
+
+## 9.4 Storage Concern Test
+
+Is this concept purely about:
+
+-   Data persistence?
+-   Querying?
+-   Index enforcement?
+-   Atomicity?
+
+If YES → it belongs in `persistence/`.
+
+## 9.5 Transport Concern Test
+
+Does this concept handle:
+
+-   Webhook parsing?
+-   Signature verification?
+-   HTTP request/response?
+-   Platform message sending?
+
+If YES → it belongs in `channels/`.
+
+## 9.6 Prohibited Ambiguity
+
+If a concept fails the Business Invariant Test,\
+it MUST NOT be placed in `domain/`.
+
+If a concept is execution-specific,\
+it MUST NOT be elevated to domain.
+
+Cross-cutting concerns must be classified --- not improvised.
+
+------------------------------------------------------------------------
+
+# 10. Architectural Violations
+
+Violations include:
+
+-   Channel importing repository
+-   Agent importing channel
+-   Persistence importing agent
+-   Domain importing execution-specific modules
+-   Direct LLM call outside AgentService
+-   Transport API call outside channels
+-   Circular dependencies
+-   Bypassing idempotency
+-   Encoding infrastructure economics in domain
+
+Violations must fail lint and CI.
+
+------------------------------------------------------------------------
+
+# 11. Mandatory Structural Design Protocol
+
+For any non-trivial structural change (new schema, service, module,
+cross-layer logic, execution concern, or persistence concern), the
+following process is REQUIRED before implementation.
+
+Failure to follow this protocol is an architectural violation.
+
+## 11.1 Concern Classification (Mandatory)
+
+The implementation plan MUST explicitly state:
+
+-   Business Invariant Test → pass/fail + explanation\
+-   Execution Concern Test → pass/fail + explanation\
+-   Coordination Concern Test → pass/fail + explanation\
+-   Storage Concern Test → pass/fail + explanation\
+-   Transport Concern Test → pass/fail + explanation
+
+Layer placement must be justified, not assumed.
+
+## 11.2 Alternative Layer Rejection (Mandatory)
+
+The plan MUST explicitly explain why the concern does NOT belong in each
+other layer.
+
+## 11.3 Future Evolution Simulation (Mandatory)
+
+The design MUST simulate at least two plausible future expansions and
+confirm:
+
+-   No layer violation would be required.
+-   No reclassification would be required.
+-   No contract rule would need modification.
+
+## 11.4 Contract Alignment Proof (Mandatory)
+
+The plan MUST explicitly confirm:
+
+-   No layer direction violations.
+-   No domain contamination.
+-   No idempotency rule violation.
+-   No summary compression violation.
+-   No transport logic leakage.
+
+Plans lacking this validation are incomplete.
+
+## 11.5 Dependency Impact Declaration
+
+The plan MUST declare:
+
+-   Which layers are modified.
+-   Which new dependencies are introduced.
+-   Whether any dependency direction changes occur.
+
+If any upward or sideways import is introduced, the plan is invalid.
+
+------------------------------------------------------------------------
+
+# 12. Change Protocol
+
+Before implementing a change:
+
+1.  Identify the correct layer using the Placement Framework.
+2.  Confirm dependency direction is valid.
+3.  Confirm path aliases are used.
+4.  Confirm lint passes.
+5.  Confirm architecture tests pass.
+6.  Confirm idempotency and summary rules remain intact.
+7.  Confirm domain purity is preserved.
+
+------------------------------------------------------------------------
+
+# 13. Design Philosophy
+
+This architecture prioritizes:
+
+-   Predictability over cleverness
+-   Explicit boundaries over convenience
+-   Structural integrity over speed
+-   Conceptual purity over abstraction drift
+
+When uncertain:
+
+-   Prefer consistency with existing patterns
+-   Prefer smaller diffs
+-   Prefer clearer boundaries
+-   Never compromise layer integrity

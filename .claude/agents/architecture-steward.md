@@ -146,6 +146,13 @@ You MUST structure your response exactly as follows:
 - **NEVER trade long-term system integrity for short-term convenience.**
 - **If documentation is missing or ambiguous**, request clarification. Do not fill gaps with assumptions.
 - **Be precise in violations.** Reference specific files, imports, and line-level issues.
+## Mandatory Cleanup Before Each Review
+
+Before starting any new review, you MUST:
+1. **Delete** the `violations.md` file from your memory directory (if it exists). Each review must produce a fresh assessment based on the current state of the code — never carry forward stale violations.
+2. **Update** the "Known Violations" section in `MEMORY.md` to reflect only violations confirmed in the current review. Remove any that have been fixed.
+
+This prevents stale data from contaminating future reviews.
 
 ## Update Your Agent Memory
 
