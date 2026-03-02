@@ -30,6 +30,8 @@ import {
   ProcessedEventSchema,
 } from './schemas/processed-event.schema';
 import { ProcessedEventRepository } from './repositories/processed-event.repository';
+import { LlmUsageLog, LlmUsageLogSchema } from './schemas/llm-usage-log.schema';
+import { LlmUsageLogRepository } from './repositories/llm-usage-log.repository';
 import { EventIdempotencyService } from './event-idempotency.service';
 import { OnboardingModule } from '@onboarding/onboarding.module';
 
@@ -45,6 +47,7 @@ const repositories = [
   MessageRepository,
   ConversationRepository,
   ProcessedEventRepository,
+  LlmUsageLogRepository,
 ];
 
 @Global()
@@ -71,6 +74,7 @@ const repositories = [
       { name: Message.name, schema: MessageSchema },
       { name: Conversation.name, schema: ConversationSchema },
       { name: ProcessedEvent.name, schema: ProcessedEventSchema },
+      { name: LlmUsageLog.name, schema: LlmUsageLogSchema },
     ]),
     forwardRef(() => OnboardingModule),
   ],

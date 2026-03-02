@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
 import { ConversationSummaryService } from './conversation-summary.service';
 import { MessageRepository } from '@persistence/repositories/message.repository';
+import { LlmUsageLogRepository } from '@persistence/repositories/llm-usage-log.repository';
 import { Types } from 'mongoose';
 import * as ai from 'ai';
 import * as llmFactory from './llm/llm.factory';
@@ -19,6 +20,7 @@ describe('ConversationSummaryService', () => {
   let service: ConversationSummaryService;
   let messageRepository: jest.Mocked<MessageRepository>;
   let configService: jest.Mocked<ConfigService>;
+  let llmUsageLogRepository: jest.Mocked<LlmUsageLogRepository>;
   let loggerErrorSpy: jest.SpyInstance;
 
   const mockChannelId = new Types.ObjectId('507f1f77bcf86cd799439011');
@@ -83,6 +85,12 @@ describe('ConversationSummaryService', () => {
             get: jest.fn(),
           },
         },
+        {
+          provide: LlmUsageLogRepository,
+          useValue: {
+            create: jest.fn().mockResolvedValue({}),
+          },
+        },
       ],
     }).compile();
 
@@ -91,6 +99,7 @@ describe('ConversationSummaryService', () => {
     );
     messageRepository = module.get(MessageRepository);
     configService = module.get(ConfigService);
+    llmUsageLogRepository = module.get(LlmUsageLogRepository);
     loggerErrorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
 
     jest.clearAllMocks();
@@ -209,6 +218,68 @@ describe('ConversationSummaryService', () => {
         'CONVERSATION_TOKEN_THRESHOLD',
         2000,
       );
+    });
+
+    it('should log LLM usage with operationType summary', async () => {
+      const mockModel = {};
+      const mockUsage = {
+        inputTokens: 200,
+        outputTokens: 80,
+        totalTokens: 280,
+      };
+      configService.get.mockReturnValue(2000);
+      messageRepository.countTokensInConversation.mockResolvedValue(2500);
+      messageRepository.findConversationContext.mockResolvedValue(
+        mockMessages as any,
+      );
+      (llmFactory.createLLMModel as jest.Mock).mockReturnValue(mockModel);
+      (ai.generateText as jest.Mock).mockResolvedValue({
+        text: 'Summary text',
+        usage: mockUsage,
+      });
+      messageRepository.create.mockResolvedValue({} as any);
+
+      await service.checkAndSummarizeIfNeeded(
+        mockConversationId,
+        mockAgentId,
+        mockContext,
+      );
+
+      expect(llmUsageLogRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          agentId: mockAgentId,
+          conversationId: mockConversationId,
+          provider: mockContext.llmConfig.provider,
+          llmModel: mockContext.llmConfig.model,
+          inputTokens: 200,
+          outputTokens: 80,
+          totalTokens: 280,
+          operationType: 'summary',
+        }),
+      );
+    });
+
+    it('should not log usage when usage data is not returned', async () => {
+      const mockModel = {};
+      configService.get.mockReturnValue(2000);
+      messageRepository.countTokensInConversation.mockResolvedValue(2500);
+      messageRepository.findConversationContext.mockResolvedValue(
+        mockMessages as any,
+      );
+      (llmFactory.createLLMModel as jest.Mock).mockReturnValue(mockModel);
+      (ai.generateText as jest.Mock).mockResolvedValue({
+        text: 'Summary text',
+        usage: undefined,
+      });
+      messageRepository.create.mockResolvedValue({} as any);
+
+      await service.checkAndSummarizeIfNeeded(
+        mockConversationId,
+        mockAgentId,
+        mockContext,
+      );
+
+      expect(llmUsageLogRepository.create).not.toHaveBeenCalled();
     });
 
     it('should handle empty/whitespace summary from LLM', async () => {

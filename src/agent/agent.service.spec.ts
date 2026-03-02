@@ -6,6 +6,7 @@ import { LlmProvider } from './llm/provider.enum';
 import { MessagePersistenceService } from '@persistence/message-persistence.service';
 import { ConversationSummaryService } from './conversation-summary.service';
 import { MetadataExposureService } from './metadata-exposure.service';
+import { LlmUsageLogRepository } from '@persistence/repositories/llm-usage-log.repository';
 import * as llmFactory from './llm/llm.factory';
 import * as ai from 'ai';
 import { Logger } from '@nestjs/common';
@@ -22,6 +23,7 @@ jest.mock('./llm/llm.factory', () => ({
 describe('AgentService', () => {
   let service: AgentService;
   let messagePersistenceService: jest.Mocked<MessagePersistenceService>;
+  let llmUsageLogRepository: jest.Mocked<LlmUsageLogRepository>;
   let logSpy: jest.SpyInstance;
   let errorSpy: jest.SpyInstance;
 
@@ -68,11 +70,18 @@ describe('AgentService', () => {
           },
         },
         MetadataExposureService,
+        {
+          provide: LlmUsageLogRepository,
+          useValue: {
+            create: jest.fn().mockResolvedValue({}),
+          },
+        },
       ],
     }).compile();
 
     service = module.get<AgentService>(AgentService);
     messagePersistenceService = module.get(MessagePersistenceService);
+    llmUsageLogRepository = module.get(LlmUsageLogRepository);
     logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
     errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
     jest.clearAllMocks();
@@ -285,6 +294,84 @@ describe('AgentService', () => {
         new Types.ObjectId(mockInput.conversationId),
         expect.anything(),
       );
+    });
+
+    it('should log LLM usage when usage data is available', async () => {
+      const mockModel = {};
+      const mockUsage = {
+        inputTokens: 100,
+        outputTokens: 50,
+        totalTokens: 150,
+      };
+      (llmFactory.createLLMModel as jest.Mock).mockReturnValue(mockModel);
+      (ai.generateText as jest.Mock).mockResolvedValue({
+        text: 'AI response',
+        usage: mockUsage,
+      });
+      messagePersistenceService.createUserMessage.mockResolvedValue();
+      messagePersistenceService.getConversationContextByConversationId.mockResolvedValue(
+        [],
+      );
+      messagePersistenceService.handleOutgoingMessage.mockResolvedValue();
+
+      await service.run(mockInput, mockContext);
+
+      expect(llmUsageLogRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: mockContext.llmConfig.provider,
+          llmModel: mockContext.llmConfig.model,
+          inputTokens: 100,
+          outputTokens: 50,
+          totalTokens: 150,
+          operationType: 'chat',
+        }),
+      );
+    });
+
+    it('should not log LLM usage when usage data is undefined', async () => {
+      const mockModel = {};
+      (llmFactory.createLLMModel as jest.Mock).mockReturnValue(mockModel);
+      (ai.generateText as jest.Mock).mockResolvedValue({
+        text: 'AI response',
+        usage: undefined,
+      });
+      messagePersistenceService.createUserMessage.mockResolvedValue();
+      messagePersistenceService.getConversationContextByConversationId.mockResolvedValue(
+        [],
+      );
+      messagePersistenceService.handleOutgoingMessage.mockResolvedValue();
+
+      await service.run(mockInput, mockContext);
+
+      expect(llmUsageLogRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('should not fail when LLM usage logging fails', async () => {
+      const mockModel = {};
+      const mockUsage = {
+        inputTokens: 100,
+        outputTokens: 50,
+        totalTokens: 150,
+      };
+      (llmFactory.createLLMModel as jest.Mock).mockReturnValue(mockModel);
+      (ai.generateText as jest.Mock).mockResolvedValue({
+        text: 'AI response',
+        usage: mockUsage,
+      });
+      messagePersistenceService.createUserMessage.mockResolvedValue();
+      messagePersistenceService.getConversationContextByConversationId.mockResolvedValue(
+        [],
+      );
+      messagePersistenceService.handleOutgoingMessage.mockResolvedValue();
+      llmUsageLogRepository.create.mockRejectedValue(
+        new Error('DB write failed'),
+      );
+
+      const result = await service.run(mockInput, mockContext);
+
+      expect(result).toEqual({
+        reply: { type: 'text', text: 'AI response' },
+      });
     });
 
     it('does not load old conversation history when a new conversation is resolved', async () => {

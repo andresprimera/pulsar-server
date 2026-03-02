@@ -8,6 +8,7 @@ import { createLLMModel } from './llm/llm.factory';
 import { MessagePersistenceService } from '@persistence/message-persistence.service';
 import { ConversationSummaryService } from './conversation-summary.service';
 import { MetadataExposureService } from './metadata-exposure.service';
+import { LlmUsageLogRepository } from '@persistence/repositories/llm-usage-log.repository';
 
 @Injectable()
 export class AgentService {
@@ -17,6 +18,7 @@ export class AgentService {
     private readonly messagePersistenceService: MessagePersistenceService,
     private readonly conversationSummaryService: ConversationSummaryService,
     private readonly metadataExposureService: MetadataExposureService,
+    private readonly llmUsageLogRepository: LlmUsageLogRepository,
   ) {}
 
   async run(input: AgentInput, context: AgentContext): Promise<AgentOutput> {
@@ -85,7 +87,7 @@ export class AgentService {
         input.contactSummary,
       );
 
-      const { text } = await generateText({
+      const { text, usage } = await generateText({
         model,
         system: systemPrompt,
         messages,
@@ -103,6 +105,27 @@ export class AgentService {
         contactId,
         conversationId,
       );
+
+      // Log LLM usage (fire-and-forget)
+      if (usage) {
+        this.llmUsageLogRepository
+          .create({
+            agentId: new Types.ObjectId(context.agentId),
+            clientId: new Types.ObjectId(context.clientId),
+            channelId: new Types.ObjectId(context.channelId),
+            contactId,
+            conversationId,
+            provider: context.llmConfig.provider,
+            llmModel: context.llmConfig.model,
+            inputTokens: usage.inputTokens ?? 0,
+            outputTokens: usage.outputTokens ?? 0,
+            totalTokens: usage.totalTokens ?? 0,
+            operationType: 'chat',
+          })
+          .catch((err) => {
+            this.logger.error(`Failed to log LLM usage: ${err.message}`);
+          });
+      }
 
       // Trigger async summarization (fire-and-forget)
       this.conversationSummaryService
