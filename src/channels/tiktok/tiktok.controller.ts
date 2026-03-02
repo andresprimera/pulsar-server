@@ -12,7 +12,9 @@ export class TiktokController {
   handleWebhook(@Body() payload: unknown): string {
     this.tiktokService.handleIncoming(payload).catch((error) => {
       this.logger.error(
-        `Failed to process TikTok webhook: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to process TikTok webhook: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
         error instanceof Error ? error.stack : undefined,
       );
     });

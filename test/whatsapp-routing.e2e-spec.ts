@@ -4,7 +4,7 @@ import * as request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { Connection } from 'mongoose';
 import { getConnectionToken } from '@nestjs/mongoose';
-import * as SEED_DATA from '../src/database/data/seed-data.json';
+import * as SEED_DATA from '../src/persistence/data/seed-data.json';
 import { AgentService } from '../src/agent/agent.service';
 
 describe('WhatsApp Message Routing (e2e)', () => {
@@ -125,7 +125,9 @@ describe('WhatsApp Message Routing (e2e)', () => {
     }
   });
 
-  const getClientAgentPhoneNumberId = async (clientId: string): Promise<string | null> => {
+  const getClientAgentPhoneNumberId = async (
+    clientId: string,
+  ): Promise<string | null> => {
     const clientAgent = await connection
       .collection('client_agents')
       .aggregate([
@@ -143,7 +145,10 @@ describe('WhatsApp Message Routing (e2e)', () => {
         (c: any) => c.phoneNumberId || c.credentials?.phoneNumberId,
       );
       if (whatsappChannel) {
-        return whatsappChannel.phoneNumberId || whatsappChannel.credentials?.phoneNumberId;
+        return (
+          whatsappChannel.phoneNumberId ||
+          whatsappChannel.credentials?.phoneNumberId
+        );
       }
     }
     return null;
@@ -156,7 +161,9 @@ describe('WhatsApp Message Routing (e2e)', () => {
       .findOne({ email: 'andresprimera@gmail.com' });
 
     if (user1) {
-      user1PhoneNumberId = await getClientAgentPhoneNumberId(user1.clientId.toString());
+      user1PhoneNumberId = await getClientAgentPhoneNumberId(
+        user1.clientId.toString(),
+      );
     }
 
     // User 2 (user2@example.com) - Sales Agent
@@ -165,7 +172,9 @@ describe('WhatsApp Message Routing (e2e)', () => {
       .findOne({ email: 'user2@example.com' });
 
     if (user2) {
-      user2PhoneNumberId = await getClientAgentPhoneNumberId(user2.clientId.toString());
+      user2PhoneNumberId = await getClientAgentPhoneNumberId(
+        user2.clientId.toString(),
+      );
     }
 
     // User 3 (user3@example.com) - Both agents
@@ -204,7 +213,8 @@ describe('WhatsApp Message Routing (e2e)', () => {
         );
         if (whatsappChannel) {
           user3Agent1PhoneNumberId =
-            whatsappChannel.phoneNumberId || whatsappChannel.credentials?.phoneNumberId;
+            whatsappChannel.phoneNumberId ||
+            whatsappChannel.credentials?.phoneNumberId;
         }
       }
 
@@ -217,7 +227,8 @@ describe('WhatsApp Message Routing (e2e)', () => {
         );
         if (whatsappChannel) {
           user3Agent2PhoneNumberId =
-            whatsappChannel.phoneNumberId || whatsappChannel.credentials?.phoneNumberId;
+            whatsappChannel.phoneNumberId ||
+            whatsappChannel.credentials?.phoneNumberId;
         }
       }
     }
@@ -227,7 +238,7 @@ describe('WhatsApp Message Routing (e2e)', () => {
     phoneNumberId: string,
     from: string,
     text: string,
-    messageId: string = `msg-${Date.now()}`,
+    messageId = `msg-${Date.now()}`,
   ) => ({
     entry: [
       {
@@ -333,11 +344,7 @@ describe('WhatsApp Message Routing (e2e)', () => {
       const response = await request(app.getHttpServer())
         .post('/whatsapp/webhook')
         .send(
-          createWhatsAppMessage(
-            'unknown-phone-12345',
-            '9999999999',
-            'Hello',
-          ),
+          createWhatsAppMessage('unknown-phone-12345', '9999999999', 'Hello'),
         )
         .expect(200);
 

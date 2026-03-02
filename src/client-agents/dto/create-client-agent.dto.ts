@@ -11,8 +11,8 @@ import {
   IsString,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ChannelProvider } from '../../channels/channel-provider.enum';
-import { LlmProvider } from '../../agent/llm/provider.enum';
+import { ChannelProvider } from '@domain/channels/channel-provider.enum';
+import { LlmProvider } from '@domain/llm/provider.enum';
 
 class LlmConfigDto {
   @IsEnum(LlmProvider)

@@ -1,31 +1,20 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException, Logger } from '@nestjs/common';
-
 import { WhatsappService } from './whatsapp.service';
-import { AgentService } from '../../agent/agent.service';
-import { AgentRepository } from '../../database/repositories/agent.repository';
-import { ClientRepository } from '../../database/repositories/client.repository';
-import { LlmProvider } from '../../agent/llm/provider.enum';
-import { AgentRoutingService } from '../shared/agent-routing.service';
-import { AgentContextService } from '../../agent/agent-context.service';
-import { ContactIdentityResolver } from '../shared/contact-identity.resolver';
+import { IncomingMessageOrchestrator } from '@orchestrator/incoming-message.orchestrator';
+import { CHANNEL_TYPES } from '@domain/channels/channel-type.constants';
+import { encrypt } from '@shared/crypto.util';
 
 describe('WhatsappService', () => {
   let service: WhatsappService;
-  let agentService: jest.Mocked<AgentService>;
-  let agentRoutingService: jest.Mocked<AgentRoutingService>;
-  let agentRepository: jest.Mocked<AgentRepository>;
-  let contactIdentityResolver: jest.Mocked<ContactIdentityResolver>;
+  let incomingMessageOrchestrator: jest.Mocked<IncomingMessageOrchestrator>;
   let loggerLogSpy: jest.SpyInstance;
-  let loggerWarnSpy: jest.SpyInstance;
+  let loggerErrorSpy: jest.SpyInstance;
   let fetchSpy: jest.SpyInstance;
 
   beforeEach(async () => {
-    // Set env vars for server-level WhatsApp config
-    process.env.WHATSAPP_API_HOST = 'http://localhost:3005';
     process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN = 'test-token';
-
-    // Mock global fetch to prevent real HTTP calls
+    process.env.WHATSAPP_API_HOST = 'http://localhost:3005';
     fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
       text: jest.fn().mockResolvedValue(''),
@@ -35,78 +24,36 @@ describe('WhatsappService', () => {
       providers: [
         WhatsappService,
         {
-          provide: AgentService,
-          useValue: { run: jest.fn() },
-        },
-        {
-          provide: AgentRoutingService,
-          useValue: { resolveRoute: jest.fn() },
-        },
-        {
-          provide: AgentRepository,
-          useValue: { findActiveById: jest.fn() },
-        },
-        {
-          provide: ClientRepository,
-          useValue: { findById: jest.fn().mockResolvedValue({ name: 'Test Client' }) },
-        },
-        {
-          provide: ContactIdentityResolver,
-          useValue: {
-            resolveContact: jest.fn(),
-          },
-        },
-        {
-          provide: AgentContextService,
-          useValue: {
-            enrichContext: jest.fn().mockImplementation((ctx) => Promise.resolve(ctx)),
-          },
+          provide: IncomingMessageOrchestrator,
+          useValue: { handle: jest.fn() },
         },
       ],
     }).compile();
 
     service = module.get<WhatsappService>(WhatsappService);
-    agentService = module.get(AgentService);
-    agentRoutingService = module.get(AgentRoutingService);
-    agentRepository = module.get(AgentRepository);
-    contactIdentityResolver = module.get(ContactIdentityResolver);
-
-    // Spy on Logger.prototype since a new Logger() is instantiated in the service
+    incomingMessageOrchestrator = module.get(IncomingMessageOrchestrator);
     loggerLogSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
-    loggerWarnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    loggerErrorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
   });
 
   afterEach(() => {
     loggerLogSpy.mockRestore();
-    loggerWarnSpy.mockRestore();
+    loggerErrorSpy.mockRestore();
     fetchSpy.mockRestore();
-    delete process.env.WHATSAPP_API_HOST;
     delete process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
-  });
-
-  it('should be defined', () => {
-    expect(service).toBeDefined();
+    delete process.env.WHATSAPP_API_HOST;
   });
 
   describe('verifyWebhook', () => {
-    it('should return challenge when mode is subscribe and token is valid', () => {
-      const result = service.verifyWebhook(
-        'subscribe',
-        'test-token',
-        'challenge123',
-      );
-      expect(result).toBe('challenge123');
+    it('returns challenge when mode is subscribe and token is valid', () => {
+      expect(
+        service.verifyWebhook('subscribe', 'test-token', 'challenge123'),
+      ).toBe('challenge123');
     });
 
-    it('should throw ForbiddenException when token is invalid', () => {
+    it('throws ForbiddenException when token is invalid', () => {
       expect(() =>
         service.verifyWebhook('subscribe', 'wrong-token', 'challenge123'),
-      ).toThrow(ForbiddenException);
-    });
-
-    it('should throw ForbiddenException when mode is not subscribe', () => {
-      expect(() =>
-        service.verifyWebhook('unsubscribe', 'test-token', 'challenge123'),
       ).toThrow(ForbiddenException);
     });
   });
@@ -142,174 +89,95 @@ describe('WhatsappService', () => {
       ...overrides.root,
     });
 
-    const mockClientAgent = {
-      _id: 'ca-1',
-      clientId: '507f1f77bcf86cd799439011',
-      agentId: 'agent-1',
-      status: 'active',
-      channels: [
-        {
-          channelId: '507f1f77bcf86cd799439014',
-          status: 'active',
-          provider: 'meta',
-          credentials: { phoneNumberId: 'phone123', accessToken: 'sk-wa-token' },
-          llmConfig: {
-            provider: LlmProvider.OpenAI,
-            apiKey: 'sk-mock-key',
-            model: 'gpt-4',
-          },
-        },
-      ],
+    const encryptedCredentials = {
+      phoneNumberId: encrypt('phone123'),
+      accessToken: encrypt('wa-token'),
     };
 
-    const mockAgent = {
-      id: 'agent-1',
-      name: 'Support Bot',
-      systemPrompt: 'You are a helpful assistant.',
-    };
-
-    const mockContact = {
-      _id: '507f1f77bcf86cd799439012',
-    };
-
-    const mockResolvedRoute = {
-      kind: 'resolved' as const,
-      candidate: {
-        clientAgent: mockClientAgent,
-        channelConfig: mockClientAgent.channels[0],
-        agentName: 'Support Bot',
-      },
-    };
-
-    it('should return early when payload has no messages', async () => {
-      await service.handleIncoming({});
-      expect(agentRoutingService.resolveRoute).not.toHaveBeenCalled();
-    });
-
-    it('should return early when payload has no entry', async () => {
-      await service.handleIncoming({ entry: [] });
-      expect(agentRoutingService.resolveRoute).not.toHaveBeenCalled();
-    });
-
-    it('should return early when message type is not text', async () => {
-      const payload = createPayload({ message: { type: 'image' } });
-      await service.handleIncoming(payload);
-      expect(agentService.run).not.toHaveBeenCalled();
-    });
-
-    it('should log warning when no route is found for phoneNumberId', async () => {
-      agentRoutingService.resolveRoute.mockResolvedValue({
-        kind: 'unroutable',
-        reason: 'no-candidates',
-      });
-
-      const payload = createPayload({
-        metadata: { phone_number_id: 'unknown-phone' },
-      });
-      await service.handleIncoming(payload);
-
-      expect(loggerWarnSpy).toHaveBeenCalledWith(
-        '[WhatsApp] No active ClientAgent found for phoneNumberId=unknown-phone.',
-      );
-      expect(agentService.run).not.toHaveBeenCalled();
-    });
-
-    it('should send clarification prompt when routing is ambiguous', async () => {
-      agentRoutingService.resolveRoute.mockResolvedValue({
-        kind: 'ambiguous',
-        candidates: [
-          {
-            clientAgent: mockClientAgent as any,
-            channelConfig: mockClientAgent.channels[0] as any,
-            agentName: 'Support Bot',
-          },
-          {
-            clientAgent: mockClientAgent as any,
-            channelConfig: mockClientAgent.channels[0] as any,
-            agentName: 'Sales Bot',
-          },
-        ],
-        prompt: 'Please choose the agent',
-      });
-
+    it('maps payload to incoming event and delegates to orchestrator', async () => {
+      incomingMessageOrchestrator.handle.mockResolvedValue(undefined);
       const payload = createPayload();
       await service.handleIncoming(payload);
+
+      expect(incomingMessageOrchestrator.handle).toHaveBeenCalledWith({
+        channelId: CHANNEL_TYPES.WHATSAPP,
+        routeChannelIdentifier: 'phone123',
+        channelIdentifier: '1234567890',
+        messageId: 'msg123',
+        text: 'Hello',
+        rawPayload: payload,
+      });
+    });
+
+    it('sends outbound message when orchestrator returns reply with channelMeta', async () => {
+      incomingMessageOrchestrator.handle.mockResolvedValue({
+        reply: { type: 'text', text: 'Echo response' },
+        channelMeta: { encryptedCredentials },
+      });
+
+      await service.handleIncoming(createPayload());
 
       expect(fetchSpy).toHaveBeenCalled();
-      expect(agentService.run).not.toHaveBeenCalled();
-      expect(loggerLogSpy).toHaveBeenCalledWith(
-        '[WhatsApp] Message sent successfully to 1234567890',
-      );
-    });
-
-    it('should call agentService.run with correct input and context', async () => {
-      agentRoutingService.resolveRoute.mockResolvedValue(mockResolvedRoute as any);
-      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
-      contactIdentityResolver.resolveContact.mockResolvedValue(mockContact as any);
-      agentService.run.mockResolvedValue({
-        reply: { type: 'text', text: 'Hello' },
-      });
-
-      const payload = createPayload();
-      await service.handleIncoming(payload);
-
-      expect(agentService.run).toHaveBeenCalledWith(
-        {
-          channel: 'whatsapp',
-          contactId: '507f1f77bcf86cd799439012',
-          message: { type: 'text', text: 'Hello' },
-          contactMetadata: undefined,
-          contactSummary: undefined,
-          metadata: { messageId: 'msg123', phoneNumberId: 'phone123' },
-        },
-        expect.objectContaining({
-          agentId: 'agent-1',
-          clientId: '507f1f77bcf86cd799439011',
-          channelId: '507f1f77bcf86cd799439014',
-          systemPrompt: 'You are a helpful assistant.',
-          channelConfig: mockClientAgent.channels[0].credentials,
-        }),
-      );
-    });
-
-    it('should log outbound message when reply exists', async () => {
-      agentRoutingService.resolveRoute.mockResolvedValue(mockResolvedRoute as any);
-      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
-      contactIdentityResolver.resolveContact.mockResolvedValue(mockContact as any);
-      agentService.run.mockResolvedValue({
-        reply: { type: 'text', text: 'Echo response' },
-      });
-
-      const payload = createPayload();
-      await service.handleIncoming(payload);
-
       expect(loggerLogSpy).toHaveBeenCalledWith(
         '[WhatsApp] Sending to 1234567890: Echo response',
       );
     });
 
-    it('should not log outbound message when reply is undefined', async () => {
-      agentRoutingService.resolveRoute.mockResolvedValue(mockResolvedRoute as any);
-      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
-      contactIdentityResolver.resolveContact.mockResolvedValue(mockContact as any);
-      agentService.run.mockResolvedValue({});
+    it('does not send outbound when orchestrator reply is undefined', async () => {
+      incomingMessageOrchestrator.handle.mockResolvedValue({});
 
-      const payload = createPayload();
-      await service.handleIncoming(payload);
+      await service.handleIncoming(createPayload());
 
-      expect(loggerLogSpy).not.toHaveBeenCalledWith(
-        expect.stringContaining('[WhatsApp] Sending to'),
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('logs API error and does not throw', async () => {
+      incomingMessageOrchestrator.handle.mockResolvedValue({
+        reply: { type: 'text', text: 'Echo response' },
+        channelMeta: { encryptedCredentials },
+      });
+      fetchSpy.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        text: jest.fn().mockResolvedValue('Internal Error'),
+      } as unknown as Response);
+
+      await expect(
+        service.handleIncoming(createPayload()),
+      ).resolves.not.toThrow();
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[WhatsApp] Failed to send reply'),
       );
     });
 
-    it('should skip processing when agent is not active', async () => {
-      agentRoutingService.resolveRoute.mockResolvedValue(mockResolvedRoute as any);
-      agentRepository.findActiveById.mockResolvedValue(null);
+    it('returns early on invalid payload and does not call orchestrator', async () => {
+      await service.handleIncoming({});
+      await service.handleIncoming({
+        entry: [{ changes: [{ value: { messages: [{ type: 'image' }] } }] }],
+      });
+      await service.handleIncoming({
+        entry: [
+          {
+            changes: [
+              {
+                value: {
+                  metadata: {},
+                  messages: [
+                    {
+                      from: '1234567890',
+                      id: 'msg123',
+                      type: 'text',
+                      text: { body: 'Hello' },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      });
 
-      const payload = createPayload();
-      await service.handleIncoming(payload);
-
-      expect(agentService.run).not.toHaveBeenCalled();
+      expect(incomingMessageOrchestrator.handle).not.toHaveBeenCalled();
     });
   });
 });

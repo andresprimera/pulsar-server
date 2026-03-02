@@ -5,7 +5,8 @@ import { AgentInput } from './contracts/agent-input';
 import { AgentOutput } from './contracts/agent-output';
 import { AgentContext } from './contracts/agent-context';
 import { createLLMModel } from './llm/llm.factory';
-import { MessagePersistenceService } from '../channels/shared/message-persistence.service';
+import { MessagePersistenceService } from '@persistence/message-persistence.service';
+import { ConversationSummaryService } from './conversation-summary.service';
 import { MetadataExposureService } from './metadata-exposure.service';
 
 @Injectable()
@@ -14,13 +15,11 @@ export class AgentService {
 
   constructor(
     private readonly messagePersistenceService: MessagePersistenceService,
+    private readonly conversationSummaryService: ConversationSummaryService,
     private readonly metadataExposureService: MetadataExposureService,
   ) {}
 
-  async run(
-    input: AgentInput,
-    context: AgentContext,
-  ): Promise<AgentOutput> {
+  async run(input: AgentInput, context: AgentContext): Promise<AgentOutput> {
     this.logger.log(
       `Processing ${context.agentId} for client ${context.clientId} ` +
         `using provider=${context.llmConfig.provider} model=${context.llmConfig.model}`,
@@ -34,14 +33,7 @@ export class AgentService {
         contactId: input.contactId,
       };
       const contactId = new Types.ObjectId(input.contactId);
-
-      const conversation =
-        await this.messagePersistenceService.resolveConversation(
-          persistenceContext,
-          contactId,
-        );
-
-      const conversationId = conversation._id as Types.ObjectId;
+      const conversationId = new Types.ObjectId(input.conversationId);
 
       const conversationHistory =
         await this.messagePersistenceService.getConversationContextByConversationId(
@@ -65,7 +57,11 @@ export class AgentService {
       // Validate conversation history if provided
       if (conversationHistory && conversationHistory.length > 0) {
         for (const msg of conversationHistory) {
-          if (!msg.content || typeof msg.content !== 'string' || !msg.content.trim()) {
+          if (
+            !msg.content ||
+            typeof msg.content !== 'string' ||
+            !msg.content.trim()
+          ) {
             this.logger.warn(
               `Invalid conversation history message detected: empty or non-string content`,
             );
@@ -100,14 +96,24 @@ export class AgentService {
 
       this.logger.log(`Response generated for ${context.agentId}`);
 
-      // Automatically handle outgoing message persistence
+      // Persist agent response
       await this.messagePersistenceService.handleOutgoingMessage(
         safeText,
         persistenceContext,
         contactId,
-        context,
         conversationId,
       );
+
+      // Trigger async summarization (fire-and-forget)
+      this.conversationSummaryService
+        .checkAndSummarizeIfNeeded(
+          conversationId,
+          new Types.ObjectId(context.agentId),
+          context,
+        )
+        .catch((err) => {
+          this.logger.error(`Background summary check failed: ${err.message}`);
+        });
 
       return {
         reply: {
@@ -147,7 +153,10 @@ export class AgentService {
       );
     }
 
-    if (typeof safeMetadata.firstName === 'string' && safeMetadata.firstName.trim()) {
+    if (
+      typeof safeMetadata.firstName === 'string' &&
+      safeMetadata.firstName.trim()
+    ) {
       contextLines.push(
         `If you greet the contact, you may use their first name: ${safeMetadata.firstName.trim()}.`,
       );

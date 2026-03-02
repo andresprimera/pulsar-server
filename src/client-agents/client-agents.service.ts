@@ -6,17 +6,17 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Types } from 'mongoose';
-import { ClientAgentRepository } from '../database/repositories/client-agent.repository';
-import { ChannelRepository } from '../database/repositories/channel.repository';
-import { ClientPhoneRepository } from '../database/repositories/client-phone.repository';
-import { encrypt, encryptRecord } from '../database/utils/crypto.util';
+import { ClientAgentRepository } from '@persistence/repositories/client-agent.repository';
+import { ChannelRepository } from '@persistence/repositories/channel.repository';
+import { ClientPhoneRepository } from '@persistence/repositories/client-phone.repository';
+import { encrypt, encryptRecord } from '@shared/crypto.util';
 
 import { CreateClientAgentDto } from './dto/create-client-agent.dto';
 import { UpdateClientAgentDto } from './dto/update-client-agent.dto';
 import { UpdateClientAgentStatusDto } from './dto/update-client-agent-status.dto';
-import { ClientsService } from '../clients/clients.service';
-import { AgentsService } from '../agents/agents.service';
-import { ClientAgent } from '../database/schemas/client-agent.schema';
+import { ClientsService } from '@clients/clients.service';
+import { AgentsService } from '@agents/agents.service';
+import { ClientAgent } from '@persistence/schemas/client-agent.schema';
 
 @Injectable()
 export class ClientAgentsService {
@@ -72,9 +72,7 @@ export class ClientAgentsService {
       const normalizedProvider = channelConfig.provider.toLowerCase().trim();
       if (!channel.supportedProviders.includes(normalizedProvider)) {
         throw new BadRequestException(
-          `Provider "${
-            channelConfig.provider
-          }" is not supported by channel "${
+          `Provider "${channelConfig.provider}" is not supported by channel "${
             channel.name
           }". Supported: ${channel.supportedProviders.join(', ')}`,
         );

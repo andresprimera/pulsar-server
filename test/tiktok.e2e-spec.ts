@@ -5,7 +5,7 @@ import { Connection, Types } from 'mongoose';
 import { getConnectionToken } from '@nestjs/mongoose';
 import { AgentService } from '../src/agent/agent.service';
 import * as request from 'supertest';
-import { ChannelProvider } from '../src/channels/channel-provider.enum';
+import { ChannelProvider } from '../src/domain/channels/channel-provider.enum';
 
 describe('TikTok Channel (e2e)', () => {
   let app: INestApplication;
@@ -21,7 +21,7 @@ describe('TikTok Channel (e2e)', () => {
   const clientAgentIdObj = new Types.ObjectId();
   const tiktokChannelIdObj = new Types.ObjectId();
   const tiktokChannelName = `E2E TikTok Channel ${tiktokChannelIdObj.toString()}`;
-  
+
   // Valid Channels Config
   const validTiktokUserId = 'tiktok-user-123';
   const senderUserId = 'sender-456';
@@ -42,7 +42,23 @@ describe('TikTok Channel (e2e)', () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
   };
-  
+
+  const waitForSpyCalls = async (
+    spy: jest.SpyInstance,
+    expectedCalls: number,
+    timeoutMs = 5000,
+  ): Promise<void> => {
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < timeoutMs) {
+      if (spy.mock.calls.length >= expectedCalls) {
+        return;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  };
+
   beforeAll(async () => {
     // 1. Mock global fetch
     fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
@@ -53,7 +69,7 @@ describe('TikTok Channel (e2e)', () => {
 
     // 2. Setup AgentService Mock
     mockAgentService = {
-      run: jest.fn().mockImplementation(async (input, context) => {
+      run: jest.fn().mockImplementation(async (input) => {
         return {
           reply: {
             type: 'text',
@@ -89,14 +105,16 @@ describe('TikTok Channel (e2e)', () => {
       await connection
         .collection('agents')
         .deleteMany({ _id: { $in: [agentIdObj] } });
-      await connection.collection('channels').deleteMany({ _id: { $in: [tiktokChannelIdObj] } });
+      await connection
+        .collection('channels')
+        .deleteMany({ _id: { $in: [tiktokChannelIdObj] } });
     }
 
     await connection.collection('channels').insertOne({
-        _id: tiktokChannelIdObj,
+      _id: tiktokChannelIdObj,
       name: tiktokChannelName,
-        type: 'tiktok',
-        supportedProviders: [ChannelProvider.Tiktok],
+      type: 'tiktok',
+      supportedProviders: [ChannelProvider.Tiktok],
     });
 
     // Create Client
@@ -140,26 +158,36 @@ describe('TikTok Channel (e2e)', () => {
 
   afterAll(async () => {
     if (connection) {
-        await connection
-          .collection('client_agents')
-          .deleteMany({ _id: { $in: [clientAgentIdObj] } });
-        await connection
-          .collection('clients')
-          .deleteMany({ _id: { $in: [clientIdObj] } });
-        await connection
-          .collection('agents')
-          .deleteMany({ _id: { $in: [agentIdObj] } });
-        await connection.collection('channels').deleteMany({ _id: { $in: [tiktokChannelIdObj] } });
+      await connection
+        .collection('client_agents')
+        .deleteMany({ _id: { $in: [clientAgentIdObj] } });
+      await connection
+        .collection('clients')
+        .deleteMany({ _id: { $in: [clientIdObj] } });
+      await connection
+        .collection('agents')
+        .deleteMany({ _id: { $in: [agentIdObj] } });
+      await connection
+        .collection('channels')
+        .deleteMany({ _id: { $in: [tiktokChannelIdObj] } });
+      await connection
+        .collection('processed_events')
+        .deleteMany({ channel: 'tiktok' });
     }
     await app.close();
     fetchSpy.mockRestore();
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await connection
+      .collection('processed_events')
+      .deleteMany({ channel: 'tiktok' });
     jest.clearAllMocks();
   });
 
   it('should process valid TikTok webhook message and send reply', async () => {
+    const fetchCallsBeforeRequest = fetchSpy.mock.calls.length;
+
     // Act
     await request(app.getHttpServer())
       .post('/tiktok/webhook')
@@ -171,11 +199,11 @@ describe('TikTok Channel (e2e)', () => {
             text: 'Hello TikTok',
           },
           recipient: {
-             user_id: validTiktokUserId,
+            user_id: validTiktokUserId,
           },
           sender: {
-             user_id: senderUserId,
-             username: 'user_sender',
+            user_id: senderUserId,
+            username: 'user_sender',
           },
           conversation_id: 'conv_123',
           message_id: 'msg_123',
@@ -192,21 +220,25 @@ describe('TikTok Channel (e2e)', () => {
     expect(runArgs.channel).toBe('tiktok');
     expect(runArgs.message.text).toBe('Hello TikTok');
 
+    await waitForSpyCalls(fetchSpy, fetchCallsBeforeRequest + 1);
+
     // Verify Outgoing Reply (Reply logic calls fetch)
     expect(fetchSpy).toHaveBeenCalledWith(
-        expect.stringContaining('/message/send/'),
-        expect.objectContaining({
-            method: 'POST',
-            headers: expect.objectContaining({
-                Authorization: `Bearer ${validAccessToken}`,
-            }),
-            body: expect.stringContaining('Reply to tiktok message'),
-        })
+      expect.stringContaining('/message/send/'),
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${validAccessToken}`,
+        }),
+        body: expect.stringContaining('Reply to tiktok message'),
+      }),
     );
   });
 
   it('should handle message for unregistered user (ignore)', async () => {
-    const callsBeforeRequest = (mockAgentService.run as jest.Mock).mock.calls.length;
+    const callsBeforeRequest = (mockAgentService.run as jest.Mock).mock.calls
+      .length;
+    const fetchCallsBeforeRequest = fetchSpy.mock.calls.length;
 
     // Act
     await request(app.getHttpServer())
@@ -214,19 +246,19 @@ describe('TikTok Channel (e2e)', () => {
       .send({
         event: 'message.received',
         data: {
-            message: {
-              type: 'text',
-              text: 'Who dis?',
-            },
-            recipient: {
-               user_id: 'unknown_user_id',
-            },
-            sender: {
-               user_id: senderUserId,
-            },
-            conversation_id: 'conv_456',
-            message_id: 'msg_456',
+          message: {
+            type: 'text',
+            text: 'Who dis?',
           },
+          recipient: {
+            user_id: 'unknown_user_id',
+          },
+          sender: {
+            user_id: senderUserId,
+          },
+          conversation_id: 'conv_456',
+          message_id: 'msg_456',
+        },
       })
       .expect(200);
 
@@ -236,11 +268,6 @@ describe('TikTok Channel (e2e)', () => {
     expect((mockAgentService.run as jest.Mock).mock.calls.length).toBe(
       callsBeforeRequest,
     );
-    // Should verify fetch was NOT called for sending reply (fetch might be called if logging uses it? No, logging uses stdout/err)
-    // Wait, fetch is mocked globally. If handleIncoming returns early, sendMessage is not called.
-    expect(fetchSpy).not.toHaveBeenCalledWith(
-        expect.stringContaining('/message/send/'),
-        expect.anything()
-    );
+    expect(fetchSpy.mock.calls.length).toBe(fetchCallsBeforeRequest);
   });
 });

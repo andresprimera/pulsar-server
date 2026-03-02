@@ -12,8 +12,8 @@ import {
   ArrayMinSize,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
-import { LlmProvider } from '../../agent/llm/provider.enum';
-import { ChannelProvider } from '../../channels/channel-provider.enum';
+import { LlmProvider } from '@domain/llm/provider.enum';
+import { ChannelProvider } from '@domain/channels/channel-provider.enum';
 
 class UserDto {
   @Transform(({ value }) => value?.toLowerCase().trim())

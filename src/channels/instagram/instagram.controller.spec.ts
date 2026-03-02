@@ -44,11 +44,9 @@ describe('InstagramController', () => {
   it('should call service.handleIncoming and return ok', async () => {
     service.handleIncoming.mockResolvedValue(undefined);
 
-    const result = await controller.handleWebhook(
-      { entry: [] },
-      'sha256=abc',
-      { rawBody: Buffer.from('{}') } as any,
-    );
+    const result = await controller.handleWebhook({ entry: [] }, 'sha256=abc', {
+      rawBody: Buffer.from('{}'),
+    } as any);
 
     expect(service.handleIncoming).toHaveBeenCalledWith(
       { entry: [] },

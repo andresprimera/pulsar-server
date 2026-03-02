@@ -60,7 +60,7 @@ $ pnpm run test:cov
 
 ## Seed Data Strategy
 
-We use seed data from `src/database/data/seed-data.json` to bootstrap local/demo environments.
+We use seed data from `src/persistence/data/seed-data.json` to bootstrap local/demo environments.
 
 ### Active channels in seed data
 

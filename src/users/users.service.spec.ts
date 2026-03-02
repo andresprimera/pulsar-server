@@ -5,7 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { UserRepository } from '../database/repositories/user.repository';
+import { UserRepository } from '@persistence/repositories/user.repository';
 
 describe('UsersService', () => {
   let service: UsersService;

@@ -38,7 +38,9 @@ export class InstagramController {
       .handleIncoming(payload, signature, req.rawBody)
       .catch((error) => {
         this.logger.error(
-          `Failed to process Instagram webhook: ${error instanceof Error ? error.message : String(error)}`,
+          `Failed to process Instagram webhook: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
           error instanceof Error ? error.stack : undefined,
         );
       });

@@ -4,7 +4,7 @@ import { AppModule } from '../src/app.module';
 import { Connection, Types } from 'mongoose';
 import { getConnectionToken } from '@nestjs/mongoose';
 import { AgentService } from '../src/agent/agent.service';
-import { ChannelProvider } from '../src/channels/channel-provider.enum';
+import { ChannelProvider } from '../src/domain/channels/channel-provider.enum';
 import * as request from 'supertest';
 
 describe('Concurrent Channels (e2e)', () => {
@@ -99,7 +99,13 @@ describe('Concurrent Channels (e2e)', () => {
         .collection('agents')
         .deleteMany({ _id: { $in: [agentIdObj] } });
       await connection.collection('channels').deleteMany({
-        _id: { $in: [whatsappChannelIdObj, tiktokChannelIdObj, instagramChannelIdObj] },
+        _id: {
+          $in: [
+            whatsappChannelIdObj,
+            tiktokChannelIdObj,
+            instagramChannelIdObj,
+          ],
+        },
       });
     }
 
@@ -194,15 +200,23 @@ describe('Concurrent Channels (e2e)', () => {
         .collection('agents')
         .deleteMany({ _id: { $in: [agentIdObj] } });
       await connection.collection('channels').deleteMany({
-        _id: { $in: [whatsappChannelIdObj, tiktokChannelIdObj, instagramChannelIdObj] },
+        _id: {
+          $in: [
+            whatsappChannelIdObj,
+            tiktokChannelIdObj,
+            instagramChannelIdObj,
+          ],
+        },
       });
+      await connection.collection('processed_events').deleteMany({});
     }
     await app.close();
     fetchSpy.mockRestore();
     delete process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN;
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await connection.collection('processed_events').deleteMany({});
     jest.clearAllMocks();
   });
 

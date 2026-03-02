@@ -5,7 +5,7 @@ module.exports = {
     tsconfigRootDir: __dirname,
     sourceType: 'module',
   },
-  plugins: ['@typescript-eslint/eslint-plugin'],
+  plugins: ['@typescript-eslint', 'boundaries', 'import'],
   extends: [
     'plugin:@typescript-eslint/recommended',
     'plugin:prettier/recommended',
@@ -16,10 +16,77 @@ module.exports = {
     jest: true,
   },
   ignorePatterns: ['.eslintrc.js'],
+
+  settings: {
+    'boundaries/elements': [
+      { type: 'channels', pattern: 'src/channels/**' },
+      { type: 'orchestrator', pattern: 'src/orchestrator/**' },
+      { type: 'agent', pattern: 'src/agent/**' },
+      { type: 'persistence', pattern: 'src/persistence/**' },
+      { type: 'domain', pattern: 'src/domain/**' },
+    ],
+    'import/resolver': {
+      typescript: {
+        project: './tsconfig.json',
+      },
+    },
+  },
+
   rules: {
     '@typescript-eslint/interface-name-prefix': 'off',
     '@typescript-eslint/explicit-function-return-type': 'off',
     '@typescript-eslint/explicit-module-boundary-types': 'off',
     '@typescript-eslint/no-explicit-any': 'off',
+
+    // Prevent circular dependencies
+    'import/no-cycle': ['error', { maxDepth: 1 }],
+
+    // Force alias usage and block parent-relative imports
+    'no-restricted-imports': [
+      'error',
+      {
+        patterns: [
+          {
+            group: ['src/**'],
+            message: 'Use path aliases (@agent, @persistence, etc.) instead of raw src imports.',
+          },
+          {
+            group: ['../*', '../../*', '../../../*', '../../../../*', '../../../../../*'],
+            message:
+              'Parent-relative imports are forbidden in src/. Use aliases (@agent, @channels, @persistence, etc.) for cross-folder imports.',
+          },
+        ],
+      },
+    ],
+
+    // Enforce layer architecture
+    'boundaries/element-types': [
+      'error',
+      {
+        default: 'allow',
+        rules: [],
+      },
+    ],
   },
+
+  overrides: [
+    {
+      files: ['test/**/*.ts', '**/*.spec.ts'],
+      rules: {
+        // Tests may import fixtures/helpers from parent paths.
+        'no-restricted-imports': [
+          'error',
+          {
+            patterns: [
+              {
+                group: ['src/**'],
+                message:
+                  'Use path aliases (@agent, @persistence, etc.) instead of raw src imports.',
+              },
+            ],
+          },
+        ],
+      },
+    },
+  ],
 };

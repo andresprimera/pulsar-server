@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
 import { ConversationSummaryService } from './conversation-summary.service';
-import { MessageRepository } from '../database/repositories/message.repository';
+import { MessageRepository } from '@persistence/repositories/message.repository';
 import { Types } from 'mongoose';
 import * as ai from 'ai';
 import * as llmFactory from './llm/llm.factory';
@@ -86,7 +86,9 @@ describe('ConversationSummaryService', () => {
       ],
     }).compile();
 
-    service = module.get<ConversationSummaryService>(ConversationSummaryService);
+    service = module.get<ConversationSummaryService>(
+      ConversationSummaryService,
+    );
     messageRepository = module.get(MessageRepository);
     configService = module.get(ConfigService);
     loggerErrorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
@@ -125,9 +127,13 @@ describe('ConversationSummaryService', () => {
       const mockModel = {};
       configService.get.mockReturnValue(2000);
       messageRepository.countTokensInConversation.mockResolvedValue(2500);
-      messageRepository.findConversationContext.mockResolvedValue(mockMessages as any);
+      messageRepository.findConversationContext.mockResolvedValue(
+        mockMessages as any,
+      );
       (llmFactory.createLLMModel as jest.Mock).mockReturnValue(mockModel);
-      (ai.generateText as jest.Mock).mockResolvedValue({ text: 'This is a summary of the conversation' });
+      (ai.generateText as jest.Mock).mockResolvedValue({
+        text: 'This is a summary of the conversation',
+      });
       messageRepository.create.mockResolvedValue({} as any);
 
       await service.checkAndSummarizeIfNeeded(
@@ -138,7 +144,9 @@ describe('ConversationSummaryService', () => {
 
       expect(messageRepository.countTokensInConversation).toHaveBeenCalled();
       expect(messageRepository.findConversationContext).toHaveBeenCalled();
-      expect(llmFactory.createLLMModel).toHaveBeenCalledWith(mockContext.llmConfig);
+      expect(llmFactory.createLLMModel).toHaveBeenCalledWith(
+        mockContext.llmConfig,
+      );
       expect(ai.generateText).toHaveBeenCalled();
       expect(messageRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -170,7 +178,9 @@ describe('ConversationSummaryService', () => {
     it('should handle LLM errors gracefully', async () => {
       configService.get.mockReturnValue(2000);
       messageRepository.countTokensInConversation.mockResolvedValue(2500);
-      messageRepository.findConversationContext.mockResolvedValue(mockMessages as any);
+      messageRepository.findConversationContext.mockResolvedValue(
+        mockMessages as any,
+      );
       (llmFactory.createLLMModel as jest.Mock).mockImplementation(() => {
         throw new Error('LLM error');
       });
@@ -195,14 +205,19 @@ describe('ConversationSummaryService', () => {
         mockContext,
       );
 
-      expect(configService.get).toHaveBeenCalledWith('CONVERSATION_TOKEN_THRESHOLD', 2000);
+      expect(configService.get).toHaveBeenCalledWith(
+        'CONVERSATION_TOKEN_THRESHOLD',
+        2000,
+      );
     });
 
     it('should handle empty/whitespace summary from LLM', async () => {
       const mockModel = {};
       configService.get.mockReturnValue(2000);
       messageRepository.countTokensInConversation.mockResolvedValue(2500);
-      messageRepository.findConversationContext.mockResolvedValue(mockMessages as any);
+      messageRepository.findConversationContext.mockResolvedValue(
+        mockMessages as any,
+      );
       (llmFactory.createLLMModel as jest.Mock).mockReturnValue(mockModel);
       (ai.generateText as jest.Mock).mockResolvedValue({ text: '   ' });
       messageRepository.create.mockResolvedValue({} as any);

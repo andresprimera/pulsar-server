@@ -6,6 +6,19 @@
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   },
+  "moduleNameMapper": {
+    "^@channels/(.*)$": "<rootDir>/../src/channels/$1",
+    "^@agent/(.*)$": "<rootDir>/../src/agent/$1",
+    "^@orchestrator/(.*)$": "<rootDir>/../src/orchestrator/$1",
+    "^@persistence/(.*)$": "<rootDir>/../src/persistence/$1",
+    "^@domain/(.*)$": "<rootDir>/../src/domain/$1",
+    "^@shared/(.*)$": "<rootDir>/../src/shared/$1",
+    "^@agents/(.*)$": "<rootDir>/../src/agents/$1",
+    "^@clients/(.*)$": "<rootDir>/../src/clients/$1",
+    "^@client-agents/(.*)$": "<rootDir>/../src/client-agents/$1",
+    "^@users/(.*)$": "<rootDir>/../src/users/$1",
+    "^@onboarding/(.*)$": "<rootDir>/../src/onboarding/$1"
+  },
   "testTimeout": 30000,
   "maxWorkers": 1
 }

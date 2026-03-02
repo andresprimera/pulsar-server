@@ -5,7 +5,7 @@ import { Connection, Types } from 'mongoose';
 import { getConnectionToken } from '@nestjs/mongoose';
 import { AgentService } from '../src/agent/agent.service';
 import * as request from 'supertest';
-import { ChannelProvider } from '../src/channels/channel-provider.enum';
+import { ChannelProvider } from '../src/domain/channels/channel-provider.enum';
 
 describe('Instagram Channel (e2e)', () => {
   let app: INestApplication;
@@ -34,6 +34,22 @@ describe('Instagram Channel (e2e)', () => {
 
     while (Date.now() - startedAt < timeoutMs) {
       if (mockFn.mock.calls.length >= expectedCalls) {
+        return;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  };
+
+  const waitForSpyCalls = async (
+    spy: jest.SpyInstance,
+    expectedCalls: number,
+    timeoutMs = 5000,
+  ): Promise<void> => {
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < timeoutMs) {
+      if (spy.mock.calls.length >= expectedCalls) {
         return;
       }
 
@@ -148,13 +164,19 @@ describe('Instagram Channel (e2e)', () => {
       await connection
         .collection('channels')
         .deleteMany({ _id: { $in: [instagramChannelIdObj] } });
+      await connection
+        .collection('processed_events')
+        .deleteMany({ channel: 'instagram' });
     }
     await app.close();
     fetchSpy.mockRestore();
     delete process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN;
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await connection
+      .collection('processed_events')
+      .deleteMany({ channel: 'instagram' });
     jest.clearAllMocks();
   });
 
@@ -201,6 +223,8 @@ describe('Instagram Channel (e2e)', () => {
     expect(runArgs.channel).toBe('instagram');
     expect(runArgs.message.text).toBe('Hello Instagram');
 
+    await waitForSpyCalls(fetchSpy, 1);
+
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining('/me/messages'),
       expect.objectContaining({
@@ -214,7 +238,8 @@ describe('Instagram Channel (e2e)', () => {
   });
 
   it('should ignore unknown instagram account id', async () => {
-    const callsBeforeRequest = (mockAgentService.run as jest.Mock).mock.calls.length;
+    const callsBeforeRequest = (mockAgentService.run as jest.Mock).mock.calls
+      .length;
 
     await request(app.getHttpServer())
       .post('/instagram/webhook')

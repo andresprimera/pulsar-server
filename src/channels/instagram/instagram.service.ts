@@ -1,20 +1,14 @@
 import { Injectable, ForbiddenException, Logger } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'crypto';
-import { Types } from 'mongoose';
-import { AgentService } from '../../agent/agent.service';
-import { AgentInput } from '../../agent/contracts/agent-input';
-import { AgentContext } from '../../agent/contracts/agent-context';
-import { AgentRepository } from '../../database/repositories/agent.repository';
-import { decryptRecord, decrypt } from '../../database/utils/crypto.util';
+import { decryptRecord } from '@shared/crypto.util';
 import {
   InstagramServerConfig,
   loadInstagramConfig,
   buildMessagesUrl,
 } from './instagram.config';
-import { AgentRoutingService } from '../shared/agent-routing.service';
-import { AgentContextService } from '../../agent/agent-context.service';
-import { ContactIdentityResolver } from '../shared/contact-identity.resolver';
-import { CHANNEL_TYPES } from '../shared/channel-type.constants';
+import { CHANNEL_TYPES } from '@domain/channels/channel-type.constants';
+import { IncomingMessageOrchestrator } from '@orchestrator/incoming-message.orchestrator';
+import { IncomingChannelEvent } from '@domain/channels/incoming-channel-event.interface';
 
 @Injectable()
 export class InstagramService {
@@ -23,11 +17,7 @@ export class InstagramService {
   private readonly responseWindowMs = 24 * 60 * 60 * 1000;
 
   constructor(
-    private readonly agentService: AgentService,
-    private readonly agentRepository: AgentRepository,
-    private readonly agentRoutingService: AgentRoutingService,
-    private readonly agentContextService: AgentContextService,
-    private readonly contactIdentityResolver: ContactIdentityResolver,
+    private readonly incomingMessageOrchestrator: IncomingMessageOrchestrator,
   ) {
     this.config = loadInstagramConfig();
   }
@@ -58,8 +48,14 @@ export class InstagramService {
       .update(body)
       .digest('hex');
 
-    const provided = Buffer.from(providedDigest, 'utf8') as unknown as Uint8Array;
-    const expected = Buffer.from(expectedDigest, 'utf8') as unknown as Uint8Array;
+    const provided = Buffer.from(
+      providedDigest,
+      'utf8',
+    ) as unknown as Uint8Array;
+    const expected = Buffer.from(
+      expectedDigest,
+      'utf8',
+    ) as unknown as Uint8Array;
 
     if (provided.length !== expected.length) {
       return false;
@@ -156,113 +152,56 @@ export class InstagramService {
           continue;
         }
 
-        const routeDecision = await this.agentRoutingService.resolveRoute({
+        const incomingEvent: IncomingChannelEvent = {
+          channelId: CHANNEL_TYPES.INSTAGRAM,
           routeChannelIdentifier: instagramAccountId,
           channelIdentifier: senderId,
-          incomingText: text,
-          channelType: CHANNEL_TYPES.INSTAGRAM,
-        });
-
-        if (routeDecision.kind === 'unroutable') {
-          this.logger.warn(
-            `[Instagram] No active ClientAgent found for instagramAccountId=${instagramAccountId}.`,
-          );
-          continue;
-        }
-
-        if (routeDecision.kind === 'ambiguous') {
-          const fallback = routeDecision.candidates[0];
-          if (!fallback?.channelConfig?.credentials) {
-            this.logger.warn(
-              `[Instagram] Unable to send routing clarification for instagramAccountId=${instagramAccountId}: missing credentials.`,
-            );
-            continue;
-          }
-
-          const decryptedCredentials = decryptRecord(fallback.channelConfig.credentials);
-          await this.sendMessage({
-            recipientId: senderId,
-            text: routeDecision.prompt,
-            accessToken: decryptedCredentials.accessToken,
-            messageTimestamp: event.timestamp,
-          });
-          continue;
-        }
-
-        const { clientAgent, channelConfig } = routeDecision.candidate;
-
-        if (!channelConfig.credentials) {
-          this.logger.error(
-            `[Instagram] Credentials missing for instagramAccountId=${instagramAccountId}. Possible select('+channels.credentials') omission.`,
-          );
-          continue;
-        }
-
-        const agent = await this.agentRepository.findActiveById(clientAgent.agentId);
-        if (!agent) {
-          this.logger.warn(
-            `[Instagram] Agent ${clientAgent.agentId} is not active. Skipping message.`,
-          );
-          continue;
-        }
-
-        const rawContext: AgentContext = {
-          agentId: clientAgent.agentId,
-          agentName: agent.name,
-          clientId: clientAgent.clientId,
-          channelId: channelConfig.channelId.toString(),
-          systemPrompt: agent.systemPrompt,
-          llmConfig: {
-            ...channelConfig.llmConfig,
-            provider: (channelConfig.llmConfig.provider || 'openai') as any,
-            apiKey: decrypt(
-              channelConfig.llmConfig.apiKey &&
-                !channelConfig.llmConfig.apiKey.includes('REPLACE_ME')
-                ? channelConfig.llmConfig.apiKey
-                : process.env.OPENAI_API_KEY ?? '',
-            ),
-            model: channelConfig.llmConfig.model || 'gpt-4o',
-          },
-          channelConfig: decryptRecord(channelConfig.credentials),
+          messageId: event?.message?.mid,
+          text,
+          rawPayload: event,
         };
 
-        const context = await this.agentContextService.enrichContext(rawContext);
-
-        const contact = await this.contactIdentityResolver.resolveContact({
-          channelType: CHANNEL_TYPES.INSTAGRAM,
-          payload: event,
-          clientId: new Types.ObjectId(clientAgent.clientId),
-          channelId: new Types.ObjectId(channelConfig.channelId.toString()),
-          contactName: senderId,
-        });
-
-        const input: AgentInput = {
-          channel: CHANNEL_TYPES.INSTAGRAM,
-          contactId: contact._id.toString(),
-          message: {
-            type: 'text',
-            text,
-          },
-          contactMetadata: contact.metadata,
-          contactSummary: contact.contactSummary,
-          metadata: {
-            messageId: event?.message?.mid,
-            instagramAccountId,
-          },
-        };
-
-        const output = await this.agentService.run(input, context);
-
-        if (output.reply) {
-          const decryptedCredentials = decryptRecord(channelConfig.credentials);
-          await this.sendMessage({
-            recipientId: senderId,
-            text: output.reply.text,
-            accessToken: decryptedCredentials.accessToken,
-            messageTimestamp: event.timestamp,
-          });
+        const output = await this.incomingMessageOrchestrator.handle(
+          incomingEvent,
+        );
+        if (!output?.reply) {
+          continue;
         }
+
+        const accessToken = this.resolveAccessTokenFromChannelMeta(
+          output.channelMeta?.encryptedCredentials,
+        );
+        if (!accessToken) {
+          this.logger.warn(
+            `[Instagram] Unable to send outbound message for instagramAccountId=${instagramAccountId}: missing credentials.`,
+          );
+          continue;
+        }
+
+        await this.sendMessage({
+          recipientId: senderId,
+          text: output.reply.text,
+          accessToken,
+          messageTimestamp: event.timestamp,
+        });
       }
     }
+  }
+
+  private resolveAccessTokenFromChannelMeta(
+    encryptedCredentials: unknown,
+  ): string | undefined {
+    if (
+      !encryptedCredentials ||
+      typeof encryptedCredentials !== 'object' ||
+      Array.isArray(encryptedCredentials)
+    ) {
+      return undefined;
+    }
+
+    const decryptedCredentials = decryptRecord(
+      encryptedCredentials as Record<string, any>,
+    );
+    return decryptedCredentials.accessToken;
   }
 }

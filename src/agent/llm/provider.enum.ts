@@ -1,4 +1,1 @@
-export enum LlmProvider {
-  OpenAI = 'openai',
-  Anthropic = 'anthropic',
-}
+export { LlmProvider } from '@domain/llm/provider.enum';

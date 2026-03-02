@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Query, Body, HttpCode, Logger } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Query,
+  Body,
+  HttpCode,
+  Logger,
+} from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
 
 @Controller('whatsapp')
@@ -19,10 +27,14 @@ export class WhatsappController {
   @Post('webhook')
   @HttpCode(200)
   handleWebhook(@Body() payload: unknown): string {
-    this.logger.log(`Incoming WhatsApp webhook payload: ${JSON.stringify(payload)}`);
+    this.logger.log(
+      `Incoming WhatsApp webhook payload: ${JSON.stringify(payload)}`,
+    );
     this.whatsappService.handleIncoming(payload).catch((error) => {
       this.logger.error(
-        `Failed to process WhatsApp webhook: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to process WhatsApp webhook: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
         error instanceof Error ? error.stack : undefined,
       );
     });

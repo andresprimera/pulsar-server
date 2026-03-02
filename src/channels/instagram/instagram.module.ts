@@ -1,11 +1,10 @@
 import { Module } from '@nestjs/common';
 import { InstagramController } from './instagram.controller';
 import { InstagramService } from './instagram.service';
-import { AgentModule } from '../../agent/agent.module';
-import { SharedChannelModule } from '../shared/shared.module';
+import { OrchestratorModule } from '@orchestrator/orchestrator.module';
 
 @Module({
-  imports: [AgentModule, SharedChannelModule],
+  imports: [OrchestratorModule],
   controllers: [InstagramController],
   providers: [InstagramService],
 })
