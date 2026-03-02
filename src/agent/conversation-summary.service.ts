@@ -5,6 +5,7 @@ import { MessageRepository } from '@persistence/repositories/message.repository'
 import { generateText } from 'ai';
 import { createLLMModel } from './llm/llm.factory';
 import { AgentContext } from './contracts/agent-context';
+import { LlmUsageLogRepository } from '@persistence/repositories/llm-usage-log.repository';
 
 @Injectable()
 export class ConversationSummaryService {
@@ -13,6 +14,7 @@ export class ConversationSummaryService {
   constructor(
     private readonly messageRepository: MessageRepository,
     private readonly configService: ConfigService,
+    private readonly llmUsageLogRepository: LlmUsageLogRepository,
   ) {}
 
   /**
@@ -82,7 +84,7 @@ export class ConversationSummaryService {
 
       // Generate summary using LLM
       const model = createLLMModel(context.llmConfig);
-      const { text } = await generateText({
+      const { text, usage } = await generateText({
         model,
         system:
           'You are a helpful assistant that creates concise summaries of conversations. ' +
@@ -108,6 +110,22 @@ export class ConversationSummaryService {
         conversationId,
         status: 'active',
       });
+
+      // Log summarization LLM usage
+      if (usage) {
+        await this.llmUsageLogRepository.create({
+          agentId,
+          clientId: new Types.ObjectId(context.clientId),
+          channelId: new Types.ObjectId(context.channelId),
+          conversationId,
+          provider: context.llmConfig.provider,
+          llmModel: context.llmConfig.model,
+          inputTokens: usage.inputTokens ?? 0,
+          outputTokens: usage.outputTokens ?? 0,
+          totalTokens: usage.totalTokens ?? 0,
+          operationType: 'summary',
+        });
+      }
 
       this.logger.log(
         `Summary generated and saved for conversation ${conversationId} agent ${agentId} client ${context.clientId}`,
