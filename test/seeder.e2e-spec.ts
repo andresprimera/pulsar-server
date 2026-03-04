@@ -3,7 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import { AppModule } from '../src/app.module';
 import { Connection } from 'mongoose';
 import { getConnectionToken } from '@nestjs/mongoose';
-import * as SEED_DATA from '../src/persistence/data/seed-data.json';
+import * as SEED_DATA from '../src/core/persistence/data/seed-data.json';
 
 describe('Seeder (e2e)', () => {
   let app: INestApplication;

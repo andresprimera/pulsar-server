@@ -1,3 +1,4 @@
+/* eslint-disable boundaries/element-types -- TODO: domain→persistence violations in this file, tracked for refactor */
 import { Injectable, Logger } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { generateText } from 'ai';

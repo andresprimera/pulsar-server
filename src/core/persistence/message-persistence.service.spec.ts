@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { MessagePersistenceService } from './message-persistence.service';
 import { MessageRepository } from '@persistence/repositories/message.repository';
 import { Types } from 'mongoose';
+// eslint-disable-next-line boundaries/element-types -- TODO: persistence→domain violation, tracked for refactor
 import { ConversationService } from '@domain/conversation/conversation.service';
 
 describe('MessagePersistenceService', () => {

@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Types } from 'mongoose';
+// eslint-disable-next-line boundaries/element-types -- TODO: domain→persistence violation, tracked for refactor
 import { Conversation } from '@persistence/schemas/conversation.schema';
+// eslint-disable-next-line boundaries/element-types -- TODO: domain→persistence violation, tracked for refactor
 import { ConversationRepository } from '@persistence/repositories/conversation.repository';
 import { WHATSAPP_CONVERSATION_TIMEOUT_MS } from './conversation.constants';
 

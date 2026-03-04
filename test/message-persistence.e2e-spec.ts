@@ -3,7 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import { AppModule } from '../src/app.module';
 import { Connection, Types } from 'mongoose';
 import { getConnectionToken } from '@nestjs/mongoose';
-import { WhatsappService } from '../src/channels/whatsapp/whatsapp.service';
+import { WhatsappService } from '../src/core/channels/whatsapp/whatsapp.service';
 import { ConfigService } from '@nestjs/config';
 
 // Mock fetch to prevent real HTTP calls

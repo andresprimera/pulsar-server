@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Types } from 'mongoose';
 import { ConversationService } from './conversation.service';
+// eslint-disable-next-line boundaries/element-types -- TODO: domain→persistence violation, tracked for refactor
 import { ConversationRepository } from '@persistence/repositories/conversation.repository';
 import { WHATSAPP_CONVERSATION_TIMEOUT_MS } from './conversation.constants';
 

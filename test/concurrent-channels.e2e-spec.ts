@@ -3,8 +3,8 @@ import { INestApplication } from '@nestjs/common';
 import { AppModule } from '../src/app.module';
 import { Connection, Types } from 'mongoose';
 import { getConnectionToken } from '@nestjs/mongoose';
-import { AgentService } from '../src/agent/agent.service';
-import { ChannelProvider } from '../src/domain/channels/channel-provider.enum';
+import { AgentService } from '../src/core/agent/agent.service';
+import { ChannelProvider } from '../src/core/domain/channels/channel-provider.enum';
 import * as request from 'supertest';
 
 describe('Concurrent Channels (e2e)', () => {

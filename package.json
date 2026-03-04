@@ -24,7 +24,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "prepare": "husky",
-    "seed": "ts-node src/persistence/seed.ts",
+    "seed": "ts-node src/core/persistence/seed.ts",
     "test:architecture": "jest --config ./test/jest-architecture.json",
     "check:cycles": "madge --circular src --extensions ts --ts-config ./tsconfig.json",
     "review:architecture": "git diff main...HEAD | claude --agent architecture-steward -p 'Review the following git diff for architectural compliance. Output your full review with a Final Verdict.'",
@@ -88,17 +88,17 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "moduleNameMapper": {
-      "^@channels/(.*)$": "<rootDir>/channels/$1",
-      "^@agent/(.*)$": "<rootDir>/agent/$1",
-      "^@orchestrator/(.*)$": "<rootDir>/orchestrator/$1",
-      "^@persistence/(.*)$": "<rootDir>/persistence/$1",
-      "^@domain/(.*)$": "<rootDir>/domain/$1",
+      "^@channels/(.*)$": "<rootDir>/core/channels/$1",
+      "^@agent/(.*)$": "<rootDir>/core/agent/$1",
+      "^@orchestrator/(.*)$": "<rootDir>/core/orchestrator/$1",
+      "^@persistence/(.*)$": "<rootDir>/core/persistence/$1",
+      "^@domain/(.*)$": "<rootDir>/core/domain/$1",
       "^@shared/(.*)$": "<rootDir>/shared/$1",
-      "^@agents/(.*)$": "<rootDir>/agents/$1",
-      "^@clients/(.*)$": "<rootDir>/clients/$1",
-      "^@client-agents/(.*)$": "<rootDir>/client-agents/$1",
-      "^@users/(.*)$": "<rootDir>/users/$1",
-      "^@onboarding/(.*)$": "<rootDir>/onboarding/$1"
+      "^@agents/(.*)$": "<rootDir>/features/agents/$1",
+      "^@clients/(.*)$": "<rootDir>/features/clients/$1",
+      "^@client-agents/(.*)$": "<rootDir>/features/client-agents/$1",
+      "^@users/(.*)$": "<rootDir>/features/users/$1",
+      "^@onboarding/(.*)$": "<rootDir>/features/onboarding/$1"
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"

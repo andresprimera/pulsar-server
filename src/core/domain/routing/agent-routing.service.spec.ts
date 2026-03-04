@@ -1,3 +1,4 @@
+/* eslint-disable boundaries/element-types -- TODO: domain→persistence violations in this file, tracked for refactor */
 import { Test, TestingModule } from '@nestjs/testing';
 import { Types } from 'mongoose';
 import { AgentRepository } from '@persistence/repositories/agent.repository';

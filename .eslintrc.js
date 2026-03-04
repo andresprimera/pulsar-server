@@ -19,11 +19,11 @@ module.exports = {
 
   settings: {
     'boundaries/elements': [
-      { type: 'channels', pattern: 'src/channels/**' },
-      { type: 'orchestrator', pattern: 'src/orchestrator/**' },
-      { type: 'agent', pattern: 'src/agent/**' },
-      { type: 'persistence', pattern: 'src/persistence/**' },
-      { type: 'domain', pattern: 'src/domain/**' },
+      { type: 'channels', pattern: 'src/core/channels/**' },
+      { type: 'orchestrator', pattern: 'src/core/orchestrator/**' },
+      { type: 'agent', pattern: 'src/core/agent/**' },
+      { type: 'persistence', pattern: 'src/core/persistence/**' },
+      { type: 'domain', pattern: 'src/core/domain/**' },
     ],
     'import/resolver': {
       typescript: {
@@ -63,8 +63,14 @@ module.exports = {
     'boundaries/element-types': [
       'error',
       {
-        default: 'allow',
-        rules: [],
+        default: 'disallow',
+        rules: [
+          { from: 'channels', allow: ['orchestrator', 'domain'] },
+          { from: 'orchestrator', allow: ['domain', 'agent', 'persistence'] },
+          { from: 'agent', allow: ['domain', 'persistence'] },
+          { from: 'domain', allow: [] },
+          { from: 'persistence', allow: [] },
+        ],
       },
     ],
   },

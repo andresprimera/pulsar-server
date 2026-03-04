@@ -1,16 +1,15 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
-import { DatabaseModule } from './persistence/database.module';
-import { WhatsappModule } from './channels/whatsapp/whatsapp.module';
-import { TiktokModule } from './channels/tiktok/tiktok.module';
-import { InstagramModule } from './channels/instagram/instagram.module';
-import { AgentsModule } from './agents/agents.module';
-import { UsersModule } from './users/users.module';
-import { ClientsModule } from './clients/clients.module';
-
-import { ClientAgentsModule } from './client-agents/client-agents.module';
-import { OnboardingModule } from './onboarding/onboarding.module';
+import { DatabaseModule } from './core/persistence/database.module';
+import { WhatsappModule } from './core/channels/whatsapp/whatsapp.module';
+import { TiktokModule } from './core/channels/tiktok/tiktok.module';
+import { InstagramModule } from './core/channels/instagram/instagram.module';
+import { AgentsModule } from './features/agents/agents.module';
+import { UsersModule } from './features/users/users.module';
+import { ClientsModule } from './features/clients/clients.module';
+import { ClientAgentsModule } from './features/client-agents/client-agents.module';
+import { OnboardingModule } from './features/onboarding/onboarding.module';
 
 @Module({
   imports: [
