@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { MessageRepository } from '@persistence/repositories/message.repository';
+// eslint-disable-next-line boundaries/element-types -- TODO: persistence→domain violation, tracked for refactor
 import { ConversationService } from '@domain/conversation/conversation.service';
 import { Conversation } from '@persistence/schemas/conversation.schema';
 

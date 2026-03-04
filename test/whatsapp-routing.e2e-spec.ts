@@ -4,8 +4,8 @@ import * as request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { Connection } from 'mongoose';
 import { getConnectionToken } from '@nestjs/mongoose';
-import * as SEED_DATA from '../src/persistence/data/seed-data.json';
-import { AgentService } from '../src/agent/agent.service';
+import * as SEED_DATA from '../src/core/persistence/data/seed-data.json';
+import { AgentService } from '../src/core/agent/agent.service';
 
 describe('WhatsApp Message Routing (e2e)', () => {
   let app: INestApplication;

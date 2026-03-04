@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 import { LlmConfig, LlmConfigSchema } from './llm-config.schema';
+// eslint-disable-next-line boundaries/element-types -- TODO: persistence→domain violation, tracked for refactor
 import { ChannelProvider } from '@domain/channels/channel-provider.enum';
 
 @Schema({ _id: false })

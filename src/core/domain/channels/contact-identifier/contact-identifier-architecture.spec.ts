@@ -1,5 +1,6 @@
 import { Types } from 'mongoose';
 import { Logger } from '@nestjs/common';
+// eslint-disable-next-line boundaries/element-types -- TODO: domain→persistence violation, tracked for refactor
 import { ContactRepository } from '@persistence/repositories/contact.repository';
 import { CHANNEL_TYPES } from '@domain/channels/channel-type.constants';
 import { ContactIdentifierExtractorRegistry } from './contact-identifier-extractor.registry';

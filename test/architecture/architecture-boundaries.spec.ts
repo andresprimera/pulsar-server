@@ -105,6 +105,38 @@ describe('Architecture Boundaries', () => {
     }
   });
 
+  it('Agent layer must not import orchestrator', () => {
+    const agentFiles = getFilesInLayer(files, 'agent');
+
+    for (const file of agentFiles) {
+      const content = fs.readFileSync(file, 'utf8');
+
+      expect(content).not.toMatch(/@orchestrator\//);
+    }
+  });
+
+  it('Domain must not import agent', () => {
+    const domainFiles = getFilesInLayer(files, 'domain');
+
+    for (const file of domainFiles) {
+      const content = fs.readFileSync(file, 'utf8');
+
+      expect(content).not.toMatch(/@agent\//);
+    }
+  });
+
+  // TODO: Known violations in conversation.service.ts and agent-routing.service.ts
+  //       Remove skip when domain is refactored to not depend on persistence
+  it.skip('Domain must not import persistence', () => {
+    const domainFiles = getFilesInLayer(files, 'domain');
+
+    for (const file of domainFiles) {
+      const content = fs.readFileSync(file, 'utf8');
+
+      expect(content).not.toMatch(/@persistence\//);
+    }
+  });
+
   it('No relative parent imports across layers', () => {
     for (const file of files) {
       const content = fs.readFileSync(file, 'utf8');

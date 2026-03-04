@@ -3,9 +3,9 @@ import { INestApplication } from '@nestjs/common';
 import { AppModule } from '../src/app.module';
 import { Connection, Types } from 'mongoose';
 import { getConnectionToken } from '@nestjs/mongoose';
-import { AgentService } from '../src/agent/agent.service';
+import { AgentService } from '../src/core/agent/agent.service';
 import * as request from 'supertest';
-import { ChannelProvider } from '../src/domain/channels/channel-provider.enum';
+import { ChannelProvider } from '../src/core/domain/channels/channel-provider.enum';
 
 describe('Instagram Channel (e2e)', () => {
   let app: INestApplication;
