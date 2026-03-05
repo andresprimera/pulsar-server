@@ -25,7 +25,7 @@ describe('OnboardingController', () => {
       _id: 'ca-1',
       clientId: 'client-1',
       agentId: 'agent-1',
-      price: 100,
+      agentPricing: { amount: 100, currency: 'USD' },
       status: 'active',
     },
   };
@@ -54,7 +54,7 @@ describe('OnboardingController', () => {
       const dto = {
         user: { email: 'test@example.com', name: 'Test' },
         client: { type: 'individual' as const },
-        agentHiring: { agentId: 'agent-1', price: 100 },
+        agentHiring: { agentId: 'agent-1' },
         channels: [],
       };
 

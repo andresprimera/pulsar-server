@@ -53,6 +53,8 @@ describe('ClientsService', () => {
 
       expect(mockClientRepository.create).toHaveBeenCalledWith({
         ...dto,
+        billingCurrency: 'USD',
+        billingAnchor: expect.any(Date),
         status: 'active',
       });
       expect(result.status).toBe('active');

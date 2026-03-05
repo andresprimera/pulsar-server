@@ -9,6 +9,7 @@ import {
   IsEnum,
   IsObject,
   IsString,
+  IsOptional,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ChannelProvider } from '@domain/channels/channel-provider.enum';
@@ -25,6 +26,20 @@ class LlmConfigDto {
   model: string;
 }
 
+class PricingOverrideDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  agentAmount?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  agentMonthlyTokenQuota?: number | null;
+}
+
 class HireChannelConfigDto {
   @IsMongoId()
   channelId: string;
@@ -38,6 +53,18 @@ class HireChannelConfigDto {
   @ValidateNested()
   @Type(() => LlmConfigDto)
   llmConfig: LlmConfigDto;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  amountOverride?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  monthlyMessageQuotaOverride?: number | null;
 }
 
 export class CreateClientAgentDto {
@@ -49,11 +76,10 @@ export class CreateClientAgentDto {
   @IsNotEmpty()
   agentId: string;
 
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @IsNotEmpty()
-  price: number;
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PricingOverrideDto)
+  pricingOverride?: PricingOverrideDto;
 
   @IsArray()
   @ValidateNested({ each: true })

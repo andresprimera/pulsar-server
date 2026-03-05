@@ -16,6 +16,8 @@ import { OnboardingService } from '@onboarding/onboarding.service';
 import { ChannelRepository } from './repositories/channel.repository';
 import { ClientAgentRepository } from './repositories/client-agent.repository';
 import { ClientPhoneRepository } from './repositories/client-phone.repository';
+import { AgentPriceRepository } from './repositories/agent-price.repository';
+import { ChannelPriceRepository } from './repositories/channel-price.repository';
 import { encryptRecord, encrypt } from '@shared/crypto.util';
 import * as SEED_DATA from './data/seed-data.json';
 import { ClientRepository } from './repositories/client.repository';
@@ -37,6 +39,8 @@ export class SeederService implements OnApplicationBootstrap {
     private readonly clientRepository: ClientRepository,
     private readonly clientAgentRepository: ClientAgentRepository,
     private readonly clientPhoneRepository: ClientPhoneRepository,
+    private readonly agentPriceRepository: AgentPriceRepository,
+    private readonly channelPriceRepository: ChannelPriceRepository,
     @InjectModel(ClientAgent.name)
     private readonly clientAgentModel: Model<ClientAgent>,
   ) {}
@@ -229,6 +233,23 @@ export class SeederService implements OnApplicationBootstrap {
           continue;
         }
 
+        // Ensure catalog prices exist for onboarding (USD)
+        await this.agentPriceRepository.upsert(
+          firstAgent._id as Types.ObjectId,
+          'USD',
+          firstAgentHiring.price ?? 0,
+        );
+        for (const channelSeed of firstHiringChannels) {
+          const channelInfo = channelsMap.get(channelSeed.channelName);
+          if (channelInfo?.channel?._id) {
+            await this.channelPriceRepository.upsert(
+              channelInfo.channel._id as Types.ObjectId,
+              'USD',
+              0,
+            );
+          }
+        }
+
         // Use OnboardingService to create User, Client, and first ClientAgent
         this.logger.log(
           `Running onboarding flow for user "${userSeed.email}" with agent "${firstAgentHiring.agentName}"...`,
@@ -241,10 +262,10 @@ export class SeederService implements OnApplicationBootstrap {
           client: {
             type: userSeed.client.type as any,
             ...(userSeed.client.name ? { name: userSeed.client.name } : {}),
+            billingCurrency: 'USD',
           },
           agentHiring: {
             agentId: firstAgent._id.toString(),
-            price: firstAgentHiring.price,
           },
           channels: channelsDto as any,
         });
@@ -355,10 +376,13 @@ export class SeederService implements OnApplicationBootstrap {
                   ...channelSeed.llmConfig,
                   apiKey: encrypt(channelSeed.llmConfig.apiKey),
                 },
+                amount: 0,
+                currency: 'USD',
+                monthlyMessageQuota: null,
               });
             }
 
-            // Create additional ClientAgent
+            // Create additional ClientAgent (snapshot pricing; Phase 2 may add catalog prices for additional agents)
             this.logger.log(
               `Hiring additional agent "${additionalHiring.agentName}" for client "${result.client._id}"...`,
             );
@@ -366,7 +390,12 @@ export class SeederService implements OnApplicationBootstrap {
               await this.clientAgentRepository.create({
                 clientId: result.client._id,
                 agentId: additionalAgent._id.toString(),
-                price: additionalHiring.price,
+                agentPricing: {
+                  amount: additionalHiring.price ?? 0,
+                  currency: 'USD',
+                  monthlyTokenQuota: null,
+                },
+                billingAnchor: new Date(),
                 status: 'active',
                 channels: additionalChannels,
               });

@@ -5,13 +5,18 @@ import {
 } from '@nestjs/common';
 import { InjectConnection } from '@nestjs/mongoose';
 import { Connection, Types } from 'mongoose';
+import {
+  assertCurrencyMatch,
+  isValidCurrencyCode,
+} from '@domain/billing/currency.validator';
 import { RegisterAndHireDto } from './dto/register-and-hire.dto';
 import { ClientRepository } from '@persistence/repositories/client.repository';
 import { UserRepository } from '@persistence/repositories/user.repository';
 import { AgentRepository } from '@persistence/repositories/agent.repository';
 import { ChannelRepository } from '@persistence/repositories/channel.repository';
 import { ClientAgentRepository } from '@persistence/repositories/client-agent.repository';
-
+import { AgentPriceRepository } from '@persistence/repositories/agent-price.repository';
+import { ChannelPriceRepository } from '@persistence/repositories/channel-price.repository';
 import { ClientPhoneRepository } from '@persistence/repositories/client-phone.repository';
 import { encryptRecord, encrypt } from '@shared/crypto.util';
 
@@ -34,7 +39,7 @@ export interface RegisterAndHireResult {
     _id: string;
     clientId: string;
     agentId: string;
-    price: number;
+    agentPricing: { amount: number; currency: string };
     status: string;
   };
 }
@@ -48,7 +53,8 @@ export class OnboardingService {
     private readonly agentRepository: AgentRepository,
     private readonly channelRepository: ChannelRepository,
     private readonly clientAgentRepository: ClientAgentRepository,
-
+    private readonly agentPriceRepository: AgentPriceRepository,
+    private readonly channelPriceRepository: ChannelPriceRepository,
     private readonly clientPhoneRepository: ClientPhoneRepository,
   ) {}
 
@@ -60,8 +66,10 @@ export class OnboardingService {
     // 1. Normalize email
     const normalizedEmail = dto.user.email.toLowerCase().trim();
 
-    // 2. Validate agent is hireable
-    await this.agentRepository.validateHireable(dto.agentHiring.agentId);
+    // 2. Validate agent is hireable and get agent for quota
+    const agent = await this.agentRepository.validateHireable(
+      dto.agentHiring.agentId,
+    );
 
     // 3. Validate client name for organization type
     if (dto.client.type === 'organization' && !dto.client.name) {
@@ -88,11 +96,19 @@ export class OnboardingService {
       }
       // 6. Create Client
       const clientName = dto.client.name || dto.user.name;
+      const billingCurrency = (
+        dto.client.billingCurrency ?? 'USD'
+      ).toUpperCase();
+      if (!isValidCurrencyCode(billingCurrency)) {
+        throw new BadRequestException('Invalid ISO 4217 currency code');
+      }
       const client = await this.clientRepository.create(
         {
           name: clientName,
           type: dto.client.type,
           status: 'active',
+          billingCurrency,
+          billingAnchor: new Date(),
         },
         session,
       );
@@ -114,6 +130,29 @@ export class OnboardingService {
         { ownerUserId: user._id as Types.ObjectId },
         session,
       );
+
+      // Resolve agent price for client billing currency
+      const agentIdObj = new Types.ObjectId(dto.agentHiring.agentId);
+      const agentPrice =
+        await this.agentPriceRepository.findActiveByAgentAndCurrency(
+          agentIdObj,
+          billingCurrency,
+        );
+      if (!agentPrice && dto.agentHiring.pricingOverride?.agentAmount == null) {
+        throw new BadRequestException(
+          `No active price found for agent in currency ${billingCurrency}`,
+        );
+      }
+      const agentAmount =
+        dto.agentHiring.pricingOverride?.agentAmount ?? agentPrice?.amount ?? 0;
+      const agentPricing = {
+        amount: agentAmount,
+        currency: billingCurrency,
+        monthlyTokenQuota:
+          dto.agentHiring.pricingOverride?.agentMonthlyTokenQuota ??
+          agent.monthlyTokenQuota ??
+          null,
+      };
 
       // 10. Process Channels
       const hireChannels = [];
@@ -145,6 +184,24 @@ export class OnboardingService {
           );
         }
 
+        const channelIdObj = new Types.ObjectId(channelConfig.channelId);
+        const channelPrice =
+          await this.channelPriceRepository.findActiveByChannelAndCurrency(
+            channelIdObj,
+            billingCurrency,
+          );
+        if (!channelPrice && channelConfig.amountOverride == null) {
+          throw new BadRequestException(
+            `No active price found for channel in currency ${billingCurrency}`,
+          );
+        }
+        const channelAmount =
+          channelConfig.amountOverride ?? channelPrice?.amount ?? 0;
+        const channelMonthlyMessageQuota =
+          channelConfig.monthlyMessageQuotaOverride ??
+          channel.monthlyMessageQuota ??
+          null;
+
         // Credentials & Phone Logic
         let phoneNumberId: string | undefined;
         if (
@@ -155,9 +212,6 @@ export class OnboardingService {
         }
 
         if (phoneNumberId) {
-          // Resolve or create ClientPhone for this client
-          // Note: We don't store clientPhoneId in ClientAgent (embedded),
-          // but we still enforce ownership via ClientPhone repository
           await this.clientPhoneRepository.resolveOrCreate(
             client._id as Types.ObjectId,
             phoneNumberId,
@@ -168,7 +222,6 @@ export class OnboardingService {
           );
         }
 
-        // Extract tiktokUserId for unencrypted storage/lookup
         let tiktokUserId: string | undefined;
         if (
           channelConfig.credentials &&
@@ -177,7 +230,6 @@ export class OnboardingService {
           tiktokUserId = channelConfig.credentials.tiktokUserId;
         }
 
-        // Extract instagramAccountId for unencrypted storage/lookup
         let instagramAccountId: string | undefined;
         if (
           channelConfig.credentials &&
@@ -187,11 +239,10 @@ export class OnboardingService {
         }
 
         hireChannels.push({
-          channelId: new Types.ObjectId(channelConfig.channelId),
+          channelId: channelIdObj,
           provider: normalizedProvider,
           status: 'active',
           credentials: encryptRecord(channelConfig.credentials),
-          // Store unencrypted keys for fast lookup
           phoneNumberId,
           tiktokUserId,
           instagramAccountId,
@@ -199,7 +250,21 @@ export class OnboardingService {
             ...channelConfig.llmConfig,
             apiKey: encrypt(channelConfig.llmConfig.apiKey),
           },
+          amount: channelAmount,
+          currency: billingCurrency,
+          monthlyMessageQuota: channelMonthlyMessageQuota,
         });
+      }
+
+      try {
+        assertCurrencyMatch(agentPricing.currency, client.billingCurrency);
+        for (const ch of hireChannels) {
+          assertCurrencyMatch(ch.currency, client.billingCurrency);
+        }
+      } catch {
+        throw new BadRequestException(
+          'Pricing currency must match client billing currency',
+        );
       }
 
       // 9. Create ClientAgent (pricing snapshot + channels)
@@ -207,7 +272,8 @@ export class OnboardingService {
         {
           clientId: (client._id as Types.ObjectId).toString(),
           agentId: dto.agentHiring.agentId,
-          price: dto.agentHiring.price,
+          agentPricing,
+          billingAnchor: new Date(),
           status: 'active',
           channels: hireChannels,
         },
@@ -237,7 +303,7 @@ export class OnboardingService {
           _id: (clientAgent._id as Types.ObjectId).toString(),
           clientId: clientAgent.clientId,
           agentId: clientAgent.agentId,
-          price: clientAgent.price,
+          agentPricing: clientAgent.agentPricing,
           status: clientAgent.status,
         },
       };

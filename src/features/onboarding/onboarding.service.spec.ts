@@ -13,6 +13,8 @@ import { AgentRepository } from '@persistence/repositories/agent.repository';
 import { ChannelRepository } from '@persistence/repositories/channel.repository';
 import { ClientAgentRepository } from '@persistence/repositories/client-agent.repository';
 import { ClientPhoneRepository } from '@persistence/repositories/client-phone.repository';
+import { AgentPriceRepository } from '@persistence/repositories/agent-price.repository';
+import { ChannelPriceRepository } from '@persistence/repositories/channel-price.repository';
 import { LlmProvider } from '@domain/llm/provider.enum';
 import { ChannelProvider } from '@domain/channels/channel-provider.enum';
 
@@ -26,17 +28,23 @@ describe('OnboardingService', () => {
   let mockChannelRepository: any;
   let mockClientAgentRepository: any;
   let mockClientPhoneRepository: any;
+  let mockAgentPriceRepository: any;
+  let mockChannelPriceRepository: any;
 
   const mockClient = {
     _id: 'client-1',
     name: 'Test Client',
     type: 'individual',
     status: 'active',
+    billingCurrency: 'USD',
+    billingAnchor: new Date(),
     toObject: () => ({
       _id: 'client-1',
       name: 'Test Client',
       type: 'individual',
       status: 'active',
+      billingCurrency: 'USD',
+      billingAnchor: new Date(),
     }),
   };
 
@@ -55,10 +63,12 @@ describe('OnboardingService', () => {
     }),
   };
 
+  const mockAgentId = '507f1f77bcf86cd799439012';
   const mockAgent = {
-    _id: 'agent-1',
+    _id: mockAgentId,
     name: 'Test Agent',
     status: 'active',
+    monthlyTokenQuota: null,
   };
 
   const mockChannel = {
@@ -66,20 +76,23 @@ describe('OnboardingService', () => {
     name: 'whatsapp-main',
     type: 'whatsapp',
     supportedProviders: ['meta'],
+    monthlyMessageQuota: null,
   };
 
   const mockClientAgent = {
     _id: 'client-agent-1',
     clientId: 'client-1',
     agentId: 'agent-1',
-    price: 100,
+    agentPricing: { amount: 100, currency: 'USD', monthlyTokenQuota: null },
+    billingAnchor: new Date(),
     status: 'active',
     channels: [],
     toObject: () => ({
       _id: 'client-agent-1',
       clientId: 'client-1',
       agentId: 'agent-1',
-      price: 100,
+      agentPricing: { amount: 100, currency: 'USD', monthlyTokenQuota: null },
+      billingAnchor: new Date(),
       status: 'active',
       channels: [],
     }),
@@ -132,6 +145,18 @@ describe('OnboardingService', () => {
       resolveOrCreate: jest.fn().mockResolvedValue(mockClientPhone),
     };
 
+    mockAgentPriceRepository = {
+      findActiveByAgentAndCurrency: jest
+        .fn()
+        .mockResolvedValue({ amount: 100 }),
+    };
+
+    mockChannelPriceRepository = {
+      findActiveByChannelAndCurrency: jest
+        .fn()
+        .mockResolvedValue({ amount: 0 }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OnboardingService,
@@ -141,6 +166,11 @@ describe('OnboardingService', () => {
         { provide: AgentRepository, useValue: mockAgentRepository },
         { provide: ChannelRepository, useValue: mockChannelRepository },
         { provide: ClientAgentRepository, useValue: mockClientAgentRepository },
+        { provide: AgentPriceRepository, useValue: mockAgentPriceRepository },
+        {
+          provide: ChannelPriceRepository,
+          useValue: mockChannelPriceRepository,
+        },
         { provide: ClientPhoneRepository, useValue: mockClientPhoneRepository },
       ],
     }).compile();
@@ -155,8 +185,8 @@ describe('OnboardingService', () => {
   describe('registerAndHire', () => {
     const validDto = {
       user: { email: 'TEST@example.com', name: 'Test User' },
-      client: { type: 'individual' as const },
-      agentHiring: { agentId: 'agent-1', price: 100 },
+      client: { type: 'individual' as const, billingCurrency: 'USD' },
+      agentHiring: { agentId: mockAgentId },
       channels: [
         {
           channelId: '507f1f77bcf86cd799439011',
@@ -201,7 +231,10 @@ describe('OnboardingService', () => {
       await service.registerAndHire(validDto);
 
       expect(mockClientRepository.create).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'Test User' }),
+        expect.objectContaining({
+          name: 'Test User',
+          billingCurrency: 'USD',
+        }),
         mockSession,
       );
     });

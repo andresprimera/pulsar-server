@@ -10,6 +10,8 @@ import {
   ValidateNested,
   Min,
   ArrayMinSize,
+  Matches,
+  IsInt,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { LlmProvider } from '@domain/llm/provider.enum';
@@ -31,16 +33,38 @@ class ClientDto {
   @IsOptional()
   @IsString()
   name?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Z]{3}$/, {
+    message:
+      'billingCurrency must be a valid ISO 4217 code (e.g. USD, EUR, BRL)',
+  })
+  billingCurrency?: string;
+}
+
+class PricingOverrideDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  agentAmount?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  agentMonthlyTokenQuota?: number | null;
 }
 
 class AgentHiringDto {
   @IsMongoId()
   agentId: string;
 
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  price: number;
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PricingOverrideDto)
+  pricingOverride?: PricingOverrideDto;
 }
 
 class LlmConfigDto {
@@ -69,6 +93,18 @@ class HireChannelConfigDto {
   @ValidateNested()
   @Type(() => LlmConfigDto)
   llmConfig: LlmConfigDto;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  amountOverride?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  monthlyMessageQuotaOverride?: number | null;
 }
 
 export class RegisterAndHireDto {

@@ -2,12 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
 import { IncomingMessageOrchestrator } from './incoming-message.orchestrator';
 import { AgentService } from '@agent/agent.service';
-import { AgentRepository } from '@persistence/repositories/agent.repository';
-import { ClientRepository } from '@persistence/repositories/client.repository';
 import { LlmProvider } from '@domain/llm/provider.enum';
 import { CHANNEL_TYPES } from '@domain/channels/channel-type.constants';
 import { AgentRoutingService } from '@domain/routing/agent-routing.service';
 import { AgentContextService } from '@agent/agent-context.service';
+import { QuotaEnforcementService } from './quota-enforcement.service';
 import { ContactIdentityResolver } from './contact-identity.resolver';
 import { ConversationService } from '@domain/conversation/conversation.service';
 import { EventIdempotencyService } from '@persistence/event-idempotency.service';
@@ -16,7 +15,7 @@ describe('IncomingMessageOrchestrator', () => {
   let service: IncomingMessageOrchestrator;
   let agentService: jest.Mocked<AgentService>;
   let agentRoutingService: jest.Mocked<AgentRoutingService>;
-  let agentRepository: jest.Mocked<AgentRepository>;
+  let agentContextService: jest.Mocked<AgentContextService>;
   let contactIdentityResolver: jest.Mocked<ContactIdentityResolver>;
   let conversationService: jest.Mocked<ConversationService>;
   let eventIdempotencyService: jest.Mocked<EventIdempotencyService>;
@@ -49,16 +48,6 @@ describe('IncomingMessageOrchestrator', () => {
           useValue: { resolveRoute: jest.fn() },
         },
         {
-          provide: AgentRepository,
-          useValue: { findActiveById: jest.fn() },
-        },
-        {
-          provide: ClientRepository,
-          useValue: {
-            findById: jest.fn().mockResolvedValue({ name: 'Test Client' }),
-          },
-        },
-        {
           provide: ContactIdentityResolver,
           useValue: {
             resolveContact: jest.fn(),
@@ -67,6 +56,13 @@ describe('IncomingMessageOrchestrator', () => {
         {
           provide: AgentContextService,
           useValue: {
+            buildContextFromRoute: jest.fn(),
+            buildAmbiguousPrompt: jest
+              .fn()
+              .mockResolvedValue(
+                'Hey there! Thanks for reaching out.\n\nWe have a few specialists ready to help you:\n1. Support Bot\n2. Sales Bot\n\nJust reply with a number or name to get started!',
+              ),
+            getClientBillingAnchor: jest.fn().mockResolvedValue(new Date()),
             enrichContext: jest
               .fn()
               .mockImplementation((ctx) => Promise.resolve(ctx)),
@@ -85,6 +81,12 @@ describe('IncomingMessageOrchestrator', () => {
             registerIfFirst: jest.fn().mockResolvedValue(true),
           },
         },
+        {
+          provide: QuotaEnforcementService,
+          useValue: {
+            check: jest.fn().mockResolvedValue({ allowed: true }),
+          },
+        },
       ],
     }).compile();
 
@@ -93,7 +95,7 @@ describe('IncomingMessageOrchestrator', () => {
     );
     agentService = module.get(AgentService);
     agentRoutingService = module.get(AgentRoutingService);
-    agentRepository = module.get(AgentRepository);
+    agentContextService = module.get(AgentContextService);
     contactIdentityResolver = module.get(ContactIdentityResolver);
     conversationService = module.get(ConversationService);
     eventIdempotencyService = module.get(EventIdempotencyService);
@@ -102,7 +104,7 @@ describe('IncomingMessageOrchestrator', () => {
   });
 
   afterEach(() => {
-    loggerWarnSpy.mockRestore();
+    loggerWarnSpy?.mockRestore();
   });
 
   it('should be defined', () => {
@@ -115,6 +117,12 @@ describe('IncomingMessageOrchestrator', () => {
       clientId: '507f1f77bcf86cd799439011',
       agentId: 'agent-1',
       status: 'active',
+      billingAnchor: new Date(),
+      agentPricing: {
+        amount: 100,
+        currency: 'USD',
+        monthlyTokenQuota: null,
+      },
       channels: [
         {
           channelId: '507f1f77bcf86cd799439014',
@@ -129,6 +137,7 @@ describe('IncomingMessageOrchestrator', () => {
             apiKey: 'sk-mock-key',
             model: 'gpt-4',
           },
+          monthlyMessageQuota: null,
         },
       ],
     };
@@ -203,7 +212,19 @@ describe('IncomingMessageOrchestrator', () => {
       agentRoutingService.resolveRoute.mockResolvedValue(
         mockResolvedRoute as any,
       );
-      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
+      agentContextService.buildContextFromRoute.mockResolvedValue({
+        agentId: 'agent-1',
+        agentName: 'Support Bot',
+        clientId: mockClientAgent.clientId,
+        channelId: mockClientAgent.channels[0].channelId,
+        systemPrompt: mockAgent.systemPrompt,
+        llmConfig: {
+          provider: LlmProvider.OpenAI,
+          apiKey: 'sk-mock',
+          model: 'gpt-4',
+        },
+        channelConfig: {},
+      });
       contactIdentityResolver.resolveContact.mockResolvedValue(
         mockContact as any,
       );
@@ -250,7 +271,19 @@ describe('IncomingMessageOrchestrator', () => {
       agentRoutingService.resolveRoute.mockResolvedValue(
         mockResolvedRoute as any,
       );
-      agentRepository.findActiveById.mockResolvedValue(mockAgent as any);
+      agentContextService.buildContextFromRoute.mockResolvedValue({
+        agentId: 'agent-1',
+        agentName: 'Support Bot',
+        clientId: mockClientAgent.clientId,
+        channelId: mockClientAgent.channels[0].channelId,
+        systemPrompt: mockAgent.systemPrompt,
+        llmConfig: {
+          provider: LlmProvider.OpenAI,
+          apiKey: 'sk-mock',
+          model: 'gpt-4',
+        },
+        channelConfig: {},
+      });
       contactIdentityResolver.resolveContact.mockResolvedValue(
         mockContact as any,
       );

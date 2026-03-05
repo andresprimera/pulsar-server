@@ -1,15 +1,3 @@
-Original prompt
-
-How would you define the pricing strategy, by being very strict about our architecture purity.
-
-- agents are going to have a monthly price. This price includes a consumtion quota.
-- Channels are going to have a price. THis price also includes a quota.
-- When the user hires an agent, they will pay the total monthly amount for agent + channels.
-- prices can change over time, but users will keep their prices when this happens.
-- I could define special prices for particular clients discretionally.
-
-
-
 # Pricing & Quota Enforcement Plan
 
 ## Context
@@ -28,21 +16,21 @@ Prices support **multiple currencies** via separate price tables (`AgentPrice`, 
 
 ## Concern Classification
 
-| Concept | Layer | Justification |
-|---|---|---|
-| Catalog prices (`AgentPrice`, `ChannelPrice`) | **Persistence** | Separate schemas per currency, UNIQUE(entityId, currency) |
-| Price lifecycle (`status: active/deprecated`) | **Persistence** | Data field on price schemas |
-| Client billing currency | **Persistence** | Data field on Client schema |
-| Snapshotted prices (on ClientAgent) | **Persistence** | Immutable data captured at hire time |
-| Billing records (`BillingRecord`) | **Persistence** | Immutable invoice snapshots per billing cycle |
-| Quota exhaustion rule (`isExceeded`) | **Domain** | Pure business invariant, no dependencies |
-| Billing period computation | **Domain** | Pure date logic, no dependencies |
-| Currency consistency invariant | **Domain** | Pure assertion: all snapshot currencies must match client currency |
-| Currency format validation (`/^[A-Z]{3}$/`) | **Domain** | Pure validation rule, no dependencies |
-| Quota enforcement gate | **Orchestrator** | Coordination concern (same pattern as idempotency) |
-| Token usage aggregation query | **Persistence** | Database aggregation |
-| Message counting query | **Persistence** | Database query |
-| Special pricing overrides (amount only) | **Features** | Admin DTO overrides at hire time, currency locked to client |
+| Concept                                       | Layer            | Justification                                                      |
+| --------------------------------------------- | ---------------- | ------------------------------------------------------------------ |
+| Catalog prices (`AgentPrice`, `ChannelPrice`) | **Persistence**  | Separate schemas per currency, UNIQUE(entityId, currency)          |
+| Price lifecycle (`status: active/deprecated`) | **Persistence**  | Data field on price schemas                                        |
+| Client billing currency                       | **Persistence**  | Data field on Client schema                                        |
+| Snapshotted prices (on ClientAgent)           | **Persistence**  | Immutable data captured at hire time                               |
+| Billing records (`BillingRecord`)             | **Persistence**  | Immutable invoice snapshots per billing cycle                      |
+| Quota exhaustion rule (`isExceeded`)          | **Domain**       | Pure business invariant, no dependencies                           |
+| Billing period computation                    | **Domain**       | Pure date logic, no dependencies                                   |
+| Currency consistency invariant                | **Domain**       | Pure assertion: all snapshot currencies must match client currency |
+| Currency format validation (`/^[A-Z]{3}$/`)   | **Domain**       | Pure validation rule, no dependencies                              |
+| Quota enforcement gate                        | **Orchestrator** | Coordination concern (same pattern as idempotency)                 |
+| Token usage aggregation query                 | **Persistence**  | Database aggregation                                               |
+| Message counting query                        | **Persistence**  | Database query                                                     |
+| Special pricing overrides (amount only)       | **Features**     | Admin DTO overrides at hire time, currency locked to client        |
 
 ---
 
@@ -51,12 +39,14 @@ Prices support **multiple currencies** via separate price tables (`AgentPrice`, 
 ### Step 1 — Add quota fields to Agent and Channel schemas (no prices)
 
 **File:** [agent.schema.ts](src/core/persistence/schemas/agent.schema.ts) — add only the quota:
+
 ```ts
 @Prop({ type: Number, default: null })
 monthlyTokenQuota: number | null;  // null = unlimited
 ```
 
 **File:** [channel.schema.ts](src/core/persistence/schemas/channel.schema.ts) — add only the quota:
+
 ```ts
 @Prop({ type: Number, default: null })
 monthlyMessageQuota: number | null;  // null = unlimited (e.g., Telegram)
@@ -79,7 +69,7 @@ export class AgentPrice extends Document {
   agentId: Types.ObjectId;
 
   @Prop({ required: true, uppercase: true, match: /^[A-Z]{3}$/ })
-  currency: string;  // ISO 4217: USD, EUR, BRL, etc.
+  currency: string; // ISO 4217: USD, EUR, BRL, etc.
 
   @Prop({ required: true, min: 0 })
   amount: number;
@@ -148,6 +138,7 @@ billingCurrency: string;  // ISO 4217 — validated with regex, uppercase enforc
 ```
 
 Update [register-and-hire.dto.ts](src/features/onboarding/dto/register-and-hire.dto.ts) `ClientDto` to accept `billingCurrency`. Add DTO validation:
+
 ```ts
 @IsOptional()
 @IsString()
@@ -162,6 +153,7 @@ billingCurrency?: string;
 **New file:** `src/features/agent-prices/agent-prices.module.ts` (+ controller, service, DTOs)
 
 Endpoints:
+
 - `PUT /agents/:agentId/prices/:currency` — upsert an agent price for a currency (creates as `active`)
 - `GET /agents/:agentId/prices` — list all prices for an agent (includes `deprecated` for admin visibility)
 - `PATCH /agents/:agentId/prices/:currency/deprecate` — set status to `deprecated` (price remains for history, cannot be used for new hires)
@@ -193,6 +185,7 @@ export class AgentPricingSnapshot {
 ```
 
 Add to `ClientAgent`:
+
 ```ts
 @Prop({ type: AgentPricingSnapshotSchema, required: true })
 agentPricing: AgentPricingSnapshot;
@@ -202,6 +195,7 @@ billingAnchor: Date;  // Set once at hire time, billing cycles from this date
 ```
 
 Add to `HireChannelConfig`:
+
 ```ts
 @Prop({ required: true, min: 0, default: 0 })
 amount: number;
@@ -220,12 +214,14 @@ Update [client-agent.entity.ts](src/core/persistence/entities/client-agent.entit
 ### Step 4 — Snapshot pricing at hire time (currency-aware)
 
 **Files:**
+
 - [client-agents.service.ts](src/features/client-agents/client-agents.service.ts)
 - [create-client-agent.dto.ts](src/features/client-agents/dto/create-client-agent.dto.ts)
 - [register-and-hire.dto.ts](src/features/onboarding/dto/register-and-hire.dto.ts)
 - [onboarding.service.ts](src/features/onboarding/onboarding.service.ts)
 
 **DTO changes:**
+
 - Remove the required `price` field from both DTOs
 - Add optional `pricingOverride` for special pricing (**amount only, currency is always `client.billingCurrency`**):
   ```ts
@@ -248,6 +244,7 @@ Overrides can change amounts but **never the currency**. Currency is always lock
 **Service changes** (in `create()`):
 
 Price resolution flow:
+
 1. Fetch client → read `client.billingCurrency`
 2. Fetch **active** `AgentPrice` for `(agentId, billingCurrency)` — fail with `BadRequestException` if not found
 3. For each channel, fetch **active** `ChannelPrice` for `(channelId, billingCurrency)` — fail if not found
@@ -259,20 +256,32 @@ Price resolution flow:
 const currency = client.billingCurrency;
 
 // Agent pricing snapshot
-const agentPrice = await this.agentPriceRepository.findActiveByAgentAndCurrency(agentId, currency);
+const agentPrice = await this.agentPriceRepository.findActiveByAgentAndCurrency(
+  agentId,
+  currency,
+);
 if (!agentPrice && !data.pricingOverride?.agentAmount) {
-  throw new BadRequestException(`No active price found for agent in currency ${currency}`);
+  throw new BadRequestException(
+    `No active price found for agent in currency ${currency}`,
+  );
 }
 const agentPricing = {
   amount: data.pricingOverride?.agentAmount ?? agentPrice.amount,
   currency,
-  monthlyTokenQuota: data.pricingOverride?.agentMonthlyTokenQuota ?? agent.monthlyTokenQuota,
+  monthlyTokenQuota:
+    data.pricingOverride?.agentMonthlyTokenQuota ?? agent.monthlyTokenQuota,
 };
 
 // Per-channel pricing snapshot (inside channel loop)
-const channelPrice = await this.channelPriceRepository.findActiveByChannelAndCurrency(channelId, currency);
+const channelPrice =
+  await this.channelPriceRepository.findActiveByChannelAndCurrency(
+    channelId,
+    currency,
+  );
 if (!channelPrice && !channelConfig.amountOverride) {
-  throw new BadRequestException(`No active price found for channel in currency ${currency}`);
+  throw new BadRequestException(
+    `No active price found for channel in currency ${currency}`,
+  );
 }
 // Add to channel config:
 //   amount: channelConfig.amountOverride ?? channelPrice.amount,
@@ -283,6 +292,7 @@ if (!channelPrice && !channelConfig.amountOverride) {
 Set `billingAnchor: new Date()`
 
 **Update `calculateClientTotal()`:**
+
 ```ts
 async calculateClientTotal(clientId: string): Promise<{ total: number; currency: string }> {
   const client = await this.clientsService.findById(clientId);
@@ -327,6 +337,7 @@ async sumTokensForClientAgent(
   periodStart: Date, periodEnd: Date,
 ): Promise<number>
 ```
+
 Uses MongoDB `$aggregate` to sum `totalTokens` within the billing period.
 
 **File:** [message.repository.ts](src/core/persistence/repositories/message.repository.ts)
@@ -337,9 +348,11 @@ async countMessagesForClientChannel(
   periodStart: Date, periodEnd: Date,
 ): Promise<number>
 ```
+
 Uses `countDocuments` to count messages (type `user`) within the billing period.
 
 **Add indexes** for efficient queries:
+
 - `llm-usage-log.schema.ts`: `{ clientId: 1, agentId: 1, createdAt: 1 }`
 - `message.schema.ts`: `{ clientId: 1, channelId: 1, type: 1, status: 1, createdAt: 1 }`
 
@@ -350,6 +363,7 @@ Uses `countDocuments` to count messages (type `user`) within the billing period.
 **New file:** `src/core/domain/quota/quota-policy.ts`
 
 Pure functions with zero dependencies:
+
 ```ts
 QuotaPolicy.isExceeded(quota: number | null, currentUsage: number): boolean
 // null quota = unlimited = never exceeded
@@ -361,6 +375,7 @@ computeCurrentBillingPeriod(billingAnchor: Date, now?: Date): { start: Date, end
 **New file:** `src/core/domain/billing/currency.validator.ts`
 
 Pure validation with zero dependencies:
+
 ```ts
 const ISO_4217_PATTERN = /^[A-Z]{3}$/;
 
@@ -368,9 +383,14 @@ export function isValidCurrencyCode(code: string): boolean {
   return ISO_4217_PATTERN.test(code);
 }
 
-export function assertCurrencyMatch(snapshotCurrency: string, clientCurrency: string): void {
+export function assertCurrencyMatch(
+  snapshotCurrency: string,
+  clientCurrency: string,
+): void {
   if (snapshotCurrency !== clientCurrency) {
-    throw new Error(`Currency mismatch: snapshot=${snapshotCurrency}, client=${clientCurrency}`);
+    throw new Error(
+      `Currency mismatch: snapshot=${snapshotCurrency}, client=${clientCurrency}`,
+    );
   }
 }
 ```
@@ -390,7 +410,7 @@ export class BillingLineItem {
   type: 'agent' | 'channel';
 
   @Prop({ type: Types.ObjectId, required: true })
-  referenceId: Types.ObjectId;  // agentId or channelId
+  referenceId: Types.ObjectId; // agentId or channelId
 
   @Prop({ required: true })
   description: string;
@@ -419,7 +439,11 @@ export class BillingRecord extends Document {
   @Prop({ required: true, min: 0 })
   totalAmount: number;
 
-  @Prop({ required: true, enum: ['generated', 'paid', 'void'], default: 'generated' })
+  @Prop({
+    required: true,
+    enum: ['generated', 'paid', 'void'],
+    default: 'generated',
+  })
   status: 'generated' | 'paid' | 'void';
 }
 
@@ -427,6 +451,7 @@ BillingRecordSchema.index({ clientId: 1, periodStart: 1, periodEnd: 1 });
 ```
 
 **Rules:**
+
 - Billing records are **immutable** — no updates except `status` transitions (`generated` → `paid`, `generated` → `void`)
 - Past invoices must never be recomputed
 - Reports and billing queries must use BillingRecord data, not live ClientAgent snapshots
@@ -457,7 +482,7 @@ export class QuotaEnforcementService {
     private readonly messageRepository: MessageRepository,
   ) {}
 
-  async check(input: QuotaCheckInput): Promise<QuotaCheckResult>
+  async check(input: QuotaCheckInput): Promise<QuotaCheckResult>;
 }
 ```
 
@@ -500,6 +525,7 @@ After all implementation steps are complete, run the `architecture-steward` agen
 5. **Repeat until the agent returns a clean approval with zero violations**
 
 **What the agent checks:**
+
 - Layer dependency directions (no upward or sideways imports)
 - Path alias usage (no relative parent imports across layers)
 - Domain purity (no persistence imports, no execution logic, no infrastructure economics)
@@ -513,45 +539,272 @@ After all implementation steps are complete, run the `architecture-steward` agen
 
 ---
 
+### Step X — Move QuotaEnforcementService to the Orchestrator Layer
+
+The quota enforcement service currently lives in the **agent layer**, but it is actually a **coordination concern**, not an agent concern.
+
+Move the service to the **orchestrator layer** to maintain strict architectural boundaries.
+
+#### Required Changes
+
+Move the file:
+
+```
+src/core/agent/quota-enforcement.service.ts
+```
+
+to:
+
+```
+src/core/orchestrator/quota-enforcement.service.ts
+```
+
+Update imports across the project accordingly.
+
+#### Module Adjustments
+
+Register the service inside:
+
+```
+src/core/orchestrator/orchestrator.module.ts
+```
+
+and remove it from:
+
+```
+src/core/agent/agent.module.ts
+```
+
+#### Architectural Rationale
+
+Quota enforcement coordinates:
+
+* token usage queries
+* message usage queries
+* billing period computation
+
+This is **workflow orchestration**, not agent execution logic.
+
+The orchestrator layer is responsible for:
+
+```
+incoming-message pipeline coordination
+idempotency
+routing
+quota gates
+agent execution orchestration
+```
+
+---
+
+### Step X+1 — Enforce Currency Invariant During Subscription Snapshot
+
+The domain rule requires that **all pricing snapshots match the client billing currency**.
+
+Add enforcement using the domain validator:
+
+```
+assertCurrencyMatch(snapshotCurrency, client.billingCurrency)
+```
+
+#### Where This Must Be Enforced
+
+Inside:
+
+```
+client-agents.service.ts
+onboarding.service.ts
+```
+
+During snapshot creation:
+
+```
+AgentPricingSnapshot
+HireChannelConfig
+```
+
+#### Required Validation
+
+Before persisting a snapshot:
+
+```
+assertCurrencyMatch(agentPricing.currency, client.billingCurrency)
+assertCurrencyMatch(channelConfig.currency, client.billingCurrency)
+```
+
+If a mismatch occurs:
+
+```
+throw new BadRequestException(
+  `Pricing currency must match client billing currency`
+)
+```
+
+#### Architectural Rationale
+
+This ensures the system invariant:
+
+```
+All billing calculations operate within a single currency.
+```
+
+It prevents mixed-currency subscriptions.
+
+---
+
+### Step X+2 — Introduce Billing Generation Service
+
+Billing records exist but are not yet generated automatically.
+
+Create a dedicated service responsible for generating **monthly billing records**.
+
+#### New File
+
+```
+src/core/orchestrator/billing-generator.service.ts
+```
+
+#### Responsibilities
+
+For a given client:
+
+1. Determine current billing period using:
+
+```
+QuotaPolicy.computeCurrentBillingPeriod()
+```
+
+2. Check if a BillingRecord already exists:
+
+```
+BillingRecordRepository.findByClientAndPeriod()
+```
+
+3. If none exists:
+
+Generate a BillingRecord using the **snapshotted subscription prices**.
+
+#### Billing Record Creation
+
+Each billing record should contain:
+
+```
+clientId
+periodStart
+periodEnd
+currency
+items[]
+totalAmount
+status: "generated"
+```
+
+#### Line Items
+
+Create line items from:
+
+```
+ClientAgent.agentPricing
+ClientAgent.channels[].amount
+```
+
+Each item must include:
+
+```
+type: 'agent' | 'channel'
+referenceId
+description
+amount
+```
+
+#### Billing Rules
+
+Billing records must follow these invariants:
+
+```
+BillingRecord is immutable after creation.
+Only status may change: generated → paid | void.
+Past billing records must never be recomputed.
+Reports must use BillingRecord data, not ClientAgent snapshots.
+```
+
+---
+
+### Step X+3 — Ensure Currency Validation During Client Creation
+
+Ensure that client billing currency is validated using the domain validator.
+
+Inside:
+
+```
+clients.service.ts
+onboarding.service.ts
+```
+
+Add validation:
+
+```
+if (!isValidCurrencyCode(client.billingCurrency)) {
+  throw new BadRequestException('Invalid ISO 4217 currency code');
+}
+```
+
+This guarantees the system never stores invalid currency values.
+
+---
+
+### Expected Outcome (Refinements X–X+3)
+
+After applying these refinements:
+
+* architectural layering is fully correct
+* currency invariants are strictly enforced
+* billing records can be generated automatically
+* pricing snapshots remain immutable
+* the pricing architecture becomes fully production-grade
+
+No existing plan steps should be removed or altered — only these additions are appended.
+
+---
+
 ## Files Summary
 
-| Action | File |
-|---|---|
-| MODIFY | `src/core/persistence/schemas/agent.schema.ts` (add `monthlyTokenQuota` only) |
+| Action | File                                                                              |
+| ------ | --------------------------------------------------------------------------------- |
+| MODIFY | `src/core/persistence/schemas/agent.schema.ts` (add `monthlyTokenQuota` only)     |
 | MODIFY | `src/core/persistence/schemas/channel.schema.ts` (add `monthlyMessageQuota` only) |
-| MODIFY | `src/core/persistence/schemas/client.schema.ts` (add `billingCurrency`) |
-| MODIFY | `src/core/persistence/schemas/client-agent.schema.ts` |
-| MODIFY | `src/core/persistence/entities/client-agent.entity.ts` |
-| CREATE | `src/core/persistence/schemas/agent-price.schema.ts` |
-| CREATE | `src/core/persistence/schemas/channel-price.schema.ts` |
-| CREATE | `src/core/persistence/schemas/billing-record.schema.ts` |
-| CREATE | `src/core/persistence/repositories/agent-price.repository.ts` |
-| CREATE | `src/core/persistence/repositories/channel-price.repository.ts` |
-| CREATE | `src/core/persistence/repositories/billing-record.repository.ts` |
-| MODIFY | `src/core/persistence/repositories/llm-usage-log.repository.ts` |
-| MODIFY | `src/core/persistence/repositories/message.repository.ts` |
-| MODIFY | `src/core/persistence/schemas/llm-usage-log.schema.ts` (index) |
-| MODIFY | `src/core/persistence/schemas/message.schema.ts` (index) |
-| MODIFY | `src/core/persistence/database.module.ts` |
-| MODIFY | `src/core/persistence/seeder.service.ts` |
-| CREATE | `src/core/domain/quota/quota-policy.ts` |
-| CREATE | `src/core/domain/billing/currency.validator.ts` |
-| CREATE | `src/core/orchestrator/quota-enforcement.service.ts` |
-| MODIFY | `src/core/orchestrator/orchestrator.module.ts` |
-| MODIFY | `src/core/orchestrator/incoming-message.orchestrator.ts` |
-| MODIFY | `src/features/client-agents/dto/create-client-agent.dto.ts` |
-| MODIFY | `src/features/client-agents/client-agents.service.ts` |
-| MODIFY | `src/features/onboarding/dto/register-and-hire.dto.ts` |
-| MODIFY | `src/features/onboarding/onboarding.service.ts` |
-| MODIFY | `src/features/agents/dto/create-agent.dto.ts` |
-| MODIFY | `src/features/agents/dto/update-agent.dto.ts` |
-| CREATE | `src/features/agent-prices/` (module, controller, service, DTOs) |
-| CREATE | `src/features/channel-prices/` (module, controller, service, DTOs) |
-| UPDATE | `docs/rules/ARCHITECTURE_CONTRACT.md` |
-| UPDATE | `docs/rules/architectural-layers.md` |
-| UPDATE | `docs/rules/data-modeling.md` |
-| UPDATE | `docs/rules/configuration.md` |
-| UPDATE | `.claude/CLAUDE.md` |
+| MODIFY | `src/core/persistence/schemas/client.schema.ts` (add `billingCurrency`)           |
+| MODIFY | `src/core/persistence/schemas/client-agent.schema.ts`                             |
+| MODIFY | `src/core/persistence/entities/client-agent.entity.ts`                            |
+| CREATE | `src/core/persistence/schemas/agent-price.schema.ts`                              |
+| CREATE | `src/core/persistence/schemas/channel-price.schema.ts`                            |
+| CREATE | `src/core/persistence/schemas/billing-record.schema.ts`                           |
+| CREATE | `src/core/persistence/repositories/agent-price.repository.ts`                     |
+| CREATE | `src/core/persistence/repositories/channel-price.repository.ts`                   |
+| CREATE | `src/core/persistence/repositories/billing-record.repository.ts`                  |
+| MODIFY | `src/core/persistence/repositories/llm-usage-log.repository.ts`                   |
+| MODIFY | `src/core/persistence/repositories/message.repository.ts`                         |
+| MODIFY | `src/core/persistence/schemas/llm-usage-log.schema.ts` (index)                    |
+| MODIFY | `src/core/persistence/schemas/message.schema.ts` (index)                          |
+| MODIFY | `src/core/persistence/database.module.ts`                                         |
+| MODIFY | `src/core/persistence/seeder.service.ts`                                          |
+| CREATE | `src/core/domain/quota/quota-policy.ts`                                           |
+| CREATE | `src/core/domain/billing/currency.validator.ts`                                   |
+| CREATE | `src/core/orchestrator/quota-enforcement.service.ts`                              |
+| MODIFY | `src/core/orchestrator/orchestrator.module.ts`                                    |
+| MODIFY | `src/core/orchestrator/incoming-message.orchestrator.ts`                          |
+| MODIFY | `src/features/client-agents/dto/create-client-agent.dto.ts`                       |
+| MODIFY | `src/features/client-agents/client-agents.service.ts`                             |
+| MODIFY | `src/features/onboarding/dto/register-and-hire.dto.ts`                            |
+| MODIFY | `src/features/onboarding/onboarding.service.ts`                                   |
+| MODIFY | `src/features/agents/dto/create-agent.dto.ts`                                     |
+| MODIFY | `src/features/agents/dto/update-agent.dto.ts`                                     |
+| CREATE | `src/features/agent-prices/` (module, controller, service, DTOs)                  |
+| CREATE | `src/features/channel-prices/` (module, controller, service, DTOs)                |
+| UPDATE | `docs/rules/ARCHITECTURE_CONTRACT.md`                                             |
+| UPDATE | `docs/rules/architectural-layers.md`                                              |
+| UPDATE | `docs/rules/data-modeling.md`                                                     |
+| UPDATE | `docs/rules/configuration.md`                                                     |
+| UPDATE | `.claude/CLAUDE.md`                                                               |
 
 ---
 
@@ -594,18 +847,19 @@ Review and update all repository documentation to reflect the new pricing archit
 
 **Files to review and update:**
 
-| File | What to update |
-|---|---|
-| [ARCHITECTURE_CONTRACT.md](docs/rules/ARCHITECTURE_CONTRACT.md) | Add pricing-related persistence responsibilities (`AgentPrice`, `ChannelPrice`, `BillingRecord`). Update domain responsibilities to include quota policy and currency invariants. Update orchestrator responsibilities to include quota enforcement gate. |
-| [architectural-layers.md](docs/rules/architectural-layers.md) | Update layer responsibility descriptions to reflect new services: `QuotaEnforcementService` in orchestrator, `QuotaPolicy` and `currency.validator` in domain, price repositories and billing record repository in persistence. |
-| [data-modeling.md](docs/rules/data-modeling.md) | Add new entity documentation for `AgentPrice`, `ChannelPrice`, `BillingRecord`. Update `Agent` (new `monthlyTokenQuota`), `Channel` (new `monthlyMessageQuota`), `Client` (new `billingCurrency`), `ClientAgent` (replaced `price` with `agentPricing` snapshot, `billingAnchor`, per-channel `amount`/`currency`/`monthlyMessageQuota`). Document entity relationships and the snapshot lifecycle. |
-| [configuration.md](docs/rules/configuration.md) | Add any new environment variables or configuration related to quota enforcement or billing. |
-| [credential-encryption.md](docs/rules/credential-encryption.md) | No changes expected — pricing data is not encrypted. Verify no conflicts. |
-| [CLAUDE.md](.claude/CLAUDE.md) | Update the architecture contract sections if they reference persistence responsibilities, domain purity rules, or orchestrator coordination duties to include pricing and quota concerns. |
+| File                                                            | What to update                                                                                                                                                                                                                                                                                                                                                                                      |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [ARCHITECTURE_CONTRACT.md](docs/rules/ARCHITECTURE_CONTRACT.md) | Add pricing-related persistence responsibilities (`AgentPrice`, `ChannelPrice`, `BillingRecord`). Update domain responsibilities to include quota policy and currency invariants. Update orchestrator responsibilities to include quota enforcement gate.                                                                                                                                           |
+| [architectural-layers.md](docs/rules/architectural-layers.md)   | Update layer responsibility descriptions to reflect new services: `QuotaEnforcementService` in orchestrator, `QuotaPolicy` and `currency.validator` in domain, price repositories and billing record repository in persistence.                                                                                                                                                                     |
+| [data-modeling.md](docs/rules/data-modeling.md)                 | Add new entity documentation for `AgentPrice`, `ChannelPrice`, `BillingRecord`. Update `Agent` (new `monthlyTokenQuota`), `Channel` (new `monthlyMessageQuota`), `Client` (new `billingCurrency`), `ClientAgent` (replaced `price` with `agentPricing` snapshot, `billingAnchor`, per-channel `amount`/`currency`/`monthlyMessageQuota`). Document entity relationships and the snapshot lifecycle. |
+| [configuration.md](docs/rules/configuration.md)                 | Add any new environment variables or configuration related to quota enforcement or billing.                                                                                                                                                                                                                                                                                                         |
+| [credential-encryption.md](docs/rules/credential-encryption.md) | No changes expected — pricing data is not encrypted. Verify no conflicts.                                                                                                                                                                                                                                                                                                                           |
+| [CLAUDE.md](.claude/CLAUDE.md)                                  | Update the architecture contract sections if they reference persistence responsibilities, domain purity rules, or orchestrator coordination duties to include pricing and quota concerns.                                                                                                                                                                                                           |
 
 **Data modeling documentation must include:**
 
 Entity relationship summary:
+
 ```
 Agent ──1:N──▸ AgentPrice (one per currency)
 Channel ──1:N──▸ ChannelPrice (one per currency)
@@ -616,6 +870,7 @@ Client ──1:N──▸ BillingRecord (one per billing cycle)
 ```
 
 Key invariants to document:
+
 - `AgentPrice` and `ChannelPrice` are catalog entries, UNIQUE per `(entityId, currency)`
 - Prices carry `status: 'active' | 'deprecated'` — only active prices used for new hires
 - `ClientAgent` stores snapshotted prices at hire time — immutable after creation
@@ -626,6 +881,7 @@ Key invariants to document:
 - `BillingRecord` is immutable — only `status` transitions allowed (`generated` → `paid` | `void`)
 
 **Pricing lifecycle to document:**
+
 ```
 Catalog price (AgentPrice/ChannelPrice, status: active)
       ↓
@@ -639,6 +895,7 @@ Billing snapshot (BillingRecord, immutable)
 ```
 
 **Orchestrator flow to document:**
+
 ```
 1. Idempotency check
 2. Route resolution

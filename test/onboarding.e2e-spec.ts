@@ -117,7 +117,7 @@ describe('Onboarding (e2e)', () => {
           },
           agentHiring: {
             agentId: testAgentId,
-            price: 99.99,
+            pricingOverride: { agentAmount: 99.99 },
           },
           channels: [
             {
@@ -133,6 +133,7 @@ describe('Onboarding (e2e)', () => {
                 apiKey: 'test-key',
                 model: 'gpt-4',
               },
+              amountOverride: 0,
             },
           ],
         })
@@ -156,7 +157,8 @@ describe('Onboarding (e2e)', () => {
       // Verify clientAgent
       expect(response.body.clientAgent.clientId).toBe(response.body.client._id);
       expect(response.body.clientAgent.agentId).toBe(testAgentId);
-      expect(response.body.clientAgent.price).toBe(99.99);
+      expect(response.body.clientAgent.agentPricing.amount).toBe(99.99);
+      expect(response.body.clientAgent.agentPricing.currency).toBeDefined();
 
       // Verify agentChannels in DB
       const savedClientAgent = await connection

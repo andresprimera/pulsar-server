@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AgentContextService } from './agent-context.service';
+import { AgentRepository } from '@persistence/repositories/agent.repository';
 import { ClientRepository } from '@persistence/repositories/client.repository';
 import { AgentContext } from './contracts/agent-context';
 import { LlmProvider } from './llm/provider.enum';
@@ -27,6 +28,12 @@ describe('AgentContextService', () => {
       providers: [
         AgentContextService,
         {
+          provide: AgentRepository,
+          useValue: {
+            findActiveById: jest.fn(),
+          },
+        },
+        {
           provide: ClientRepository,
           useValue: {
             findById: jest.fn(),
@@ -41,7 +48,7 @@ describe('AgentContextService', () => {
   });
 
   afterEach(() => {
-    warnSpy.mockRestore();
+    warnSpy?.mockRestore();
   });
 
   it('should be defined', () => {

@@ -3,14 +3,18 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { ClientAgentRepository } from '@persistence/repositories/client-agent.repository';
 import { ChannelRepository } from '@persistence/repositories/channel.repository';
 import { ClientPhoneRepository } from '@persistence/repositories/client-phone.repository';
+import { AgentPriceRepository } from '@persistence/repositories/agent-price.repository';
+import { ChannelPriceRepository } from '@persistence/repositories/channel-price.repository';
 import { encrypt, encryptRecord } from '@shared/crypto.util';
 
+import { assertCurrencyMatch } from '@domain/billing/currency.validator';
 import { CreateClientAgentDto } from './dto/create-client-agent.dto';
 import { UpdateClientAgentDto } from './dto/update-client-agent.dto';
 import { UpdateClientAgentStatusDto } from './dto/update-client-agent-status.dto';
@@ -28,6 +32,8 @@ export class ClientAgentsService {
     private readonly agentsService: AgentsService,
     private readonly channelRepository: ChannelRepository,
     private readonly clientPhoneRepository: ClientPhoneRepository,
+    private readonly agentPriceRepository: AgentPriceRepository,
+    private readonly channelPriceRepository: ChannelPriceRepository,
   ) {}
 
   async create(data: CreateClientAgentDto): Promise<ClientAgent> {
@@ -44,6 +50,30 @@ export class ClientAgentsService {
     if (!agent || agent.status !== 'active') {
       throw new BadRequestException('Agent not found or not active');
     }
+
+    const currency = client.billingCurrency;
+    const agentIdObj = new Types.ObjectId(data.agentId);
+
+    const agentPrice =
+      await this.agentPriceRepository.findActiveByAgentAndCurrency(
+        agentIdObj,
+        currency,
+      );
+    if (!agentPrice && data.pricingOverride?.agentAmount == null) {
+      throw new BadRequestException(
+        `No active price found for agent in currency ${currency}`,
+      );
+    }
+    const agentAmount =
+      data.pricingOverride?.agentAmount ?? agentPrice?.amount ?? 0;
+    const agentPricing = {
+      amount: agentAmount,
+      currency,
+      monthlyTokenQuota:
+        data.pricingOverride?.agentMonthlyTokenQuota ??
+        agent.monthlyTokenQuota ??
+        null,
+    };
 
     // Fail fast: check if agent is already hired by this client
     const existing = await this.clientAgentRepository.findByClientAndAgent(
@@ -77,6 +107,24 @@ export class ClientAgentsService {
           }". Supported: ${channel.supportedProviders.join(', ')}`,
         );
       }
+
+      const channelIdObj = new Types.ObjectId(channelConfig.channelId);
+      const channelPrice =
+        await this.channelPriceRepository.findActiveByChannelAndCurrency(
+          channelIdObj,
+          currency,
+        );
+      if (!channelPrice && channelConfig.amountOverride == null) {
+        throw new BadRequestException(
+          `No active price found for channel in currency ${currency}`,
+        );
+      }
+      const channelAmount =
+        channelConfig.amountOverride ?? channelPrice?.amount ?? 0;
+      const channelMonthlyMessageQuota =
+        channelConfig.monthlyMessageQuotaOverride ??
+        channel.monthlyMessageQuota ??
+        null;
 
       let phoneNumberId: string | undefined;
       if (
@@ -113,7 +161,7 @@ export class ClientAgentsService {
       }
 
       channels.push({
-        channelId: new Types.ObjectId(channelConfig.channelId),
+        channelId: channelIdObj,
         provider: normalizedProvider,
         status: 'active',
         credentials: encryptRecord(channelConfig.credentials),
@@ -124,14 +172,29 @@ export class ClientAgentsService {
           ...channelConfig.llmConfig,
           apiKey: encrypt(channelConfig.llmConfig.apiKey),
         },
+        amount: channelAmount,
+        currency,
+        monthlyMessageQuota: channelMonthlyMessageQuota,
       });
+    }
+
+    try {
+      assertCurrencyMatch(agentPricing.currency, client.billingCurrency);
+      for (const ch of channels) {
+        assertCurrencyMatch(ch.currency, client.billingCurrency);
+      }
+    } catch {
+      throw new BadRequestException(
+        'Pricing currency must match client billing currency',
+      );
     }
 
     try {
       return await this.clientAgentRepository.create({
         clientId: data.clientId,
         agentId: data.agentId,
-        price: data.price,
+        agentPricing,
+        billingAnchor: new Date(),
         status: 'active',
         channels,
       });
@@ -193,12 +256,41 @@ export class ClientAgentsService {
     return updated;
   }
 
-  async calculateClientTotal(clientId: string): Promise<number> {
+  async calculateClientTotal(
+    clientId: string,
+  ): Promise<{ total: number; currency: string }> {
+    const client = await this.clientsService.findById(clientId);
+    if (!client) {
+      throw new NotFoundException('Client not found');
+    }
+
     const activeClientAgents =
       await this.clientAgentRepository.findByClientAndStatus(
         clientId,
         'active',
       );
-    return activeClientAgents.reduce((total, ca) => total + ca.price, 0);
+
+    if (activeClientAgents.length === 0) {
+      return { total: 0, currency: client.billingCurrency };
+    }
+
+    const hasMismatch = activeClientAgents.some(
+      (ca) => ca.agentPricing.currency !== client.billingCurrency,
+    );
+    if (hasMismatch) {
+      throw new InternalServerErrorException(
+        'Mixed currency subscriptions detected — data integrity violation',
+      );
+    }
+
+    const total = activeClientAgents.reduce((sum, ca) => {
+      const agentAmount = ca.agentPricing.amount;
+      const channelsAmount = ca.channels
+        .filter((ch) => ch.status === 'active')
+        .reduce((chSum, ch) => chSum + ch.amount, 0);
+      return sum + agentAmount + channelsAmount;
+    }, 0);
+
+    return { total, currency: client.billingCurrency };
   }
 }

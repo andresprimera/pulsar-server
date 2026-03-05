@@ -1,10 +1,7 @@
-import { IsInt, IsOptional, Min } from 'class-validator';
-import { Type } from 'class-transformer';
-
+/**
+ * Pricing is snapshotted at hire time and is immutable.
+ * Only status changes are allowed via updateStatus.
+ */
 export class UpdateClientAgentDto {
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @IsOptional()
-  price?: number;
+  // No updatable fields; pricing and channels are immutable after hire
 }

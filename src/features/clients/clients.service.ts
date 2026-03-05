@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { isValidCurrencyCode } from '@domain/billing/currency.validator';
 import { ClientRepository } from '@persistence/repositories/client.repository';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
@@ -13,8 +14,14 @@ export class ClientsService {
   constructor(private readonly clientRepository: ClientRepository) {}
 
   async create(dto: CreateClientDto) {
+    const billingCurrency = (dto.billingCurrency ?? 'USD').toUpperCase();
+    if (!isValidCurrencyCode(billingCurrency)) {
+      throw new BadRequestException('Invalid ISO 4217 currency code');
+    }
     return this.clientRepository.create({
       ...dto,
+      billingCurrency,
+      billingAnchor: new Date(),
       status: 'active',
     });
   }
@@ -39,6 +46,13 @@ export class ClientsService {
 
     if (existing.status === 'archived') {
       throw new BadRequestException('Archived clients cannot be modified');
+    }
+
+    if (dto.billingCurrency != null) {
+      const billingCurrency = dto.billingCurrency.toUpperCase();
+      if (!isValidCurrencyCode(billingCurrency)) {
+        throw new BadRequestException('Invalid ISO 4217 currency code');
+      }
     }
 
     const client = await this.clientRepository.update(id, dto);

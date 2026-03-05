@@ -11,7 +11,7 @@ describe('ClientAgentsController', () => {
     clientId: 'client-1',
     agentId: 'agent-1',
     status: 'active',
-    price: 100,
+    agentPricing: { amount: 100, currency: 'USD' },
   };
 
   beforeEach(async () => {
@@ -45,7 +45,6 @@ describe('ClientAgentsController', () => {
       const dto: any = {
         clientId: 'client-1',
         agentId: 'agent-1',
-        price: 100,
         channels: [
           {
             channelId: '507f1f77bcf86cd799439011',
@@ -83,16 +82,13 @@ describe('ClientAgentsController', () => {
 
   describe('update', () => {
     it('should call service.update', async () => {
-      const dto = { price: 200 };
-      mockClientAgentsService.update.mockResolvedValue({
-        ...mockClientAgent,
-        price: 200,
-      });
+      const dto = {};
+      mockClientAgentsService.update.mockResolvedValue(mockClientAgent);
 
       const result = await controller.update('ca-1', dto);
 
       expect(mockClientAgentsService.update).toHaveBeenCalledWith('ca-1', dto);
-      expect(result.price).toBe(200);
+      expect(result).toEqual(mockClientAgent);
     });
   });
 
@@ -116,14 +112,17 @@ describe('ClientAgentsController', () => {
 
   describe('calculateClientTotal', () => {
     it('should call service.calculateClientTotal', async () => {
-      mockClientAgentsService.calculateClientTotal.mockResolvedValue(100);
+      mockClientAgentsService.calculateClientTotal.mockResolvedValue({
+        total: 100,
+        currency: 'USD',
+      });
 
       const result = await controller.calculateClientTotal('client-1');
 
       expect(mockClientAgentsService.calculateClientTotal).toHaveBeenCalledWith(
         'client-1',
       );
-      expect(result).toBe(100);
+      expect(result).toEqual({ total: 100, currency: 'USD' });
     });
   });
 });

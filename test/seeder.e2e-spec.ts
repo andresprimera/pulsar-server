@@ -228,7 +228,9 @@ describe('Seeder (e2e)', () => {
 
       expect(clientAgents).toHaveLength(1);
       expect(clientAgents[0].status).toBe('active');
-      expect(clientAgents[0].price).toBe(seedUser1.agentHirings[0].price);
+      expect(clientAgents[0].agentPricing?.amount).toBe(
+        seedUser1.agentHirings[0].price,
+      );
     });
 
     it('should configure User 1 with the correct channels', async () => {

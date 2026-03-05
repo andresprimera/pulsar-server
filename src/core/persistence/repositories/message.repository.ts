@@ -116,6 +116,23 @@ export class MessageRepository {
     return this.model.findOne(query).sort({ createdAt: -1 }).exec();
   }
 
+  async countMessagesForClientChannel(
+    clientId: Types.ObjectId,
+    channelId: Types.ObjectId,
+    periodStart: Date,
+    periodEnd: Date,
+  ): Promise<number> {
+    return this.model
+      .countDocuments({
+        clientId,
+        channelId,
+        type: 'user',
+        status: 'active',
+        createdAt: { $gte: periodStart, $lt: periodEnd },
+      })
+      .exec();
+  }
+
   async countTokensInConversation(
     conversationId: Types.ObjectId,
     agentId: Types.ObjectId,

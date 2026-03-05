@@ -6,6 +6,8 @@ import { WhatsappModule } from './core/channels/whatsapp/whatsapp.module';
 import { TiktokModule } from './core/channels/tiktok/tiktok.module';
 import { InstagramModule } from './core/channels/instagram/instagram.module';
 import { AgentsModule } from './features/agents/agents.module';
+import { AgentPricesModule } from './features/agent-prices/agent-prices.module';
+import { ChannelPricesModule } from './features/channel-prices/channel-prices.module';
 import { UsersModule } from './features/users/users.module';
 import { ClientsModule } from './features/clients/clients.module';
 import { ClientAgentsModule } from './features/client-agents/client-agents.module';
@@ -19,6 +21,8 @@ import { OnboardingModule } from './features/onboarding/onboarding.module';
     TiktokModule,
     InstagramModule,
     AgentsModule,
+    AgentPricesModule,
+    ChannelPricesModule,
     UsersModule,
     ClientsModule,
     ClientAgentsModule,

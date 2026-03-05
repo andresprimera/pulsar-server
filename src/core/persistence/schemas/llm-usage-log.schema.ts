@@ -41,3 +41,4 @@ export class LlmUsageLog extends Document {
 }
 
 export const LlmUsageLogSchema = SchemaFactory.createForClass(LlmUsageLog);
+LlmUsageLogSchema.index({ clientId: 1, agentId: 1, createdAt: 1 });

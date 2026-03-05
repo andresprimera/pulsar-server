@@ -3,19 +3,13 @@ import { Types } from 'mongoose';
 import { AgentService } from '@agent/agent.service';
 import { AgentOutput } from '@agent/contracts/agent-output';
 import { AgentInput } from '@agent/contracts/agent-input';
-import { AgentContext } from '@agent/contracts/agent-context';
 import { AgentContextService } from '@agent/agent-context.service';
-import { AgentRepository } from '@persistence/repositories/agent.repository';
-import { ClientRepository } from '@persistence/repositories/client.repository';
-import { decrypt, decryptRecord } from '@shared/crypto.util';
+import { QuotaEnforcementService } from './quota-enforcement.service';
 import { CHANNEL_TYPES } from '@domain/channels/channel-type.constants';
 import { ChannelType } from '@domain/channels/channel-type.type';
 import { IncomingChannelEvent } from '@domain/channels/incoming-channel-event.interface';
 import { ContactIdentityResolver } from './contact-identity.resolver';
-import {
-  AgentRoutingService,
-  RouteCandidate,
-} from '@domain/routing/agent-routing.service';
+import { AgentRoutingService } from '@domain/routing/agent-routing.service';
 import { ConversationService } from '@domain/conversation/conversation.service';
 import { EventIdempotencyService } from '@persistence/event-idempotency.service';
 
@@ -25,13 +19,12 @@ export class IncomingMessageOrchestrator {
 
   constructor(
     private readonly agentService: AgentService,
-    private readonly agentRepository: AgentRepository,
-    private readonly clientRepository: ClientRepository,
     private readonly agentRoutingService: AgentRoutingService,
     private readonly agentContextService: AgentContextService,
     private readonly contactIdentityResolver: ContactIdentityResolver,
     private readonly conversationService: ConversationService,
     private readonly eventIdempotencyService: EventIdempotencyService,
+    private readonly quotaEnforcementService: QuotaEnforcementService,
   ) {}
 
   async handle(event: IncomingChannelEvent): Promise<AgentOutput | undefined> {
@@ -72,7 +65,9 @@ export class IncomingMessageOrchestrator {
         return undefined;
       }
 
-      const prompt = await this.buildAmbiguousPrompt(routeDecision.candidates);
+      const prompt = await this.agentContextService.buildAmbiguousPrompt(
+        routeDecision.candidates,
+      );
       return {
         reply: {
           type: 'text',
@@ -86,7 +81,6 @@ export class IncomingMessageOrchestrator {
 
     const { clientAgent, channelConfig } = routeDecision.candidate;
 
-    // Guard: credentials may be undefined if select('+channels.credentials') was missed
     if (!channelConfig.credentials) {
       this.logger.error(
         `[${logPrefix}] Credentials missing for routeChannelIdentifier=${event.routeChannelIdentifier}. Possible select('+channels.credentials') omission.`,
@@ -94,38 +88,42 @@ export class IncomingMessageOrchestrator {
       return undefined;
     }
 
-    const agent = await this.agentRepository.findActiveById(
-      clientAgent.agentId,
+    const rawContext = await this.agentContextService.buildContextFromRoute(
+      clientAgent,
+      channelConfig,
     );
-    if (!agent) {
+    if (!rawContext) {
       this.logger.warn(
         `[${logPrefix}] Agent ${clientAgent.agentId} is not active. Skipping message.`,
       );
       return undefined;
     }
 
-    const rawContext: AgentContext = {
-      agentId: clientAgent.agentId,
-      agentName: agent.name,
+    const clientBillingAnchor =
+      await this.agentContextService.getClientBillingAnchor(
+        clientAgent.clientId,
+      );
+    if (!clientBillingAnchor) {
+      this.logger.warn(
+        `[${logPrefix}] Client ${clientAgent.clientId} has no billing anchor. Skipping message.`,
+      );
+      return undefined;
+    }
+    const quotaResult = await this.quotaEnforcementService.check({
       clientId: clientAgent.clientId,
-      channelId: channelConfig.channelId.toString(),
-      systemPrompt: agent.systemPrompt,
-      llmConfig: {
-        ...channelConfig.llmConfig,
-        // TODO: [HACK] REMOVE THIS IN PRODUCTION.
-        // Forcing 'openai' provider and system key for dev/testing ease.
-        // This bypasses client billing!
-        provider: (channelConfig.llmConfig.provider || 'openai') as any,
-        apiKey: decrypt(
-          channelConfig.llmConfig.apiKey &&
-            !channelConfig.llmConfig.apiKey.includes('REPLACE_ME')
-            ? channelConfig.llmConfig.apiKey
-            : process.env.OPENAI_API_KEY ?? '',
-        ),
-        model: channelConfig.llmConfig.model || 'gpt-4o',
-      },
-      channelConfig: decryptRecord(channelConfig.credentials),
-    };
+      agentId: clientAgent.agentId,
+      channelId: channelConfig.channelId,
+      clientBillingAnchor,
+      agentMonthlyTokenQuota:
+        clientAgent.agentPricing?.monthlyTokenQuota ?? null,
+      channelMonthlyMessageQuota: channelConfig.monthlyMessageQuota ?? null,
+    });
+    if (!quotaResult.allowed) {
+      this.logger.warn(
+        `[${logPrefix}] Quota exceeded for routeChannelIdentifier=${event.routeChannelIdentifier}: ${quotaResult.reason}. Message dropped.`,
+      );
+      return undefined;
+    }
 
     const context = await this.agentContextService.enrichContext(rawContext);
 
@@ -190,30 +188,5 @@ export class IncomingMessageOrchestrator {
       default:
         return channelId || 'Channel';
     }
-  }
-
-  private async buildAmbiguousPrompt(
-    candidates: RouteCandidate[],
-  ): Promise<string> {
-    const clientId = candidates[0].clientAgent.clientId;
-    const client = await this.clientRepository.findById(clientId);
-    const clientName = client?.name;
-
-    const lines = candidates.map(
-      (candidate, index) => `${index + 1}. ${candidate.agentName}`,
-    );
-
-    const greeting = clientName
-      ? `Hey there! Thanks for reaching out to *${clientName}*.`
-      : `Hey there! Thanks for reaching out.`;
-
-    return [
-      greeting,
-      '',
-      'We have a few specialists ready to help you:',
-      ...lines,
-      '',
-      'Just reply with a number or name to get started!',
-    ].join('\n');
   }
 }

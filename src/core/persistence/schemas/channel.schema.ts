@@ -14,6 +14,9 @@ export class Channel extends Document {
 
   @Prop({ required: true, type: [String] })
   supportedProviders: string[];
+
+  @Prop({ type: Number, default: null })
+  monthlyMessageQuota: number | null; // null = unlimited (e.g. Telegram)
 }
 
 export const ChannelSchema = SchemaFactory.createForClass(Channel);
