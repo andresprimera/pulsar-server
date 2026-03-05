@@ -67,6 +67,12 @@ describe('Onboarding (e2e)', () => {
       });
 
     testAgentId = agentResponse.body._id;
+
+    // Ensure catalog price exists for onboarding (USD)
+    await request(app.getHttpServer())
+      .put(`/agents/${testAgentId}/prices/USD`)
+      .send({ amount: 0 })
+      .expect(200);
   });
 
   afterAll(async () => {
@@ -92,9 +98,17 @@ describe('Onboarding (e2e)', () => {
       },
       { upsert: true, returnDocument: 'after' },
     );
-    return result.value
+    const channelId = result.value
       ? result.value._id.toString()
       : result.lastErrorObject.upserted.toString();
+
+    // Ensure catalog price exists for onboarding (USD)
+    await request(app.getHttpServer())
+      .put(`/channels/${channelId}/prices/USD`)
+      .send({ amount: 0 })
+      .expect(200);
+
+    return channelId;
   }
 
   describe('POST /onboarding/register-and-hire', () => {
@@ -586,7 +600,10 @@ describe('Onboarding (e2e)', () => {
           .send({
             user: { email: 'test@example.com', name: 'Test' },
             client: { type: 'individual' },
-            agentHiring: { agentId: testAgentId, price: -1 },
+            agentHiring: {
+              agentId: testAgentId,
+              pricingOverride: { agentAmount: -1 },
+            },
             channels: [
               {
                 channelId,
@@ -603,7 +620,7 @@ describe('Onboarding (e2e)', () => {
           .expect(400);
 
         expect(response.body.message).toEqual(
-          expect.arrayContaining([expect.stringContaining('price')]),
+          expect.arrayContaining([expect.stringMatching(/price|amount/i)]),
         );
       });
 
