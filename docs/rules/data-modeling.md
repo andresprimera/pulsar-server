@@ -47,3 +47,11 @@ ARCHITECTURE_CONTRACT.md has higher priority than this file.
 ## BillingRecord uniqueness
 
 - **(clientId, periodStart, periodEnd)** must be unique. Enforced by a unique compound index on the BillingRecord collection. A client may have only one billing record per billing period. Duplicate key errors (MongoDB 11000) on insert indicate another worker or request already generated the record; the service should treat this as a safe no-op and return.
+
+## Database seeding (pricing and billing)
+
+- Seeding creates a **full catalog** before any user: one `AgentPrice` and one `ChannelPrice` per seed agent and channel in the default currency (from `seed-data.json` `billingCurrency` or `USD`). User processing order does not affect the catalog.
+- **Client** gets `billingCurrency` and `billingAnchor` via onboarding; per-user `client.billingCurrency` in seed (optional) overrides the default.
+- **ClientAgent** snapshots and additional hirings use the **client’s** `billingAnchor` and `billingCurrency` (no mixed currency; quota and billing periods are consistent per client).
+- Optional seed fields (for tests or demos): top-level or per-user `billingCurrency`; `agents[].monthlyTokenQuota` and `agents[].defaultPrice`; `channels[].monthlyMessageQuota` and `channels[].amount`.
+- After all users and ClientAgents are seeded, the seeder optionally calls `BillingGeneratorService.generateForClient(clientId)` for each seeded client so the current period has one billing record per client (dev/demo).

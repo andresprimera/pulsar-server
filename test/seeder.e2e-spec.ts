@@ -72,14 +72,35 @@ describe('Seeder (e2e)', () => {
         clientId: { $in: clientIds.map((id) => id.toString()) },
       });
 
-      // Clean up seeded clients
+      // Clean up seeded clients and their billing records
+      await connection.collection('billing_records').deleteMany({
+        clientId: { $in: clientIds },
+      });
       await connection.collection('clients').deleteMany({
         _id: { $in: clientIds },
       });
 
-      // Clean up seeded agents
+      // Clean up seeded agents and their catalog prices
+      const seededAgents = await connection
+        .collection('agents')
+        .find({ createdBySeeder: true })
+        .toArray();
+      const seededAgentIds = seededAgents.map((a) => a._id);
+      await connection.collection('agent_prices').deleteMany({
+        agentId: { $in: seededAgentIds },
+      });
       await connection.collection('agents').deleteMany({
         createdBySeeder: true,
+      });
+
+      const seedChannelNames = SEED_DATA.channels.map((c) => c.name);
+      const seededChannels = await connection
+        .collection('channels')
+        .find({ name: { $in: seedChannelNames } })
+        .toArray();
+      const seededChannelIds = seededChannels.map((c) => c._id);
+      await connection.collection('channel_prices').deleteMany({
+        channelId: { $in: seededChannelIds },
       });
 
       // Clean up seeded users
@@ -88,7 +109,6 @@ describe('Seeder (e2e)', () => {
       });
 
       // Clean up seeded channels from seed data
-      const seedChannelNames = SEED_DATA.channels.map((c) => c.name);
       await connection.collection('channels').deleteMany({
         name: { $in: seedChannelNames },
       });
@@ -207,6 +227,11 @@ describe('Seeder (e2e)', () => {
       expect(client).toBeDefined();
       expect(client.type).toBe(seedUser1.client.type);
       expect(client.status).toBe('active');
+      expect(client.billingCurrency).toBe(
+        (SEED_DATA as any).billingCurrency ?? 'USD',
+      );
+      expect(client.billingAnchor).toBeDefined();
+      expect(client.billingAnchor).toBeInstanceOf(Date);
     });
 
     it(`should hire ${seedUser1.agentHirings[0].agentName} for User 1`, async () => {
@@ -344,6 +369,11 @@ describe('Seeder (e2e)', () => {
       expect(client).toBeDefined();
       expect(client.type).toBe(seedUser2.client.type);
       expect(client.name).toBe((seedUser2.client as any).name);
+      expect(client.billingCurrency).toBe(
+        (SEED_DATA as any).billingCurrency ?? 'USD',
+      );
+      expect(client.billingAnchor).toBeDefined();
+      expect(client.billingAnchor).toBeInstanceOf(Date);
     });
   });
 
@@ -356,6 +386,21 @@ describe('Seeder (e2e)', () => {
       expect(user).toBeDefined();
       expect(user.name).toBe(seedUser3.name);
       expect(user.status).toBe('active');
+    });
+
+    it('should create User 3 client with billingCurrency and billingAnchor', async () => {
+      const user = await connection
+        .collection('users')
+        .findOne({ email: seedUser3.email });
+      const client = await connection
+        .collection('clients')
+        .findOne({ _id: user.clientId });
+      expect(client).toBeDefined();
+      expect(client.billingCurrency).toBe(
+        (SEED_DATA as any).billingCurrency ?? 'USD',
+      );
+      expect(client.billingAnchor).toBeDefined();
+      expect(client.billingAnchor).toBeInstanceOf(Date);
     });
 
     it('should hire both agents for User 3', async () => {

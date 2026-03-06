@@ -14,6 +14,6 @@ import { DomainModule } from '@domain/domain.module';
     QuotaEnforcementService,
     BillingGeneratorService,
   ],
-  exports: [IncomingMessageOrchestrator],
+  exports: [IncomingMessageOrchestrator, BillingGeneratorService],
 })
 export class OrchestratorModule {}

@@ -135,6 +135,8 @@ describe('Concurrent Channels (e2e)', () => {
       name: 'Concurrent Test Client',
       type: 'individual',
       status: 'active',
+      billingCurrency: 'USD',
+      billingAnchor: new Date(),
     });
 
     await connection.collection('agents').insertOne({

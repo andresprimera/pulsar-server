@@ -14,7 +14,8 @@ export class ConversationRepository {
     data: Partial<Conversation>,
     session?: ClientSession,
   ): Promise<Conversation> {
-    const [doc] = await this.model.create([data], { session });
+    const opts = session ? { session } : {};
+    const [doc] = await this.model.create([data], opts);
     return doc;
   }
 
@@ -40,7 +41,11 @@ export class ConversationRepository {
     session?: ClientSession,
   ): Promise<Conversation | null> {
     return this.model
-      .findByIdAndUpdate(id, { status }, { new: true, session })
+      .findByIdAndUpdate(
+        id,
+        { status },
+        { new: true, ...(session && { session }) },
+      )
       .exec();
   }
 
@@ -50,7 +55,11 @@ export class ConversationRepository {
     session?: ClientSession,
   ): Promise<Conversation | null> {
     return this.model
-      .findByIdAndUpdate(id, { lastMessageAt }, { new: true, session })
+      .findByIdAndUpdate(
+        id,
+        { lastMessageAt },
+        { new: true, ...(session && { session }) },
+      )
       .exec();
   }
 }

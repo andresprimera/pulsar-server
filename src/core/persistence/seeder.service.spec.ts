@@ -266,6 +266,14 @@ describe('SeederService', () => {
 
       await service.onApplicationBootstrap();
 
+      // Verify catalog pre-seed: one AgentPrice and one ChannelPrice per entity in default currency
+      expect(mockAgentPriceRepository.upsert).toHaveBeenCalledTimes(
+        SEED_DATA.agents.length,
+      );
+      expect(mockChannelPriceRepository.upsert).toHaveBeenCalledTimes(
+        SEED_DATA.channels.length,
+      );
+
       // Verify agents creation (both agents should be created)
       expect(mockAgentModel.create).toHaveBeenCalledTimes(
         SEED_DATA.agents.length,
@@ -523,6 +531,12 @@ describe('SeederService', () => {
       mockOnboardingService.registerAndHire.mockResolvedValueOnce(
         onboardingResultForUser3,
       );
+
+      mockClientRepository.findById.mockResolvedValue({
+        _id: '507f1f77bcf86cd799439011',
+        billingAnchor: new Date(),
+        billingCurrency: 'USD',
+      });
 
       const expectedPhoneNumberId = (
         seedUser.agentHirings[1].channels[0].credentials as any

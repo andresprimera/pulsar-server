@@ -119,6 +119,8 @@ describe('Instagram Channel (e2e)', () => {
       name: 'Instagram Test Client',
       type: 'individual',
       status: 'active',
+      billingCurrency: 'USD',
+      billingAnchor: new Date(),
     });
 
     await connection.collection('agents').insertOne({

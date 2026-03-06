@@ -94,6 +94,7 @@ describe('UserRepository', () => {
   describe('findByEmail', () => {
     it('should return user when exists', async () => {
       mockModel.findOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockUser),
         session: jest.fn().mockReturnValue({
           exec: jest.fn().mockResolvedValue(mockUser),
         }),
@@ -109,6 +110,7 @@ describe('UserRepository', () => {
 
     it('should return null when not exists', async () => {
       mockModel.findOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
         session: jest.fn().mockReturnValue({
           exec: jest.fn().mockResolvedValue(null),
         }),

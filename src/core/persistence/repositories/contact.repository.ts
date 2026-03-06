@@ -58,15 +58,13 @@ export class ContactRepository {
       const contact = await this.model
         .findOneAndUpdate(
           filter,
-          {
-            $setOnInsert: setOnInsert,
-          },
+          { $setOnInsert: setOnInsert },
           {
             upsert: true,
             new: true,
             setDefaultsOnInsert: true,
             runValidators: true,
-            session,
+            ...(session && { session }),
           },
         )
         .exec();
@@ -82,10 +80,11 @@ export class ContactRepository {
           `event=contact_duplicate_key_retry clientId=${clientId.toString()} channelId=${channelId.toString()}`,
         );
 
-        const existing = await this.model
-          .findOne(filter)
-          .session(session)
-          .exec();
+        const retryQuery = this.model.findOne(filter);
+        const existing = await (session
+          ? retryQuery.session(session)
+          : retryQuery
+        ).exec();
         if (existing) {
           return existing;
         }

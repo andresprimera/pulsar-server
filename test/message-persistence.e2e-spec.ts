@@ -61,12 +61,14 @@ describe('Message Persistence (e2e)', () => {
         .deleteMany({ externalId: userPhone.replace(/[^\d]/g, '') });
     }
 
-    // Create Client
+    // Create Client (billingAnchor required for orchestrator to process messages)
     await connection.collection('clients').insertOne({
       _id: clientIdObj,
       name: 'E2E Test Client',
       type: 'individual',
       status: 'active',
+      billingCurrency: 'USD',
+      billingAnchor: new Date(),
     });
 
     // Create Agent

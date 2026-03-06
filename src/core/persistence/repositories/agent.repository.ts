@@ -49,7 +49,8 @@ export class AgentRepository {
     agentId: string,
     session?: ClientSession,
   ): Promise<Agent> {
-    const agent = await this.model.findById(agentId).session(session).exec();
+    const query = this.model.findById(agentId);
+    const agent = await (session ? query.session(session) : query).exec();
 
     if (!agent) {
       this.logger.warn(`Hire rejected - agent ${agentId} not found`);

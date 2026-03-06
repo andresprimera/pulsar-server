@@ -11,7 +11,8 @@ export class UserRepository {
   ) {}
 
   async create(data: Partial<User>, session?: ClientSession): Promise<User> {
-    const [doc] = await this.model.create([data], { session });
+    const opts = session ? { session } : {};
+    const [doc] = await this.model.create([data], opts);
     return doc;
   }
 
@@ -27,7 +28,8 @@ export class UserRepository {
     email: string,
     session?: ClientSession,
   ): Promise<User | null> {
-    return this.model.findOne({ email }).session(session).exec();
+    const query = this.model.findOne({ email });
+    return (session ? query.session(session) : query).exec();
   }
 
   async findByStatus(
