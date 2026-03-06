@@ -85,6 +85,7 @@ Transport is pure I/O.
 -   Enforce idempotency (Phase C)
 -   Resolve routing
 -   Resolve contact identity
+-   Enforce quota enforcement gate (before building `AgentContext`)
 -   Resolve or create conversation
 -   Build `AgentContext`
 -   Call `AgentService`
@@ -129,7 +130,7 @@ Agent owns AI execution and AI-related runtime concerns.
 -   Conversation lifecycle rules
 -   Routing logic
 -   Contact business invariants
--   Pure business policies
+-   Pure business policies (e.g. quota policy, billing period computation, currency format and consistency invariants)
 
 Domain defines business truth --- not execution mechanics.
 
@@ -162,6 +163,7 @@ Domain defines business truth --- not execution mechanics.
 -   Message storage
 -   Conversation storage
 -   Summary storage
+-   Catalog prices (AgentPrice, ChannelPrice) and billing records (BillingRecord)
 
 Persistence owns data integrity and atomic guarantees.
 

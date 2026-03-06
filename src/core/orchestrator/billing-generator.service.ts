@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { QuotaPolicy } from '@domain/quota/quota-policy';
+import { AgentRepository } from '@persistence/repositories/agent.repository';
 import { BillingRecordRepository } from '@persistence/repositories/billing-record.repository';
+import { ChannelRepository } from '@persistence/repositories/channel.repository';
 import { ClientAgentRepository } from '@persistence/repositories/client-agent.repository';
 import { ClientRepository } from '@persistence/repositories/client.repository';
 
@@ -13,6 +15,8 @@ export class BillingGeneratorService {
     private readonly billingRecordRepository: BillingRecordRepository,
     private readonly clientAgentRepository: ClientAgentRepository,
     private readonly clientRepository: ClientRepository,
+    private readonly agentRepository: AgentRepository,
+    private readonly channelRepository: ChannelRepository,
   ) {}
 
   /**
@@ -68,19 +72,23 @@ export class BillingGeneratorService {
     const currency = client.billingCurrency;
 
     for (const ca of clientAgents) {
+      const agent = await this.agentRepository.findById(ca.agentId);
       items.push({
         type: 'agent',
         referenceId: new Types.ObjectId(ca.agentId),
-        description: `Agent subscription`,
+        description: agent ? `Agent: ${agent.name}` : 'Agent subscription',
         amount: ca.agentPricing.amount,
       });
       totalAmount += ca.agentPricing.amount;
 
       for (const ch of ca.channels) {
+        const channel = await this.channelRepository.findById(
+          String(ch.channelId),
+        );
         items.push({
           type: 'channel',
           referenceId: ch.channelId as Types.ObjectId,
-          description: `Channel`,
+          description: channel ? `Channel: ${channel.name}` : 'Channel',
           amount: ch.amount,
         });
         totalAmount += ch.amount;
