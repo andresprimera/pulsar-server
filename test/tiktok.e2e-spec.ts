@@ -117,12 +117,14 @@ describe('TikTok Channel (e2e)', () => {
       supportedProviders: [ChannelProvider.Tiktok],
     });
 
-    // Create Client
+    // Create Client (billingAnchor required for orchestrator to process messages)
     await connection.collection('clients').insertOne({
       _id: clientIdObj,
       name: 'TikTok Test Client',
       type: 'individual',
       status: 'active',
+      billingCurrency: 'USD',
+      billingAnchor: new Date(),
     });
 
     // Create Agent

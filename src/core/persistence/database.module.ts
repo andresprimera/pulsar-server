@@ -32,6 +32,18 @@ import {
 import { ProcessedEventRepository } from './repositories/processed-event.repository';
 import { LlmUsageLog, LlmUsageLogSchema } from './schemas/llm-usage-log.schema';
 import { LlmUsageLogRepository } from './repositories/llm-usage-log.repository';
+import { AgentPrice, AgentPriceSchema } from './schemas/agent-price.schema';
+import { AgentPriceRepository } from './repositories/agent-price.repository';
+import {
+  ChannelPrice,
+  ChannelPriceSchema,
+} from './schemas/channel-price.schema';
+import { ChannelPriceRepository } from './repositories/channel-price.repository';
+import {
+  BillingRecord,
+  BillingRecordSchema,
+} from './schemas/billing-record.schema';
+import { BillingRecordRepository } from './repositories/billing-record.repository';
 import { EventIdempotencyService } from './event-idempotency.service';
 import { OnboardingModule } from '@onboarding/onboarding.module';
 
@@ -40,7 +52,9 @@ const repositories = [
   AgentRepository,
   ChannelRepository,
   ClientAgentRepository,
-
+  AgentPriceRepository,
+  ChannelPriceRepository,
+  BillingRecordRepository,
   ClientPhoneRepository,
   ContactRepository,
   UserRepository,
@@ -75,6 +89,9 @@ const repositories = [
       { name: Conversation.name, schema: ConversationSchema },
       { name: ProcessedEvent.name, schema: ProcessedEventSchema },
       { name: LlmUsageLog.name, schema: LlmUsageLogSchema },
+      { name: AgentPrice.name, schema: AgentPriceSchema },
+      { name: ChannelPrice.name, schema: ChannelPriceSchema },
+      { name: BillingRecord.name, schema: BillingRecordSchema },
     ]),
     forwardRef(() => OnboardingModule),
   ],

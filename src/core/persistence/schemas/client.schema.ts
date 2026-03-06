@@ -29,6 +29,21 @@ export class Client extends Document {
   })
   status: 'active' | 'inactive' | 'archived';
 
+  @Prop({
+    required: true,
+    uppercase: true,
+    match: /^[A-Z]{3}$/,
+    default: 'USD',
+  })
+  billingCurrency: string; // ISO 4217
+
+  /**
+   * Billing cycle anchor for the entire client. Set once at creation, immutable.
+   * All billing periods and quota resets are derived from this date.
+   */
+  @Prop({ required: true })
+  billingAnchor: Date;
+
   @Prop({ type: Object })
   llmPreferences?: {
     provider: string;

@@ -66,6 +66,8 @@ describe('ClientAgents (e2e)', () => {
       name,
       type: 'individual',
       status: 'active',
+      billingCurrency: 'USD',
+      billingAnchor: new Date(),
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -82,8 +84,15 @@ describe('ClientAgents (e2e)', () => {
       })
       .expect(201);
 
-    createdAgentIds.push(response.body._id);
-    return response.body._id;
+    const agentId = response.body._id;
+    createdAgentIds.push(agentId);
+
+    await request(app.getHttpServer())
+      .put(`/agents/${agentId}/prices/USD`)
+      .send({ amount: 0 })
+      .expect(200);
+
+    return agentId;
   };
 
   const provisionChannel = async (
@@ -101,7 +110,13 @@ describe('ClientAgents (e2e)', () => {
       supportedProviders,
     });
 
-    return channelId.toString();
+    const channelIdStr = channelId.toString();
+    await request(app.getHttpServer())
+      .put(`/channels/${channelIdStr}/prices/USD`)
+      .send({ amount: 0 })
+      .expect(200);
+
+    return channelIdStr;
   };
 
   beforeAll(async () => {

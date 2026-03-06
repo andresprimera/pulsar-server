@@ -67,6 +67,13 @@ export class Message extends Document {
 }
 
 export const MessageSchema = SchemaFactory.createForClass(Message);
+MessageSchema.index({
+  clientId: 1,
+  channelId: 1,
+  type: 1,
+  status: 1,
+  createdAt: 1,
+});
 
 // Validation: user messages must have contactId, agent/summary messages must have agentId
 MessageSchema.pre('validate', function (next) {

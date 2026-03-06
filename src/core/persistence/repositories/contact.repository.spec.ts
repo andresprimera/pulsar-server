@@ -169,6 +169,7 @@ describe('ContactRepository', () => {
         exec: jest.fn().mockRejectedValue(duplicateError),
       }),
       findOne: jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue(existing),
         session: jest.fn().mockReturnValue({
           exec: jest.fn().mockResolvedValue(existing),
         }),

@@ -22,7 +22,8 @@ export class ClientAgentRepository {
     data: Partial<ClientAgent>,
     session?: ClientSession,
   ): Promise<ClientAgent> {
-    const [doc] = await this.model.create([data], { session });
+    const opts = session ? { session } : {};
+    const [doc] = await this.model.create([data], opts);
     return doc;
   }
 

@@ -30,6 +30,7 @@ export class ClientPhoneRepository {
         ? new Types.ObjectId(data.clientId)
         : data.clientId;
 
+    const opts = session ? { session } : {};
     const [doc] = await this.model.create(
       [
         {
@@ -39,7 +40,7 @@ export class ClientPhoneRepository {
           metadata: data.metadata,
         },
       ],
-      { session },
+      opts,
     );
     return doc;
   }
@@ -56,10 +57,11 @@ export class ClientPhoneRepository {
     const clientObjectId =
       typeof clientId === 'string' ? new Types.ObjectId(clientId) : clientId;
 
-    return this.model
-      .findOne({ clientId: clientObjectId, phoneNumberId })
-      .session(session || null)
-      .exec();
+    const query = this.model.findOne({
+      clientId: clientObjectId,
+      phoneNumberId,
+    });
+    return (session ? query.session(session) : query).exec();
   }
 
   /**
@@ -78,10 +80,8 @@ export class ClientPhoneRepository {
     id: Types.ObjectId | string,
     session?: ClientSession,
   ): Promise<ClientPhone | null> {
-    return this.model
-      .findById(id)
-      .session(session || null)
-      .exec();
+    const query = this.model.findById(id);
+    return (session ? query.session(session) : query).exec();
   }
 
   /**
@@ -111,10 +111,11 @@ export class ClientPhoneRepository {
 
     // Pre-check: does this phone already exist?
     // This runs inside the session so it respects the transaction snapshot.
-    const existing = await this.model
-      .findOne({ phoneNumberId })
-      .session(options?.session || null)
-      .exec();
+    const findQuery = this.model.findOne({ phoneNumberId });
+    const existing = await (options?.session
+      ? findQuery.session(options.session)
+      : findQuery
+    ).exec();
 
     if (existing) {
       // If owned by THIS client, return it (idempotent success)
@@ -152,10 +153,8 @@ export class ClientPhoneRepository {
     const clientObjectId =
       typeof clientId === 'string' ? new Types.ObjectId(clientId) : clientId;
 
-    return this.model
-      .find({ clientId: clientObjectId })
-      .session(session || null)
-      .exec();
+    const query = this.model.find({ clientId: clientObjectId });
+    return (session ? query.session(session) : query).exec();
   }
 
   /**
@@ -170,7 +169,7 @@ export class ClientPhoneRepository {
 
     const result = await this.model.deleteMany(
       { clientId: clientObjectId },
-      { session },
+      session ? { session } : {},
     );
     return result.deletedCount;
   }

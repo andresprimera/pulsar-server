@@ -1,16 +1,30 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 import { LlmConfig, LlmConfigSchema } from './llm-config.schema';
-// eslint-disable-next-line boundaries/element-types -- TODO: persistence→domain violation, tracked for refactor
-import { ChannelProvider } from '@domain/channels/channel-provider.enum';
+import { CHANNEL_PROVIDER_VALUES } from '@shared/channel-provider.constants';
+
+@Schema({ _id: false })
+export class AgentPricingSnapshot {
+  @Prop({ required: true, min: 0 })
+  amount: number;
+
+  @Prop({ required: true, uppercase: true, maxlength: 3 })
+  currency: string;
+
+  @Prop({ type: Number, default: null })
+  monthlyTokenQuota: number | null;
+}
+
+export const AgentPricingSnapshotSchema =
+  SchemaFactory.createForClass(AgentPricingSnapshot);
 
 @Schema({ _id: false })
 export class HireChannelConfig {
   @Prop({ type: Types.ObjectId, ref: 'Channel', required: true })
   channelId: Types.ObjectId;
 
-  @Prop({ required: true, enum: ChannelProvider })
-  provider: ChannelProvider;
+  @Prop({ type: String, required: true, enum: CHANNEL_PROVIDER_VALUES })
+  provider: (typeof CHANNEL_PROVIDER_VALUES)[number];
 
   @Prop({ required: true, enum: ['active', 'inactive'], default: 'active' })
   status: 'active' | 'inactive';
@@ -30,6 +44,15 @@ export class HireChannelConfig {
 
   @Prop({ type: LlmConfigSchema, required: true })
   llmConfig: LlmConfig;
+
+  @Prop({ required: true, min: 0, default: 0 })
+  amount: number;
+
+  @Prop({ required: true, uppercase: true, maxlength: 3 })
+  currency: string;
+
+  @Prop({ type: Number, default: null })
+  monthlyMessageQuota: number | null;
 }
 
 export const HireChannelConfigSchema =
@@ -50,8 +73,11 @@ export class ClientAgent extends Document {
   })
   status: 'active' | 'inactive' | 'archived';
 
-  @Prop({ required: true, min: 0 })
-  price: number;
+  @Prop({ type: AgentPricingSnapshotSchema, required: true })
+  agentPricing: AgentPricingSnapshot;
+
+  @Prop({ required: true })
+  billingAnchor: Date;
 
   @Prop({ type: [HireChannelConfigSchema], required: true })
   channels: HireChannelConfig[];

@@ -14,7 +14,8 @@ export class ClientRepository {
     data: Partial<Client>,
     session?: ClientSession,
   ): Promise<Client> {
-    const [doc] = await this.model.create([data], { session });
+    const opts = session ? { session } : {};
+    const [doc] = await this.model.create([data], opts);
     return doc;
   }
 
@@ -37,9 +38,7 @@ export class ClientRepository {
     data: Partial<Client>,
     session?: ClientSession,
   ): Promise<Client | null> {
-    return this.model
-      .findByIdAndUpdate(id, data, { new: true })
-      .session(session)
-      .exec();
+    const query = this.model.findByIdAndUpdate(id, data, { new: true });
+    return (session ? query.session(session) : query).exec();
   }
 }

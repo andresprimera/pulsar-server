@@ -6,10 +6,12 @@ import {
 } from '@nestjs/common';
 import { ClientAgentsService } from './client-agents.service';
 import { ClientAgentRepository } from '@persistence/repositories/client-agent.repository';
-import { ClientsService } from '@clients/clients.service';
 import { AgentsService } from '@agents/agents.service';
+import { ClientsService } from '@clients/clients.service';
 import { ChannelRepository } from '@persistence/repositories/channel.repository';
 import { ClientPhoneRepository } from '@persistence/repositories/client-phone.repository';
+import { AgentPriceRepository } from '@persistence/repositories/agent-price.repository';
+import { ChannelPriceRepository } from '@persistence/repositories/channel-price.repository';
 
 describe('ClientAgentsService', () => {
   let service: ClientAgentsService;
@@ -18,23 +20,28 @@ describe('ClientAgentsService', () => {
   let mockAgentsService: any;
   let mockChannelRepository: any;
   let mockClientPhoneRepository: any;
+  let mockAgentPriceRepository: any;
+  let mockChannelPriceRepository: any;
 
   const mockClientAgent = {
     id: 'ca-1',
     clientId: 'client-1',
     agentId: 'agent-1',
     status: 'active',
-    price: 100,
+    agentPricing: { amount: 100, currency: 'USD', monthlyTokenQuota: null },
+    billingAnchor: new Date(),
   };
 
   const mockClient = {
     id: 'client-1',
     status: 'active',
+    billingCurrency: 'USD',
   };
 
   const mockAgent = {
     id: 'agent-1',
     status: 'active',
+    monthlyTokenQuota: null,
   };
 
   beforeEach(async () => {
@@ -63,6 +70,18 @@ describe('ClientAgentsService', () => {
       resolveOrCreate: jest.fn(),
     };
 
+    mockAgentPriceRepository = {
+      findActiveByAgentAndCurrency: jest
+        .fn()
+        .mockResolvedValue({ amount: 100 }),
+    };
+
+    mockChannelPriceRepository = {
+      findActiveByChannelAndCurrency: jest
+        .fn()
+        .mockResolvedValue({ amount: 0 }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ClientAgentsService,
@@ -86,6 +105,14 @@ describe('ClientAgentsService', () => {
           provide: ClientPhoneRepository,
           useValue: mockClientPhoneRepository,
         },
+        {
+          provide: AgentPriceRepository,
+          useValue: mockAgentPriceRepository,
+        },
+        {
+          provide: ChannelPriceRepository,
+          useValue: mockChannelPriceRepository,
+        },
       ],
     }).compile();
 
@@ -100,7 +127,6 @@ describe('ClientAgentsService', () => {
     const baseDto: any = {
       clientId: '507f1f77bcf86cd799439011',
       agentId: '507f1f77bcf86cd799439012',
-      price: 100,
       channels: [
         {
           channelId: '507f1f77bcf86cd799439013',
@@ -118,11 +144,18 @@ describe('ClientAgentsService', () => {
     it('should create client agent if client and agent are active', async () => {
       mockClientsService.findById.mockResolvedValue(mockClient);
       mockAgentsService.findOne.mockResolvedValue(mockAgent);
+      mockAgentPriceRepository.findActiveByAgentAndCurrency.mockResolvedValue({
+        amount: 100,
+      });
+      mockChannelPriceRepository.findActiveByChannelAndCurrency.mockResolvedValue(
+        { amount: 0 },
+      );
       mockClientAgentRepository.findByClientAndAgent.mockResolvedValue(null);
       mockChannelRepository.findByIdOrFail.mockResolvedValue({
         _id: '507f1f77bcf86cd799439013',
         name: 'Instagram',
         supportedProviders: ['instagram'],
+        monthlyMessageQuota: null,
       });
       mockClientAgentRepository.create.mockResolvedValue(mockClientAgent);
 
@@ -139,12 +172,18 @@ describe('ClientAgentsService', () => {
         expect.objectContaining({
           clientId: baseDto.clientId,
           agentId: baseDto.agentId,
-          price: baseDto.price,
+          agentPricing: expect.objectContaining({
+            amount: 100,
+            currency: 'USD',
+          }),
+          billingAnchor: expect.any(Date),
           status: 'active',
           channels: expect.arrayContaining([
             expect.objectContaining({
               instagramAccountId: '17841400000000009',
               provider: 'instagram',
+              amount: 0,
+              currency: 'USD',
             }),
           ]),
         }),
@@ -354,21 +393,19 @@ describe('ClientAgentsService', () => {
   describe('update', () => {
     it('should update client agent', async () => {
       mockClientAgentRepository.findById.mockResolvedValue(mockClientAgent);
-      mockClientAgentRepository.update.mockResolvedValue({
-        ...mockClientAgent,
-        price: 200,
-      });
+      mockClientAgentRepository.update.mockResolvedValue(mockClientAgent);
 
-      const result = await service.update('ca-1', { price: 200 });
-      expect(mockClientAgentRepository.update).toHaveBeenCalledWith('ca-1', {
-        price: 200,
-      });
-      expect(result.price).toBe(200);
+      const result = await service.update('ca-1', {} as any);
+      expect(mockClientAgentRepository.update).toHaveBeenCalledWith(
+        'ca-1',
+        expect.any(Object),
+      );
+      expect(result).toEqual(mockClientAgent);
     });
 
     it('should throw NotFoundException if not found', async () => {
       mockClientAgentRepository.findById.mockResolvedValue(null);
-      await expect(service.update('unknown', { price: 200 })).rejects.toThrow(
+      await expect(service.update('unknown', {} as any)).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -378,7 +415,7 @@ describe('ClientAgentsService', () => {
         ...mockClientAgent,
         status: 'archived',
       });
-      await expect(service.update('ca-1', { price: 200 })).rejects.toThrow(
+      await expect(service.update('ca-1', {} as any)).rejects.toThrow(
         BadRequestException,
       );
     });
@@ -427,23 +464,32 @@ describe('ClientAgentsService', () => {
   });
 
   describe('calculateClientTotal', () => {
-    it('should sum prices of active agents', async () => {
+    it('should sum prices of active agents and return total with currency', async () => {
+      mockClientsService.findById.mockResolvedValue(mockClient);
       mockClientAgentRepository.findByClientAndStatus.mockResolvedValue([
-        { price: 100 },
-        { price: 200 },
+        {
+          agentPricing: { amount: 100, currency: 'USD' },
+          channels: [{ status: 'active', amount: 10 }],
+        },
+        {
+          agentPricing: { amount: 200, currency: 'USD' },
+          channels: [{ status: 'active', amount: 0 }],
+        },
       ]);
 
       const result = await service.calculateClientTotal('client-1');
+      expect(mockClientsService.findById).toHaveBeenCalledWith('client-1');
       expect(
         mockClientAgentRepository.findByClientAndStatus,
       ).toHaveBeenCalledWith('client-1', 'active');
-      expect(result).toBe(300);
+      expect(result).toEqual({ total: 310, currency: 'USD' });
     });
 
-    it('should return 0 if no active agents', async () => {
+    it('should return 0 and client currency if no active agents', async () => {
+      mockClientsService.findById.mockResolvedValue(mockClient);
       mockClientAgentRepository.findByClientAndStatus.mockResolvedValue([]);
       const result = await service.calculateClientTotal('client-1');
-      expect(result).toBe(0);
+      expect(result).toEqual({ total: 0, currency: 'USD' });
     });
   });
 });

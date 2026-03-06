@@ -31,7 +31,7 @@ export class ChannelRepository {
       .findOneAndUpdate(
         { name },
         { $setOnInsert: { ...data, name } },
-        { upsert: true, new: true, session },
+        { upsert: true, new: true, ...(session && { session }) },
       )
       .exec();
   }

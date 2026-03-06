@@ -1,4 +1,5 @@
 {
+  "billingCurrency": "USD",
   "agents": [
     {
       "name": "Customer Service Agent",

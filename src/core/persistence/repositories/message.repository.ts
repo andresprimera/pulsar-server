@@ -18,7 +18,8 @@ export class MessageRepository {
       throw new BadRequestException('conversationId is required');
     }
 
-    const [doc] = await this.model.create([data], { session });
+    const opts = session ? { session } : {};
+    const [doc] = await this.model.create([data], opts);
     return doc;
   }
 
@@ -114,6 +115,23 @@ export class MessageRepository {
     }
 
     return this.model.findOne(query).sort({ createdAt: -1 }).exec();
+  }
+
+  async countMessagesForClientChannel(
+    clientId: Types.ObjectId,
+    channelId: Types.ObjectId,
+    periodStart: Date,
+    periodEnd: Date,
+  ): Promise<number> {
+    return this.model
+      .countDocuments({
+        clientId,
+        channelId,
+        type: 'user',
+        status: 'active',
+        createdAt: { $gte: periodStart, $lt: periodEnd },
+      })
+      .exec();
   }
 
   async countTokensInConversation(

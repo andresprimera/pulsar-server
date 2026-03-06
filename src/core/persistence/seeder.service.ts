@@ -16,6 +16,8 @@ import { OnboardingService } from '@onboarding/onboarding.service';
 import { ChannelRepository } from './repositories/channel.repository';
 import { ClientAgentRepository } from './repositories/client-agent.repository';
 import { ClientPhoneRepository } from './repositories/client-phone.repository';
+import { AgentPriceRepository } from './repositories/agent-price.repository';
+import { ChannelPriceRepository } from './repositories/channel-price.repository';
 import { encryptRecord, encrypt } from '@shared/crypto.util';
 import * as SEED_DATA from './data/seed-data.json';
 import { ClientRepository } from './repositories/client.repository';
@@ -37,6 +39,8 @@ export class SeederService implements OnApplicationBootstrap {
     private readonly clientRepository: ClientRepository,
     private readonly clientAgentRepository: ClientAgentRepository,
     private readonly clientPhoneRepository: ClientPhoneRepository,
+    private readonly agentPriceRepository: AgentPriceRepository,
+    private readonly channelPriceRepository: ChannelPriceRepository,
     @InjectModel(ClientAgent.name)
     private readonly clientAgentModel: Model<ClientAgent>,
   ) {}
@@ -111,6 +115,9 @@ export class SeederService implements OnApplicationBootstrap {
             systemPrompt: agentSeed.systemPrompt,
             status: agentSeed.status,
             createdBySeeder: true,
+            ...((agentSeed as any).monthlyTokenQuota != null
+              ? { monthlyTokenQuota: (agentSeed as any).monthlyTokenQuota }
+              : {}),
           });
         } else {
           this.logger.log(
@@ -131,9 +138,44 @@ export class SeederService implements OnApplicationBootstrap {
             supportedProviders: channelSeed.supportedProviders.map((p) =>
               p.toLowerCase(),
             ),
+            ...((channelSeed as any).monthlyMessageQuota != null
+              ? {
+                  monthlyMessageQuota: (channelSeed as any).monthlyMessageQuota,
+                }
+              : {}),
           },
         );
         channelsMap.set(channelSeed.name, { channel });
+      }
+
+      // 3. Pre-seed full catalog (AgentPrice + ChannelPrice) in default currency before any user
+      const defaultCurrency = (SEED_DATA as any).billingCurrency ?? 'USD';
+      this.logger.log(
+        `Seeding catalog prices (${defaultCurrency}) for all agents and channels...`,
+      );
+      const agentPriceByAgentName = this.getDefaultAgentPricesFromSeed();
+      for (const agentSeed of SEED_DATA.agents) {
+        const agent = agentsMap.get(agentSeed.name);
+        if (!agent) continue;
+        const amount =
+          agentPriceByAgentName.get(agentSeed.name) ??
+          (agentSeed as any).defaultPrice ??
+          0;
+        await this.agentPriceRepository.upsert(
+          agent._id as Types.ObjectId,
+          defaultCurrency,
+          amount,
+        );
+      }
+      for (const channelSeed of SEED_DATA.channels) {
+        const channelInfo = channelsMap.get(channelSeed.name);
+        if (!channelInfo?.channel?._id) continue;
+        const amount = (channelSeed as any).amount ?? 0;
+        await this.channelPriceRepository.upsert(
+          channelInfo.channel._id as Types.ObjectId,
+          defaultCurrency,
+          amount,
+        );
       }
 
       // Ensure indexes are built before transaction starts to avoid "catalog changes" error
@@ -143,7 +185,7 @@ export class SeederService implements OnApplicationBootstrap {
         this.clientAgentModel.createIndexes(),
       ]);
 
-      // 3. Process each user
+      // 4. Process each user
       for (const userSeed of SEED_DATA.users) {
         const resolveHiringChannels = (hiringSeed: any) => {
           const channelsFromHiring = Array.isArray(hiringSeed.channels)
@@ -229,6 +271,9 @@ export class SeederService implements OnApplicationBootstrap {
           continue;
         }
 
+        const billingCurrency =
+          (userSeed.client as any)?.billingCurrency ?? defaultCurrency;
+
         // Use OnboardingService to create User, Client, and first ClientAgent
         this.logger.log(
           `Running onboarding flow for user "${userSeed.email}" with agent "${firstAgentHiring.agentName}"...`,
@@ -241,10 +286,10 @@ export class SeederService implements OnApplicationBootstrap {
           client: {
             type: userSeed.client.type as any,
             ...(userSeed.client.name ? { name: userSeed.client.name } : {}),
+            billingCurrency,
           },
           agentHiring: {
             agentId: firstAgent._id.toString(),
-            price: firstAgentHiring.price,
           },
           channels: channelsDto as any,
         });
@@ -258,122 +303,142 @@ export class SeederService implements OnApplicationBootstrap {
 
         // Process additional agent hirings if any
         if (userSeed.agentHirings.length > 1) {
-          for (let i = 1; i < userSeed.agentHirings.length; i++) {
-            const additionalHiring = userSeed.agentHirings[i];
-            const additionalAgent = agentsMap.get(additionalHiring.agentName);
-            if (!additionalAgent) {
-              this.logger.warn(
-                `Agent "${additionalHiring.agentName}" not found for additional hiring. Skipping.`,
-              );
-              continue;
-            }
-
-            assertHiringChannelsOrThrow(additionalHiring);
-
-            // Prepare channels for additional agent
-            const additionalChannels = [];
-            const additionalHiringChannels =
-              resolveHiringChannels(additionalHiring);
-
-            for (const channelSeed of additionalHiringChannels) {
-              const channelInfo = channelsMap.get(channelSeed.channelName);
-              if (!channelInfo) {
+          const client = await this.clientRepository.findById(
+            result.client._id,
+          );
+          if (!client) {
+            this.logger.warn(
+              `Client ${result.client._id} not found; skipping additional hirings for ${userSeed.email}.`,
+            );
+          } else {
+            for (let i = 1; i < userSeed.agentHirings.length; i++) {
+              const additionalHiring = userSeed.agentHirings[i];
+              const additionalAgent = agentsMap.get(additionalHiring.agentName);
+              if (!additionalAgent) {
+                this.logger.warn(
+                  `Agent "${additionalHiring.agentName}" not found for additional hiring. Skipping.`,
+                );
                 continue;
               }
 
-              const provider =
-                channelSeed.provider ||
-                channelInfo.channel.supportedProviders[0];
+              assertHiringChannelsOrThrow(additionalHiring);
 
-              // Handle phone number for WhatsApp channels
-              let phoneNumberId: string | undefined;
-              if (
-                channelSeed.credentials &&
-                'phoneNumberId' in channelSeed.credentials
-              ) {
-                phoneNumberId = channelSeed.credentials.phoneNumberId;
-              }
+              // Prepare channels for additional agent
+              const additionalChannels = [];
+              const additionalHiringChannels =
+                resolveHiringChannels(additionalHiring);
 
-              if (phoneNumberId) {
-                // Ensure ClientPhone exists for this phone number
-                try {
-                  const clientId = result.client._id;
-                  if (!Types.ObjectId.isValid(clientId)) {
-                    this.logger.warn(
-                      `Skipping ClientPhone creation for invalid clientId "${clientId}" during seeding.`,
+              for (const channelSeed of additionalHiringChannels) {
+                const channelInfo = channelsMap.get(channelSeed.channelName);
+                if (!channelInfo) {
+                  continue;
+                }
+
+                const provider =
+                  channelSeed.provider ||
+                  channelInfo.channel.supportedProviders[0];
+
+                // Handle phone number for WhatsApp channels
+                let phoneNumberId: string | undefined;
+                if (
+                  channelSeed.credentials &&
+                  'phoneNumberId' in channelSeed.credentials
+                ) {
+                  phoneNumberId = channelSeed.credentials.phoneNumberId;
+                }
+
+                if (phoneNumberId) {
+                  // Ensure ClientPhone exists for this phone number
+                  try {
+                    const clientId = result.client._id;
+                    if (!Types.ObjectId.isValid(clientId)) {
+                      this.logger.warn(
+                        `Skipping ClientPhone creation for invalid clientId "${clientId}" during seeding.`,
+                      );
+                      continue;
+                    }
+
+                    await this.clientPhoneRepository.resolveOrCreate(
+                      clientId,
+                      phoneNumberId,
+                      {
+                        provider: provider.toLowerCase() as any,
+                      },
                     );
-                    continue;
-                  }
-
-                  await this.clientPhoneRepository.resolveOrCreate(
-                    clientId,
-                    phoneNumberId,
-                    {
-                      provider: provider.toLowerCase() as any,
-                    },
-                  );
-                } catch (error) {
-                  // Phone may already be owned by another client from a previous seed user
-                  // This is expected when multiple seed users share the same channel config
-                  if (error.status === 409) {
-                    this.logger.warn(
-                      `Phone ${phoneNumberId} already owned by another client. Skipping for additional agent.`,
-                    );
-                  } else {
-                    throw error;
+                  } catch (error) {
+                    // Phone may already be owned by another client from a previous seed user
+                    // This is expected when multiple seed users share the same channel config
+                    if (error.status === 409) {
+                      this.logger.warn(
+                        `Phone ${phoneNumberId} already owned by another client. Skipping for additional agent.`,
+                      );
+                    } else {
+                      throw error;
+                    }
                   }
                 }
+
+                // Handle tiktokUserId for TikTok channels
+                let tiktokUserId: string | undefined;
+                if (
+                  channelSeed.credentials &&
+                  'tiktokUserId' in channelSeed.credentials
+                ) {
+                  tiktokUserId = channelSeed.credentials.tiktokUserId;
+                }
+
+                // Handle instagramAccountId for Instagram channels
+                let instagramAccountId: string | undefined;
+                if (
+                  channelSeed.credentials &&
+                  'instagramAccountId' in channelSeed.credentials
+                ) {
+                  instagramAccountId =
+                    channelSeed.credentials.instagramAccountId;
+                }
+
+                additionalChannels.push({
+                  channelId: channelInfo.channel._id as Types.ObjectId,
+                  provider: provider.toLowerCase(),
+                  status: channelSeed.status || 'active',
+                  credentials: encryptRecord(channelSeed.credentials),
+                  phoneNumberId,
+                  tiktokUserId,
+                  instagramAccountId,
+                  llmConfig: {
+                    ...channelSeed.llmConfig,
+                    apiKey: encrypt(channelSeed.llmConfig.apiKey),
+                  },
+                  amount: 0,
+                  currency: client.billingCurrency,
+                  monthlyMessageQuota:
+                    (channelInfo.channel as any).monthlyMessageQuota ?? null,
+                });
               }
 
-              // Handle tiktokUserId for TikTok channels
-              let tiktokUserId: string | undefined;
-              if (
-                channelSeed.credentials &&
-                'tiktokUserId' in channelSeed.credentials
-              ) {
-                tiktokUserId = channelSeed.credentials.tiktokUserId;
-              }
+              // Create additional ClientAgent using client's billing anchor and currency
+              this.logger.log(
+                `Hiring additional agent "${additionalHiring.agentName}" for client "${result.client._id}"...`,
+              );
+              const additionalClientAgent =
+                await this.clientAgentRepository.create({
+                  clientId: result.client._id,
+                  agentId: additionalAgent._id.toString(),
+                  agentPricing: {
+                    amount: additionalHiring.price ?? 0,
+                    currency: client.billingCurrency,
+                    monthlyTokenQuota:
+                      (additionalAgent as any).monthlyTokenQuota ?? null,
+                  },
+                  billingAnchor: client.billingAnchor,
+                  status: 'active',
+                  channels: additionalChannels,
+                });
 
-              // Handle instagramAccountId for Instagram channels
-              let instagramAccountId: string | undefined;
-              if (
-                channelSeed.credentials &&
-                'instagramAccountId' in channelSeed.credentials
-              ) {
-                instagramAccountId = channelSeed.credentials.instagramAccountId;
-              }
-
-              additionalChannels.push({
-                channelId: channelInfo.channel._id as Types.ObjectId,
-                provider: provider.toLowerCase(),
-                status: channelSeed.status || 'active',
-                credentials: encryptRecord(channelSeed.credentials),
-                phoneNumberId,
-                tiktokUserId,
-                instagramAccountId,
-                llmConfig: {
-                  ...channelSeed.llmConfig,
-                  apiKey: encrypt(channelSeed.llmConfig.apiKey),
-                },
-              });
+              this.logger.log(
+                `  - Additional ClientAgent: ${additionalClientAgent._id}`,
+              );
             }
-
-            // Create additional ClientAgent
-            this.logger.log(
-              `Hiring additional agent "${additionalHiring.agentName}" for client "${result.client._id}"...`,
-            );
-            const additionalClientAgent =
-              await this.clientAgentRepository.create({
-                clientId: result.client._id,
-                agentId: additionalAgent._id.toString(),
-                price: additionalHiring.price,
-                status: 'active',
-                channels: additionalChannels,
-              });
-
-            this.logger.log(
-              `  - Additional ClientAgent: ${additionalClientAgent._id}`,
-            );
           }
         }
       }
@@ -426,5 +491,23 @@ export class SeederService implements OnApplicationBootstrap {
 
   private async sleep(ms: number): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Derives default agent price per agent name from first occurrence in users' agentHirings.
+   * Used to pre-seed catalog when agents[] does not define defaultPrice.
+   */
+  private getDefaultAgentPricesFromSeed(): Map<string, number> {
+    const map = new Map<string, number>();
+    for (const user of SEED_DATA.users) {
+      const hirings = user.agentHirings ?? [];
+      for (const h of hirings) {
+        const name = h.agentName;
+        if (name && !map.has(name) && (h as any).price != null) {
+          map.set(name, (h as any).price);
+        }
+      }
+    }
+    return map;
   }
 }

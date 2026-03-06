@@ -10,6 +10,8 @@ import { ChannelRepository } from './repositories/channel.repository';
 import { ClientRepository } from './repositories/client.repository';
 import { ClientAgentRepository } from './repositories/client-agent.repository';
 import { ClientPhoneRepository } from './repositories/client-phone.repository';
+import { AgentPriceRepository } from './repositories/agent-price.repository';
+import { ChannelPriceRepository } from './repositories/channel-price.repository';
 import { OnboardingService } from '@onboarding/onboarding.service';
 import { BadRequestException, Logger } from '@nestjs/common';
 import * as SEED_DATA from './data/seed-data.json';
@@ -25,6 +27,8 @@ describe('SeederService', () => {
   let mockClientRepository: any;
   let mockClientAgentRepository: any;
   let mockClientPhoneRepository: any;
+  let mockAgentPriceRepository: any;
+  let mockChannelPriceRepository: any;
   let loggerSpy: jest.SpyInstance;
   let loggerWarnSpy: jest.SpyInstance;
   let loggerErrorSpy: jest.SpyInstance;
@@ -50,7 +54,10 @@ describe('SeederService', () => {
       _id: 'client-agent-id',
       clientId: 'client-id',
       agentId: mockAgentId.toString(),
-      price: SEED_DATA.users[0].agentHirings[0].price,
+      agentPricing: {
+        amount: SEED_DATA.users[0].agentHirings[0].price,
+        currency: 'USD',
+      },
       status: 'active',
     },
   };
@@ -104,6 +111,14 @@ describe('SeederService', () => {
       resolveOrCreate: jest.fn(),
     };
 
+    mockAgentPriceRepository = {
+      upsert: jest.fn().mockResolvedValue({}),
+    };
+
+    mockChannelPriceRepository = {
+      upsert: jest.fn().mockResolvedValue({}),
+    };
+
     mockClientAgentModel = {
       createIndexes: jest.fn().mockResolvedValue(undefined),
     };
@@ -131,6 +146,14 @@ describe('SeederService', () => {
         {
           provide: ClientPhoneRepository,
           useValue: mockClientPhoneRepository,
+        },
+        {
+          provide: AgentPriceRepository,
+          useValue: mockAgentPriceRepository,
+        },
+        {
+          provide: ChannelPriceRepository,
+          useValue: mockChannelPriceRepository,
         },
       ],
     }).compile();
@@ -242,6 +265,14 @@ describe('SeederService', () => {
       });
 
       await service.onApplicationBootstrap();
+
+      // Verify catalog pre-seed: one AgentPrice and one ChannelPrice per entity in default currency
+      expect(mockAgentPriceRepository.upsert).toHaveBeenCalledTimes(
+        SEED_DATA.agents.length,
+      );
+      expect(mockChannelPriceRepository.upsert).toHaveBeenCalledTimes(
+        SEED_DATA.channels.length,
+      );
 
       // Verify agents creation (both agents should be created)
       expect(mockAgentModel.create).toHaveBeenCalledTimes(
@@ -500,6 +531,12 @@ describe('SeederService', () => {
       mockOnboardingService.registerAndHire.mockResolvedValueOnce(
         onboardingResultForUser3,
       );
+
+      mockClientRepository.findById.mockResolvedValue({
+        _id: '507f1f77bcf86cd799439011',
+        billingAnchor: new Date(),
+        billingCurrency: 'USD',
+      });
 
       const expectedPhoneNumberId = (
         seedUser.agentHirings[1].channels[0].credentials as any

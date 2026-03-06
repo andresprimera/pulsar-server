@@ -25,6 +25,9 @@ export class Agent extends Document {
 
   @Prop({ default: false })
   createdBySeeder: boolean;
+
+  @Prop({ type: Number, default: null })
+  monthlyTokenQuota: number | null; // null = unlimited
 }
 
 export const AgentSchema = SchemaFactory.createForClass(Agent);
