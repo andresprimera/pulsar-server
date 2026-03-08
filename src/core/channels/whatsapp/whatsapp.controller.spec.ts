@@ -1,27 +1,40 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException } from '@nestjs/common';
+import { ChannelProvider } from '@domain/channels/channel-provider.enum';
 import { WhatsappController } from './whatsapp.controller';
-import { WhatsappService } from './whatsapp.service';
+import { WhatsAppChannelService } from './whatsapp-channel.service';
+import { WhatsAppProviderRouter } from './provider-router';
 
 describe('WhatsappController', () => {
   let controller: WhatsappController;
-  let service: jest.Mocked<WhatsappService>;
+  let service: jest.Mocked<WhatsAppChannelService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [WhatsappController],
       providers: [
         {
-          provide: WhatsappService,
+          provide: WhatsAppChannelService,
           useValue: {
-            verifyWebhook: jest.fn(),
-            handleIncoming: jest.fn(),
+            verifyMetaWebhook: jest.fn(),
+            handleIncoming: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: WhatsAppProviderRouter,
+          useValue: {
+            hasAdapter: jest.fn((p: string) =>
+              [ChannelProvider.Meta, ChannelProvider.Dialog360].includes(
+                p as ChannelProvider,
+              ),
+            ),
           },
         },
       ],
     }).compile();
 
     controller = module.get<WhatsappController>(WhatsappController);
-    service = module.get(WhatsappService);
+    service = module.get(WhatsAppChannelService);
   });
 
   it('should be defined', () => {
@@ -29,8 +42,8 @@ describe('WhatsappController', () => {
   });
 
   describe('verify', () => {
-    it('should delegate to service.verifyWebhook()', () => {
-      service.verifyWebhook.mockReturnValue('challenge123');
+    it('delegates to service.verifyMetaWebhook()', () => {
+      service.verifyMetaWebhook.mockReturnValue('challenge123');
 
       const result = controller.verify(
         'subscribe',
@@ -38,7 +51,7 @@ describe('WhatsappController', () => {
         'challenge123',
       );
 
-      expect(service.verifyWebhook).toHaveBeenCalledWith(
+      expect(service.verifyMetaWebhook).toHaveBeenCalledWith(
         'subscribe',
         'test-token',
         'challenge123',
@@ -48,14 +61,54 @@ describe('WhatsappController', () => {
   });
 
   describe('handleWebhook', () => {
-    it('should call service.handleIncoming() and return ok', async () => {
-      service.handleIncoming.mockResolvedValue(undefined);
+    it('calls service.handleIncoming with ChannelProvider.Meta and returns ok', () => {
       const payload = { entry: [] };
 
-      const result = await controller.handleWebhook(payload);
+      const result = controller.handleWebhook(payload);
 
-      expect(service.handleIncoming).toHaveBeenCalledWith(payload);
+      expect(service.handleIncoming).toHaveBeenCalledWith(
+        payload,
+        ChannelProvider.Meta,
+      );
       expect(result).toBe('ok');
+    });
+  });
+
+  describe('handleProviderWebhook', () => {
+    it('calls service.handleIncoming with the specified provider', () => {
+      const payload = { entry: [] };
+
+      const result = controller.handleProviderWebhook(
+        payload,
+        ChannelProvider.Dialog360,
+      );
+
+      expect(service.handleIncoming).toHaveBeenCalledWith(
+        payload,
+        ChannelProvider.Dialog360,
+      );
+      expect(result).toBe('ok');
+    });
+
+    it('calls service.handleIncoming with provider "meta"', () => {
+      const payload = { entry: [] };
+
+      const result = controller.handleProviderWebhook(
+        payload,
+        ChannelProvider.Meta,
+      );
+
+      expect(service.handleIncoming).toHaveBeenCalledWith(
+        payload,
+        ChannelProvider.Meta,
+      );
+      expect(result).toBe('ok');
+    });
+
+    it('throws BadRequestException for unsupported provider', () => {
+      expect(() => controller.handleProviderWebhook({}, 'unsupported')).toThrow(
+        BadRequestException,
+      );
     });
   });
 });

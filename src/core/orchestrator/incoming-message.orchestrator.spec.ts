@@ -241,6 +241,7 @@ describe('IncomingMessageOrchestrator', () => {
         reply: { type: 'text', text: 'Hello' },
         channelMeta: {
           encryptedCredentials: mockClientAgent.channels[0].credentials,
+          provider: mockClientAgent.channels[0].provider,
         },
       });
       expect(agentService.run).toHaveBeenCalledWith(

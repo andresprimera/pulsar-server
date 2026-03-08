@@ -21,8 +21,8 @@ export class ClientPhone extends Document {
   @Prop({ required: true })
   phoneNumberId: string;
 
-  @Prop({ enum: ['meta', 'twilio', 'custom'] })
-  provider?: 'meta' | 'twilio' | 'custom';
+  @Prop({ enum: ['meta', 'twilio', 'dialog360', 'custom'] })
+  provider?: 'meta' | 'twilio' | 'dialog360' | 'custom';
 
   @Prop({ type: Object })
   metadata?: Record<string, any>;

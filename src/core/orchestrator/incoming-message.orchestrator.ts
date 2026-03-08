@@ -75,6 +75,7 @@ export class IncomingMessageOrchestrator {
         },
         channelMeta: {
           encryptedCredentials: fallback.channelConfig.credentials,
+          provider: fallback.channelConfig.provider,
         },
       };
     }
@@ -173,6 +174,7 @@ export class IncomingMessageOrchestrator {
       ...output,
       channelMeta: {
         encryptedCredentials: channelConfig.credentials,
+        provider: channelConfig.provider,
       },
     };
   }

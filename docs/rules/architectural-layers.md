@@ -28,3 +28,22 @@ Inbound message flow (orchestrator):
 5. Quota enforcement gate
 6. Build AgentContext
 7. Agent execution (contact resolution, conversation resolution, AgentService)
+
+Outbound message flow (gateway):
+
+```
+MessagingGatewayService
+    ↓
+ChannelRouter (resolves channel → adapter)
+    ↓
+ChannelAdapter (e.g. WhatsAppChannelService)
+    ↓
+ProviderRouter → ProviderAdapter
+```
+
+- `ChannelAdapter` is the interface every channel implements.
+- `@ChannelAdapterProvider()` decorator marks a class for automatic discovery.
+- `ChannelRouter` auto-discovers adapters via `DiscoveryService` at module init.
+- `MessagingGatewayService` is the single outbound entry point.
+- Gateway contains no business logic --- pure routing and delegation.
+- Adding a new channel: (1) implement `ChannelAdapter`, (2) decorate with `@ChannelAdapterProvider()`, (3) import channel module in `MessagingGatewayModule`.

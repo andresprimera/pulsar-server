@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { DatabaseModule } from './core/persistence/database.module';
 import { WhatsappModule } from './core/channels/whatsapp/whatsapp.module';
+import { MessagingGatewayModule } from './core/channels/gateway/messaging-gateway.module';
 import { TiktokModule } from './core/channels/tiktok/tiktok.module';
 import { InstagramModule } from './core/channels/instagram/instagram.module';
 import { AgentsModule } from './features/agents/agents.module';
@@ -18,6 +19,7 @@ import { OnboardingModule } from './features/onboarding/onboarding.module';
     ConfigModule.forRoot({ isGlobal: true }),
     DatabaseModule,
     WhatsappModule,
+    MessagingGatewayModule,
     TiktokModule,
     InstagramModule,
     AgentsModule,
