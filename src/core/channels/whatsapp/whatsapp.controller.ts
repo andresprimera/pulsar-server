@@ -37,27 +37,30 @@ export class WhatsappController {
 
   @Post('webhook')
   @HttpCode(200)
-  handleWebhook(@Body() payload: unknown): string {
+  async handleWebhook(@Body() payload: unknown): Promise<string> {
     this.logger.log(`Incoming WhatsApp webhook (${ChannelProvider.Meta})`);
-    this.whatsAppChannelService
-      .handleIncoming(payload, ChannelProvider.Meta)
-      .catch((error) => {
-        this.logger.error(
-          `Failed to process WhatsApp webhook (${ChannelProvider.Meta}): ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-          error instanceof Error ? error.stack : undefined,
-        );
-      });
+    try {
+      await this.whatsAppChannelService.handleIncoming(
+        payload,
+        ChannelProvider.Meta,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to process WhatsApp webhook (${ChannelProvider.Meta}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
     return 'ok';
   }
 
   @Post('webhook/:provider')
   @HttpCode(200)
-  handleProviderWebhook(
+  async handleProviderWebhook(
     @Body() payload: unknown,
     @Param('provider') provider: string,
-  ): string {
+  ): Promise<string> {
     if (!this.providerRouter.hasAdapter(provider)) {
       throw new BadRequestException(
         `Unsupported WhatsApp provider: ${provider}`,
@@ -65,16 +68,19 @@ export class WhatsappController {
     }
 
     this.logger.log(`Incoming WhatsApp webhook (${provider})`);
-    this.whatsAppChannelService
-      .handleIncoming(payload, provider as any)
-      .catch((error) => {
-        this.logger.error(
-          `Failed to process WhatsApp webhook (${provider}): ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-          error instanceof Error ? error.stack : undefined,
-        );
-      });
+    try {
+      await this.whatsAppChannelService.handleIncoming(
+        payload,
+        provider as any,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to process WhatsApp webhook (${provider}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
     return 'ok';
   }
 }

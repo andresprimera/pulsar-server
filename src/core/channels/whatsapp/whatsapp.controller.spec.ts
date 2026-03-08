@@ -61,10 +61,10 @@ describe('WhatsappController', () => {
   });
 
   describe('handleWebhook', () => {
-    it('calls service.handleIncoming with ChannelProvider.Meta and returns ok', () => {
+    it('calls service.handleIncoming with ChannelProvider.Meta and returns ok', async () => {
       const payload = { entry: [] };
 
-      const result = controller.handleWebhook(payload);
+      const result = await controller.handleWebhook(payload);
 
       expect(service.handleIncoming).toHaveBeenCalledWith(
         payload,
@@ -75,10 +75,10 @@ describe('WhatsappController', () => {
   });
 
   describe('handleProviderWebhook', () => {
-    it('calls service.handleIncoming with the specified provider', () => {
+    it('calls service.handleIncoming with the specified provider', async () => {
       const payload = { entry: [] };
 
-      const result = controller.handleProviderWebhook(
+      const result = await controller.handleProviderWebhook(
         payload,
         ChannelProvider.Dialog360,
       );
@@ -90,10 +90,10 @@ describe('WhatsappController', () => {
       expect(result).toBe('ok');
     });
 
-    it('calls service.handleIncoming with provider "meta"', () => {
+    it('calls service.handleIncoming with provider "meta"', async () => {
       const payload = { entry: [] };
 
-      const result = controller.handleProviderWebhook(
+      const result = await controller.handleProviderWebhook(
         payload,
         ChannelProvider.Meta,
       );
@@ -105,10 +105,10 @@ describe('WhatsappController', () => {
       expect(result).toBe('ok');
     });
 
-    it('throws BadRequestException for unsupported provider', () => {
-      expect(() => controller.handleProviderWebhook({}, 'unsupported')).toThrow(
-        BadRequestException,
-      );
+    it('throws BadRequestException for unsupported provider', async () => {
+      await expect(
+        controller.handleProviderWebhook({}, 'unsupported'),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

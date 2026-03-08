@@ -84,6 +84,12 @@ export class OnboardingService {
     const session = await this.connection.startSession();
     session.startTransaction();
 
+    let client: Awaited<ReturnType<ClientRepository['create']>> | undefined;
+    let user: Awaited<ReturnType<UserRepository['create']>> | undefined;
+    let clientAgent:
+      | Awaited<ReturnType<ClientAgentRepository['create']>>
+      | undefined;
+
     try {
       // 5. Check user email doesn't exist (inside transaction for consistency
       //    under concurrent onboarding — prevents two requests from both passing
@@ -102,7 +108,7 @@ export class OnboardingService {
       if (!isValidCurrencyCode(billingCurrency)) {
         throw new BadRequestException('Invalid ISO 4217 currency code');
       }
-      const client = await this.clientRepository.create(
+      client = await this.clientRepository.create(
         {
           name: clientName,
           type: dto.client.type,
@@ -114,7 +120,7 @@ export class OnboardingService {
       );
 
       // 7. Create User
-      const user = await this.userRepository.create(
+      user = await this.userRepository.create(
         {
           email: normalizedEmail,
           name: dto.user.name,
@@ -268,7 +274,7 @@ export class OnboardingService {
       }
 
       // 9. Create ClientAgent (pricing snapshot + channels)
-      const clientAgent = await this.clientAgentRepository.create(
+      clientAgent = await this.clientAgentRepository.create(
         {
           clientId: (client._id as Types.ObjectId).toString(),
           agentId: dto.agentHiring.agentId,
@@ -324,6 +330,14 @@ export class OnboardingService {
       // Re-throw other errors
       throw error;
     } finally {
+      // Detach session from any created documents so they can be used after
+      // endSession() (avoids MongoExpiredSessionError when docs are later
+      // read from the identity map by other requests).
+      for (const doc of [client, user, clientAgent]) {
+        if (doc && typeof (doc as any).$session === 'function') {
+          (doc as any).$session(null);
+        }
+      }
       session.endSession();
     }
   }

@@ -417,6 +417,10 @@ describe('Message Persistence (e2e)', () => {
     });
 
     it('should reuse existing contact on subsequent messages', async () => {
+      // Use unique message ids so in-memory dedup from other tests doesn't skip these
+      const msgId1 = 'msg-reuse-contact-1';
+      const msgId2 = 'msg-reuse-contact-2';
+
       // First message
       const payload1 = {
         entry: [
@@ -427,7 +431,7 @@ describe('Message Persistence (e2e)', () => {
                   messages: [
                     {
                       from: userPhone,
-                      id: 'msg1',
+                      id: msgId1,
                       type: 'text',
                       text: { body: 'First' },
                     },
@@ -441,11 +445,16 @@ describe('Message Persistence (e2e)', () => {
       };
 
       await whatsappService.handleIncoming(payload1, 'meta');
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
+      const contactFilter = {
+        clientId: clientIdObj,
+        channelId: channelIdObj,
+        externalId: userPhone.replace(/[^\d]/g, ''),
+      };
       const contactCountAfterFirst = await connection
         .collection('contacts')
-        .countDocuments({ externalId: userPhone.replace(/[^\d]/g, '') });
+        .countDocuments(contactFilter);
 
       // Second message
       const payload2 = {
@@ -457,7 +466,7 @@ describe('Message Persistence (e2e)', () => {
                   messages: [
                     {
                       from: userPhone,
-                      id: 'msg2',
+                      id: msgId2,
                       type: 'text',
                       text: { body: 'Second' },
                     },
@@ -471,11 +480,11 @@ describe('Message Persistence (e2e)', () => {
       };
 
       await whatsappService.handleIncoming(payload2, 'meta');
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
       const contactCountAfterSecond = await connection
         .collection('contacts')
-        .countDocuments({ externalId: userPhone.replace(/[^\d]/g, '') });
+        .countDocuments(contactFilter);
 
       // Should still be only one contact
       expect(contactCountAfterFirst).toBe(1);

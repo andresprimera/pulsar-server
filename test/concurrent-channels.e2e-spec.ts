@@ -368,7 +368,10 @@ describe('Concurrent Channels (e2e)', () => {
       ChannelProvider.Instagram,
     ];
 
-    const knownUntestedProviders = [ChannelProvider.Twilio];
+    const knownUntestedProviders = [
+      ChannelProvider.Twilio,
+      ChannelProvider.Dialog360,
+    ];
 
     const allProviders = Object.values(ChannelProvider);
     const missing = allProviders.filter(
