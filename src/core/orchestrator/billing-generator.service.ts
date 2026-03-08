@@ -121,4 +121,29 @@ export class BillingGeneratorService {
 
     return { clientId, periodStart, periodEnd };
   }
+
+  /**
+   * Generates billing records for all clients for their current billing period.
+   * Each client is processed via generateForClient (idempotent). Returns counts.
+   */
+  async generateForAllClients(): Promise<{
+    generated: number;
+    skipped: number;
+  }> {
+    const clients = await this.clientRepository.findAll();
+    let generated = 0;
+    let skipped = 0;
+    for (const client of clients) {
+      const result = await this.generateForClient(String(client._id));
+      if (result) {
+        generated += 1;
+      } else {
+        skipped += 1;
+      }
+    }
+    this.logger.log(
+      `generateForAllClients completed: generated=${generated} skipped=${skipped} total=${clients.length}`,
+    );
+    return { generated, skipped };
+  }
 }
