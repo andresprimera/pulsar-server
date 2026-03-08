@@ -16,6 +16,21 @@ If any other document conflicts with this one, this document wins.
 
 ------------------------------------------------------------------------
 
+# Reference documentation (where to look)
+
+**Read when implementing or changing related areas:**
+
+- **`docs/rules/`** — How to write code: layer boundaries, validation, encryption, data modeling, configuration.
+  - `docs/rules/architectural-layers.md` — Controller / service / repository boundaries, DatabaseModule, lifecycle.
+  - `docs/rules/configuration.md` — ValidationPipe, Logger, path aliases, LLM SDK usage.
+  - `docs/rules/credential-encryption.md` — Encrypting credentials, routing keys, `crypto.util.ts`.
+  - `docs/rules/data-modeling.md` — Schemas, indexes, repositories, transactions.
+- **`docs/`** (root) — How the system works: routing, message flow, persistence (read when touching agents, channels, or conversations).
+
+Before changing layers, credentials, channels, or persistence, read the relevant doc above.
+
+------------------------------------------------------------------------
+
 # 1. Layer Overview
 
 The system is divided into five strict layers:
