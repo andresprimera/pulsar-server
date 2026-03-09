@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
+import { ChannelEnvService } from '@channels/config/channel-env.service';
 import { TiktokService } from './tiktok.service';
 import { IncomingMessageOrchestrator } from '@orchestrator/incoming-message.orchestrator';
 import { encrypt } from '@shared/crypto.util';
@@ -25,6 +26,12 @@ describe('TiktokService', () => {
         {
           provide: IncomingMessageOrchestrator,
           useValue: { handle: jest.fn() },
+        },
+        {
+          provide: ChannelEnvService,
+          useValue: {
+            getTikTokCredentials: jest.fn().mockReturnValue(undefined),
+          },
         },
       ],
     }).compile();

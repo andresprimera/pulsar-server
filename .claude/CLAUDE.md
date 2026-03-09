@@ -91,6 +91,29 @@ Relative parent imports across layers are forbidden.
 
 Transport is pure I/O.
 
+## 2.1 Outbound Messaging Gateway
+
+The transport layer contains a centralized outbound dispatch subsystem:
+
+```
+MessagingGatewayService → ChannelRouter → ChannelAdapter → ProviderRouter → ProviderAdapter
+```
+
+-   **`ChannelAdapter`** (`channels/channel-adapter.interface.ts`):
+    Interface every channel implements (`channel` + `sendMessage`).
+-   **`@ChannelAdapterProvider()`** (`channels/channel-adapter.decorator.ts`):
+    Decorator marking a class for automatic discovery by `ChannelRouter`.
+-   **`ChannelRouter`** (`channels/channel-router.ts`):
+    Auto-discovers adapters via `DiscoveryService` + `OnModuleInit`.
+-   **`MessagingGatewayService`** (`channels/gateway/messaging-gateway.service.ts`):
+    Single outbound entry point. Routing only --- no business logic.
+-   **`MessagingGatewayModule`** (`channels/gateway/messaging-gateway.module.ts`):
+    Imports `DiscoveryModule` + channel modules. Exports `MessagingGatewayService`.
+-   Gateway MUST NOT import `@agent/`, `@domain/`, or `@persistence/`.
+-   Adding a new channel: (1) implement `ChannelAdapter`,
+    (2) decorate with `@ChannelAdapterProvider()`,
+    (3) import channel module in `MessagingGatewayModule`.
+
 ------------------------------------------------------------------------
 
 # 3. Coordination Layer (`orchestrator/`)

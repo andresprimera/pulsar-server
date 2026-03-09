@@ -260,6 +260,7 @@ export class SeederService implements OnApplicationBootstrap {
             provider: provider,
             status: channelSeed.status || 'active',
             credentials: channelSeed.credentials,
+            routingIdentifier: channelSeed.routingIdentifier,
             llmConfig: channelSeed.llmConfig,
           });
         }
@@ -338,13 +339,34 @@ export class SeederService implements OnApplicationBootstrap {
                   channelSeed.provider ||
                   channelInfo.channel.supportedProviders[0];
 
-                // Handle phone number for WhatsApp channels
+                // Routing identifiers: from credentials or routingIdentifier by channel type
                 let phoneNumberId: string | undefined;
+                let tiktokUserId: string | undefined;
+                let instagramAccountId: string | undefined;
                 if (
                   channelSeed.credentials &&
-                  'phoneNumberId' in channelSeed.credentials
+                  typeof channelSeed.credentials === 'object'
                 ) {
-                  phoneNumberId = channelSeed.credentials.phoneNumberId;
+                  if ('phoneNumberId' in channelSeed.credentials) {
+                    phoneNumberId = channelSeed.credentials.phoneNumberId;
+                  }
+                  if ('tiktokUserId' in channelSeed.credentials) {
+                    tiktokUserId = channelSeed.credentials.tiktokUserId;
+                  }
+                  if ('instagramAccountId' in channelSeed.credentials) {
+                    instagramAccountId =
+                      channelSeed.credentials.instagramAccountId;
+                  }
+                }
+                if (channelSeed.routingIdentifier?.trim()) {
+                  const rid = channelSeed.routingIdentifier.trim();
+                  if (channelInfo.channel.type === 'whatsapp') {
+                    phoneNumberId = phoneNumberId ?? rid;
+                  } else if (channelInfo.channel.type === 'instagram') {
+                    instagramAccountId = instagramAccountId ?? rid;
+                  } else if (channelInfo.channel.type === 'tiktok') {
+                    tiktokUserId = tiktokUserId ?? rid;
+                  }
                 }
 
                 if (phoneNumberId) {
@@ -378,30 +400,18 @@ export class SeederService implements OnApplicationBootstrap {
                   }
                 }
 
-                // Handle tiktokUserId for TikTok channels
-                let tiktokUserId: string | undefined;
-                if (
+                const credentialsToStore =
                   channelSeed.credentials &&
-                  'tiktokUserId' in channelSeed.credentials
-                ) {
-                  tiktokUserId = channelSeed.credentials.tiktokUserId;
-                }
-
-                // Handle instagramAccountId for Instagram channels
-                let instagramAccountId: string | undefined;
-                if (
-                  channelSeed.credentials &&
-                  'instagramAccountId' in channelSeed.credentials
-                ) {
-                  instagramAccountId =
-                    channelSeed.credentials.instagramAccountId;
-                }
+                  typeof channelSeed.credentials === 'object' &&
+                  Object.keys(channelSeed.credentials).length > 0
+                    ? encryptRecord(channelSeed.credentials)
+                    : undefined;
 
                 additionalChannels.push({
                   channelId: channelInfo.channel._id as Types.ObjectId,
                   provider: provider.toLowerCase(),
                   status: channelSeed.status || 'active',
-                  credentials: encryptRecord(channelSeed.credentials),
+                  credentials: credentialsToStore,
                   phoneNumberId,
                   tiktokUserId,
                   instagramAccountId,

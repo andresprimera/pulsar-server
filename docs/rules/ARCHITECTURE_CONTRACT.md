@@ -76,6 +76,57 @@ Relative parent imports across layers are forbidden.
 
 Transport is pure I/O.
 
+## 2.1 Outbound Messaging Gateway
+
+The transport layer contains a centralized outbound dispatch subsystem:
+
+```
+MessagingGatewayService
+        ↓
+    ChannelRouter
+        ↓
+    ChannelAdapter (interface)
+        ↓
+    Channel-specific service (e.g. WhatsAppChannelService)
+        ↓
+    ProviderRouter → ProviderAdapter
+```
+
+### Components
+
+-   **`ChannelAdapter`** (`channels/channel-adapter.interface.ts`):
+    Interface every channel must implement. Defines `channel` identifier
+    and `sendMessage(input)` method.
+
+-   **`ChannelAdapterProvider`** (`channels/channel-adapter.decorator.ts`):
+    Decorator that marks a class as a channel adapter. Uses `SetMetadata`
+    to attach `CHANNEL_ADAPTER_METADATA` for automatic discovery.
+
+-   **`ChannelRouter`** (`channels/channel-router.ts`):
+    Registry that maps channel name → `ChannelAdapter`.
+    Uses `DiscoveryService` + `OnModuleInit` to automatically discover
+    all providers decorated with `@ChannelAdapterProvider()`.
+    Throws for unknown channels.
+
+-   **`MessagingGatewayService`** (`channels/gateway/messaging-gateway.service.ts`):
+    Single outbound entry point. Resolves channel via `ChannelRouter`
+    and delegates to the adapter. Contains no business logic.
+
+-   **`MessagingGatewayModule`** (`channels/gateway/messaging-gateway.module.ts`):
+    Imports `DiscoveryModule` and channel modules. Exports `MessagingGatewayService`.
+
+### Gateway Rules
+
+-   Gateway performs **routing only** --- no business logic, no persistence.
+-   Gateway MUST NOT import `@agent/`, `@domain/`, or `@persistence/`.
+-   Channel adapters are **automatically discovered** via the
+    `@ChannelAdapterProvider()` decorator. No manual registration needed.
+-   Adding a new channel requires: (1) implement `ChannelAdapter`,
+    (2) decorate with `@ChannelAdapterProvider()`,
+    (3) import the channel module in `MessagingGatewayModule`.
+-   Provider-level routing remains internal to each channel service
+    (e.g. `WhatsAppProviderRouter`).
+
 ------------------------------------------------------------------------
 
 # 3. Coordination Layer (`orchestrator/`)

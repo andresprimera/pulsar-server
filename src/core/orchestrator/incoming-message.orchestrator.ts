@@ -58,35 +58,29 @@ export class IncomingMessageOrchestrator {
 
     if (routeDecision.kind === 'ambiguous') {
       const fallback = routeDecision.candidates[0];
-      if (!fallback?.channelConfig?.credentials) {
-        this.logger.warn(
-          `[${logPrefix}] Unable to build routing clarification for routeChannelIdentifier=${event.routeChannelIdentifier}: missing credentials.`,
-        );
-        return undefined;
-      }
-
       const prompt = await this.agentContextService.buildAmbiguousPrompt(
         routeDecision.candidates,
       );
+      const fallbackConfig = fallback?.channelConfig;
+      const routeChannelIdentifier =
+        fallbackConfig?.phoneNumberId ??
+        fallbackConfig?.instagramAccountId ??
+        fallbackConfig?.tiktokUserId ??
+        event.routeChannelIdentifier;
       return {
         reply: {
           type: 'text',
           text: prompt,
         },
         channelMeta: {
-          encryptedCredentials: fallback.channelConfig.credentials,
+          encryptedCredentials: fallbackConfig?.credentials ?? undefined,
+          provider: fallbackConfig?.provider,
+          routeChannelIdentifier,
         },
       };
     }
 
     const { clientAgent, channelConfig } = routeDecision.candidate;
-
-    if (!channelConfig.credentials) {
-      this.logger.error(
-        `[${logPrefix}] Credentials missing for routeChannelIdentifier=${event.routeChannelIdentifier}. Possible select('+channels.credentials') omission.`,
-      );
-      return undefined;
-    }
 
     const rawContext = await this.agentContextService.buildContextFromRoute(
       clientAgent,
@@ -169,10 +163,17 @@ export class IncomingMessageOrchestrator {
       return output;
     }
 
+    const routeChannelIdentifier =
+      channelConfig.phoneNumberId ??
+      channelConfig.instagramAccountId ??
+      channelConfig.tiktokUserId ??
+      event.routeChannelIdentifier;
     return {
       ...output,
       channelMeta: {
-        encryptedCredentials: channelConfig.credentials,
+        encryptedCredentials: channelConfig.credentials ?? undefined,
+        provider: channelConfig.provider,
+        routeChannelIdentifier,
       },
     };
   }

@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException } from '@nestjs/common';
+import { ChannelEnvService } from '@channels/config/channel-env.service';
 import { InstagramService } from './instagram.service';
 import { IncomingMessageOrchestrator } from '@orchestrator/incoming-message.orchestrator';
 import { encrypt } from '@shared/crypto.util';
@@ -26,6 +27,12 @@ describe('InstagramService', () => {
         {
           provide: IncomingMessageOrchestrator,
           useValue: { handle: jest.fn() },
+        },
+        {
+          provide: ChannelEnvService,
+          useValue: {
+            getInstagramCredentials: jest.fn().mockReturnValue(undefined),
+          },
         },
       ],
     }).compile();

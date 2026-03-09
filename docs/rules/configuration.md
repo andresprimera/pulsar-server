@@ -14,6 +14,10 @@ ARCHITECTURE_CONTRACT.md has higher priority.
 - Persistence module is global and registered once.
 - Feature modules must not duplicate persistence imports.
 - Orchestrator coordinates cross-layer interactions.
+- `MessagingGatewayModule` imports `DiscoveryModule` and channel modules, exports `MessagingGatewayService`.
+- Channel modules that participate in outbound messaging must export their service (e.g. `WhatsappModule` exports `WhatsAppChannelService`).
+- Channel adapters are **automatically discovered** via the `@ChannelAdapterProvider()` decorator. No manual registration in the gateway module is needed.
+- New channel modules must be imported in `MessagingGatewayModule` so their providers are visible to `DiscoveryService`.
 
 ## Event Lifecycle Integrity
 

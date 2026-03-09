@@ -128,6 +128,7 @@ describe('IncomingMessageOrchestrator', () => {
           channelId: '507f1f77bcf86cd799439014',
           status: 'active',
           provider: 'meta',
+          phoneNumberId: 'phone123',
           credentials: {
             phoneNumberId: 'phone123',
             accessToken: 'sk-wa-token',
@@ -241,6 +242,8 @@ describe('IncomingMessageOrchestrator', () => {
         reply: { type: 'text', text: 'Hello' },
         channelMeta: {
           encryptedCredentials: mockClientAgent.channels[0].credentials,
+          provider: mockClientAgent.channels[0].provider,
+          routeChannelIdentifier: 'phone123',
         },
       });
       expect(agentService.run).toHaveBeenCalledWith(

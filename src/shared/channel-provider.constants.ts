@@ -8,6 +8,7 @@ export const CHANNEL_PROVIDER_VALUES = [
   'twilio',
   'tiktok',
   'instagram',
+  'dialog360',
 ] as const;
 
 export type ChannelProviderValue = (typeof CHANNEL_PROVIDER_VALUES)[number];

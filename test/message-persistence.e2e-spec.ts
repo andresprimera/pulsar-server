@@ -3,7 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import { AppModule } from '../src/app.module';
 import { Connection, Types } from 'mongoose';
 import { getConnectionToken } from '@nestjs/mongoose';
-import { WhatsappService } from '../src/core/channels/whatsapp/whatsapp.service';
+import { WhatsAppChannelService } from '../src/core/channels/whatsapp/whatsapp-channel.service';
 import { ConfigService } from '@nestjs/config';
 
 // Mock fetch to prevent real HTTP calls
@@ -20,7 +20,7 @@ jest.mock('ai', () => ({
 
 describe('Message Persistence (e2e)', () => {
   let app: INestApplication;
-  let whatsappService: WhatsappService;
+  let whatsappService: WhatsAppChannelService;
   let connection: Connection;
   let configService: ConfigService;
 
@@ -41,7 +41,9 @@ describe('Message Persistence (e2e)', () => {
     app = moduleFixture.createNestApplication();
     await app.init();
 
-    whatsappService = moduleFixture.get<WhatsappService>(WhatsappService);
+    whatsappService = moduleFixture.get<WhatsAppChannelService>(
+      WhatsAppChannelService,
+    );
     connection = moduleFixture.get<Connection>(getConnectionToken());
     configService = moduleFixture.get<ConfigService>(ConfigService);
 
@@ -165,7 +167,7 @@ describe('Message Persistence (e2e)', () => {
       };
 
       // Act
-      await whatsappService.handleIncoming(payload);
+      await whatsappService.handleIncoming(payload, 'meta');
 
       // Wait a bit for async operations
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -223,7 +225,7 @@ describe('Message Persistence (e2e)', () => {
         ],
       };
 
-      await whatsappService.handleIncoming(payload1);
+      await whatsappService.handleIncoming(payload1, 'meta');
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Act - Send second message
@@ -249,7 +251,7 @@ describe('Message Persistence (e2e)', () => {
         ],
       };
 
-      await whatsappService.handleIncoming(payload2);
+      await whatsappService.handleIncoming(payload2, 'meta');
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Assert - Should have 4 messages total (2 user + 2 agent)
@@ -347,7 +349,7 @@ describe('Message Persistence (e2e)', () => {
         ],
       };
 
-      await whatsappService.handleIncoming(payload);
+      await whatsappService.handleIncoming(payload, 'meta');
 
       // Wait for async summarization
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -400,7 +402,7 @@ describe('Message Persistence (e2e)', () => {
         ],
       };
 
-      await whatsappService.handleIncoming(payload);
+      await whatsappService.handleIncoming(payload, 'meta');
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       const contact = await connection
@@ -415,6 +417,10 @@ describe('Message Persistence (e2e)', () => {
     });
 
     it('should reuse existing contact on subsequent messages', async () => {
+      // Use unique message ids so in-memory dedup from other tests doesn't skip these
+      const msgId1 = 'msg-reuse-contact-1';
+      const msgId2 = 'msg-reuse-contact-2';
+
       // First message
       const payload1 = {
         entry: [
@@ -425,7 +431,7 @@ describe('Message Persistence (e2e)', () => {
                   messages: [
                     {
                       from: userPhone,
-                      id: 'msg1',
+                      id: msgId1,
                       type: 'text',
                       text: { body: 'First' },
                     },
@@ -438,12 +444,17 @@ describe('Message Persistence (e2e)', () => {
         ],
       };
 
-      await whatsappService.handleIncoming(payload1);
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await whatsappService.handleIncoming(payload1, 'meta');
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
+      const contactFilter = {
+        clientId: clientIdObj,
+        channelId: channelIdObj,
+        externalId: userPhone.replace(/[^\d]/g, ''),
+      };
       const contactCountAfterFirst = await connection
         .collection('contacts')
-        .countDocuments({ externalId: userPhone.replace(/[^\d]/g, '') });
+        .countDocuments(contactFilter);
 
       // Second message
       const payload2 = {
@@ -455,7 +466,7 @@ describe('Message Persistence (e2e)', () => {
                   messages: [
                     {
                       from: userPhone,
-                      id: 'msg2',
+                      id: msgId2,
                       type: 'text',
                       text: { body: 'Second' },
                     },
@@ -468,12 +479,12 @@ describe('Message Persistence (e2e)', () => {
         ],
       };
 
-      await whatsappService.handleIncoming(payload2);
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await whatsappService.handleIncoming(payload2, 'meta');
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
       const contactCountAfterSecond = await connection
         .collection('contacts')
-        .countDocuments({ externalId: userPhone.replace(/[^\d]/g, '') });
+        .countDocuments(contactFilter);
 
       // Should still be only one contact
       expect(contactCountAfterFirst).toBe(1);

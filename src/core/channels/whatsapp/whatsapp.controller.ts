@@ -4,16 +4,23 @@ import {
   Post,
   Query,
   Body,
+  Param,
   HttpCode,
   Logger,
+  BadRequestException,
 } from '@nestjs/common';
-import { WhatsappService } from './whatsapp.service';
+import { ChannelProvider } from '@domain/channels/channel-provider.enum';
+import { WhatsAppChannelService } from './whatsapp-channel.service';
+import { WhatsAppProviderRouter } from './provider-router';
 
 @Controller('whatsapp')
 export class WhatsappController {
   private readonly logger = new Logger(WhatsappController.name);
 
-  constructor(private readonly whatsappService: WhatsappService) {}
+  constructor(
+    private readonly whatsAppChannelService: WhatsAppChannelService,
+    private readonly providerRouter: WhatsAppProviderRouter,
+  ) {}
 
   @Get('webhook')
   verify(
@@ -21,23 +28,59 @@ export class WhatsappController {
     @Query('hub.verify_token') token: string,
     @Query('hub.challenge') challenge: string,
   ): string {
-    return this.whatsappService.verifyWebhook(mode, token, challenge);
+    return this.whatsAppChannelService.verifyMetaWebhook(
+      mode,
+      token,
+      challenge,
+    );
   }
 
   @Post('webhook')
   @HttpCode(200)
-  handleWebhook(@Body() payload: unknown): string {
-    this.logger.log(
-      `Incoming WhatsApp webhook payload: ${JSON.stringify(payload)}`,
-    );
-    this.whatsappService.handleIncoming(payload).catch((error) => {
+  async handleWebhook(@Body() payload: unknown): Promise<string> {
+    this.logger.log(`Incoming WhatsApp webhook (${ChannelProvider.Meta})`);
+    try {
+      await this.whatsAppChannelService.handleIncoming(
+        payload,
+        ChannelProvider.Meta,
+      );
+    } catch (error) {
       this.logger.error(
-        `Failed to process WhatsApp webhook: ${
+        `Failed to process WhatsApp webhook (${ChannelProvider.Meta}): ${
           error instanceof Error ? error.message : String(error)
         }`,
         error instanceof Error ? error.stack : undefined,
       );
-    });
+    }
+    return 'ok';
+  }
+
+  @Post('webhook/:provider')
+  @HttpCode(200)
+  async handleProviderWebhook(
+    @Body() payload: unknown,
+    @Param('provider') provider: string,
+  ): Promise<string> {
+    if (!this.providerRouter.hasAdapter(provider)) {
+      throw new BadRequestException(
+        `Unsupported WhatsApp provider: ${provider}`,
+      );
+    }
+
+    this.logger.log(`Incoming WhatsApp webhook (${provider})`);
+    try {
+      await this.whatsAppChannelService.handleIncoming(
+        payload,
+        provider as any,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to process WhatsApp webhook (${provider}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
     return 'ok';
   }
 }
