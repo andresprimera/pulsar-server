@@ -1,0 +1,50 @@
+# Channel credential fallback from environment
+
+When a channel config has **no credentials** (or invalid/incomplete credentials) in the DB, the channel layer can use **platform authentication credentials** from the environment as fallback.
+
+**Routing identifiers** (phoneNumberId, instagramAccountId, tiktokUserId) are **never** read from `.env`. They must always be stored per client in the database and determine which client integration handles a message.
+
+## Behavior
+
+- **Routing identifiers** → always from DB (per-client channel config).
+- **Authentication credentials** (accessToken, apiKey) → from DB when present and valid; otherwise from `.env` fallback.
+- **Both credential sources missing** → runtime error with a clear message.
+
+## Environment variables (authentication only)
+
+`.env` provides **only platform-level authentication credentials**, not routing identifiers.
+
+### WhatsApp Meta
+
+| Variable | Description |
+|----------|-------------|
+| `WHATSAPP_META_ACCESS_TOKEN` | Access token (fallback when DB credentials missing) |
+
+### WhatsApp Dialog360
+
+| Variable | Description |
+|----------|-------------|
+| `WHATSAPP_DIALOG360_API_KEY` | API key (fallback when DB credentials missing) |
+
+### Instagram
+
+| Variable | Description |
+|----------|-------------|
+| `INSTAGRAM_ACCESS_TOKEN` | Access token (fallback when DB credentials missing) |
+
+### TikTok
+
+| Variable | Description |
+|----------|-------------|
+| `TIKTOK_ACCESS_TOKEN` | Access token (fallback when DB credentials missing) |
+
+## Startup validation
+
+`ChannelEnvValidator` runs at application startup. If a credential env var is set, it must be valid; otherwise the application fails to start with an explicit error.
+
+## Architecture
+
+- **Routing identifiers** → always from DB (orchestrator passes `routeChannelIdentifier` from channel config to the channel layer).
+- **Credential resolution** → channel layer only; orchestrator does not read `.env`.
+- DB credentials remain encrypted at rest; env credentials are runtime-only and not stored in the DB.
+- Multi-tenant routing is preserved: each client’s channel config stores its own routing IDs in the DB.

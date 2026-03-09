@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
 import { ChannelProvider } from '@domain/channels/channel-provider.enum';
+import { ChannelEnvService } from '@channels/config/channel-env.service';
 import { WhatsAppChannelService } from './whatsapp-channel.service';
 import { WhatsAppProviderRouter } from './provider-router';
 import { IncomingMessageOrchestrator } from '@orchestrator/incoming-message.orchestrator';
@@ -12,6 +13,7 @@ describe('WhatsAppChannelService', () => {
   let service: WhatsAppChannelService;
   let orchestrator: jest.Mocked<IncomingMessageOrchestrator>;
   let providerRouter: jest.Mocked<WhatsAppProviderRouter>;
+  let channelEnvService: jest.Mocked<ChannelEnvService>;
   let mockAdapter: jest.Mocked<WhatsAppProviderAdapter>;
 
   beforeEach(async () => {
@@ -33,12 +35,20 @@ describe('WhatsAppChannelService', () => {
           provide: WhatsAppProviderRouter,
           useValue: { resolve: jest.fn().mockReturnValue(mockAdapter) },
         },
+        {
+          provide: ChannelEnvService,
+          useValue: {
+            getWhatsAppMetaCredentials: jest.fn().mockReturnValue(undefined),
+            getWhatsApp360Credentials: jest.fn().mockReturnValue(undefined),
+          },
+        },
       ],
     }).compile();
 
     service = module.get(WhatsAppChannelService);
     orchestrator = module.get(IncomingMessageOrchestrator);
     providerRouter = module.get(WhatsAppProviderRouter);
+    channelEnvService = module.get(ChannelEnvService);
 
     jest.spyOn(Logger.prototype, 'log').mockImplementation();
     jest.spyOn(Logger.prototype, 'warn').mockImplementation();
@@ -147,6 +157,7 @@ describe('WhatsAppChannelService', () => {
         channelMeta: {
           encryptedCredentials,
           provider: ChannelProvider.Dialog360,
+          routeChannelIdentifier: 'phone123',
         },
       });
 
@@ -187,12 +198,45 @@ describe('WhatsAppChannelService', () => {
 
       orchestrator.handle.mockResolvedValue({
         reply: { type: 'text', text: 'Echo response' },
-        channelMeta: { encryptedCredentials },
+        channelMeta: {
+          encryptedCredentials,
+          routeChannelIdentifier: 'phone123',
+        },
       });
 
       await expect(
         service.handleIncoming(createPayload(), ChannelProvider.Meta),
       ).resolves.not.toThrow();
+    });
+
+    it('uses env fallback for accessToken when DB credentials missing but routeChannelIdentifier provided', async () => {
+      mockAdapter.parseInbound.mockReturnValue({
+        phoneNumberId: 'phone123',
+        senderId: '1234567890',
+        messageId: 'msg123',
+        text: 'Hello',
+      });
+      channelEnvService.getWhatsAppMetaCredentials.mockReturnValue({
+        accessToken: 'env-token',
+      });
+      orchestrator.handle.mockResolvedValue({
+        reply: { type: 'text', text: 'Hi' },
+        channelMeta: {
+          routeChannelIdentifier: 'phone123',
+          encryptedCredentials: undefined,
+        },
+      });
+
+      await service.handleIncoming(createPayload(), ChannelProvider.Meta);
+
+      expect(mockAdapter.sendMessage).toHaveBeenCalledWith(
+        '1234567890',
+        'Hi',
+        expect.objectContaining({
+          phoneNumberId: 'phone123',
+          accessToken: 'env-token',
+        }),
+      );
     });
 
     it('does not log message content in outbound logs', async () => {
@@ -205,7 +249,10 @@ describe('WhatsAppChannelService', () => {
 
       orchestrator.handle.mockResolvedValue({
         reply: { type: 'text', text: 'Super secret reply' },
-        channelMeta: { encryptedCredentials },
+        channelMeta: {
+          encryptedCredentials,
+          routeChannelIdentifier: 'phone123',
+        },
       });
 
       await service.handleIncoming(createPayload(), ChannelProvider.Meta);

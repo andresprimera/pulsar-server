@@ -29,8 +29,8 @@ export class HireChannelConfig {
   @Prop({ required: true, enum: ['active', 'inactive'], default: 'active' })
   status: 'active' | 'inactive';
 
-  @Prop({ type: Object, required: true, select: false })
-  credentials: Record<string, any>;
+  @Prop({ type: Object, required: false, select: false })
+  credentials?: Record<string, any>;
 
   // Unencrypted routing keys for fast lookup
   @Prop({ type: String, required: false, index: true })

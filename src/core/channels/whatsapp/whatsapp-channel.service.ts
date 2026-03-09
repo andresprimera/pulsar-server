@@ -10,6 +10,7 @@ import {
   SendMessageInput,
 } from '@channels/channel-adapter.interface';
 import { ChannelAdapterProvider } from '@channels/channel-adapter.decorator';
+import { ChannelEnvService } from '@channels/config/channel-env.service';
 import { WhatsAppProviderRouter } from './provider-router';
 import {
   MetaCredentials,
@@ -31,6 +32,7 @@ export class WhatsAppChannelService implements ChannelAdapter {
   constructor(
     private readonly incomingMessageOrchestrator: IncomingMessageOrchestrator,
     private readonly providerRouter: WhatsAppProviderRouter,
+    private readonly channelEnvService: ChannelEnvService,
   ) {
     this.cleanupInterval = setInterval(
       () => this.evictExpiredEntries(),
@@ -57,14 +59,12 @@ export class WhatsAppChannelService implements ChannelAdapter {
     const provider = (input.provider ??
       ChannelProvider.Meta) as ChannelProviderValue;
     const adapter = this.providerRouter.resolve(provider);
-
-    const credentials = this.resolveCredentials(input.credentials, provider);
-    if (!credentials) {
-      throw new Error(
-        `[WhatsApp/${provider}] Unable to resolve credentials for outbound message`,
-      );
-    }
-
+    // Gateway path: no routeChannelIdentifier; phoneNumberId must come from DB credentials.
+    const credentials = this.resolveCredentialsOrThrow(
+      input.credentials,
+      provider,
+      undefined,
+    );
     await adapter.sendMessage(input.to, input.message, credentials);
   }
 
@@ -107,13 +107,19 @@ export class WhatsAppChannelService implements ChannelAdapter {
     const outboundProvider = output.channelMeta?.provider ?? provider;
     const outboundAdapter = this.providerRouter.resolve(outboundProvider);
 
-    const credentials = this.resolveCredentials(
-      output.channelMeta?.encryptedCredentials,
-      outboundProvider,
-    );
-    if (!credentials) {
+    const routeChannelIdentifier = output.channelMeta?.routeChannelIdentifier;
+    let credentials: WhatsAppProviderCredentials;
+    try {
+      credentials = this.resolveCredentialsOrThrow(
+        output.channelMeta?.encryptedCredentials,
+        outboundProvider,
+        routeChannelIdentifier,
+      );
+    } catch (err) {
       this.logger.warn(
-        `[WhatsApp/${outboundProvider}] Missing credentials for phoneNumberId=${parsed.phoneNumberId}`,
+        `[WhatsApp/${outboundProvider}] ${
+          err instanceof Error ? err.message : String(err)
+        }`,
       );
       return;
     }
@@ -154,10 +160,57 @@ export class WhatsAppChannelService implements ChannelAdapter {
     }
   }
 
-  private resolveCredentials(
+  /**
+   * Resolves credentials: routing identifier always from DB (routeChannelIdentifier);
+   * auth (accessToken/apiKey) from DB or env fallback.
+   * When routeChannelIdentifier is undefined (e.g. gateway send), full credentials must come from DB.
+   */
+  private resolveCredentialsOrThrow(
     encryptedCredentials: unknown,
     provider: ChannelProviderValue,
-  ): WhatsAppProviderCredentials | undefined {
+    routeChannelIdentifier: string | undefined,
+  ): WhatsAppProviderCredentials {
+    const decrypted = this.tryDecryptCredentials(encryptedCredentials);
+
+    if (routeChannelIdentifier) {
+      // Inbound reply path: phoneNumberId always from DB (orchestrator passed it).
+      const phoneNumberId = routeChannelIdentifier;
+      if (provider === ChannelProvider.Dialog360) {
+        const apiKey: string | undefined =
+          (decrypted?.apiKey as string) ||
+          (decrypted?.accessToken as string) ||
+          this.channelEnvService.getWhatsApp360Credentials()?.apiKey;
+        if (!apiKey) {
+          throw new Error(
+            `[WhatsApp/${provider}] No credentials: provide apiKey in channel config or set WHATSAPP_DIALOG360_API_KEY in .env.`,
+          );
+        }
+        return { phoneNumberId, apiKey } satisfies Dialog360Credentials;
+      }
+      const accessToken: string | undefined =
+        (decrypted?.accessToken as string) ||
+        this.channelEnvService.getWhatsAppMetaCredentials()?.accessToken;
+      if (!accessToken) {
+        throw new Error(
+          `[WhatsApp/${provider}] No credentials: provide accessToken in channel config or set WHATSAPP_META_ACCESS_TOKEN in .env.`,
+        );
+      }
+      return { phoneNumberId, accessToken } satisfies MetaCredentials;
+    }
+
+    // Gateway path: no route context; phoneNumberId must come from DB credentials.
+    const fromDb = this.tryDbCredentials(encryptedCredentials, provider);
+    if (fromDb) {
+      return fromDb;
+    }
+    throw new Error(
+      `[WhatsApp/${provider}] No credentials: routing identifier and credentials must come from DB when sending via gateway.`,
+    );
+  }
+
+  private tryDecryptCredentials(
+    encryptedCredentials: unknown,
+  ): Record<string, unknown> | undefined {
     if (
       !encryptedCredentials ||
       typeof encryptedCredentials !== 'object' ||
@@ -165,32 +218,40 @@ export class WhatsAppChannelService implements ChannelAdapter {
     ) {
       return undefined;
     }
+    return decryptRecord(encryptedCredentials as Record<string, any>) as Record<
+      string,
+      unknown
+    >;
+  }
 
-    const decrypted = decryptRecord(
-      encryptedCredentials as Record<string, any>,
-    );
-
-    if (!decrypted.phoneNumberId) {
+  private tryDbCredentials(
+    encryptedCredentials: unknown,
+    provider: ChannelProviderValue,
+  ): WhatsAppProviderCredentials | undefined {
+    const decrypted = this.tryDecryptCredentials(encryptedCredentials);
+    if (!decrypted) {
       return undefined;
     }
-
+    const phoneNumberId = decrypted.phoneNumberId;
+    if (!phoneNumberId || typeof phoneNumberId !== 'string') {
+      return undefined;
+    }
     if (provider === ChannelProvider.Dialog360) {
       const apiKey = decrypted.apiKey || decrypted.accessToken;
-      if (!apiKey) {
+      if (!apiKey || typeof apiKey !== 'string') {
         return undefined;
       }
       return {
-        phoneNumberId: decrypted.phoneNumberId,
+        phoneNumberId,
         apiKey,
       } satisfies Dialog360Credentials;
     }
-
-    if (!decrypted.accessToken) {
+    if (!decrypted.accessToken || typeof decrypted.accessToken !== 'string') {
       return undefined;
     }
     return {
-      phoneNumberId: decrypted.phoneNumberId,
-      accessToken: decrypted.accessToken,
+      phoneNumberId,
+      accessToken: decrypted.accessToken as string,
     } satisfies MetaCredentials;
   }
 }

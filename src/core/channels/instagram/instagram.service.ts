@@ -1,6 +1,7 @@
 import { Injectable, ForbiddenException, Logger } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { decryptRecord } from '@shared/crypto.util';
+import { ChannelEnvService } from '@channels/config/channel-env.service';
 import {
   InstagramServerConfig,
   loadInstagramConfig,
@@ -18,6 +19,7 @@ export class InstagramService {
 
   constructor(
     private readonly incomingMessageOrchestrator: IncomingMessageOrchestrator,
+    private readonly channelEnvService: ChannelEnvService,
   ) {
     this.config = loadInstagramConfig();
   }
@@ -168,12 +170,16 @@ export class InstagramService {
           continue;
         }
 
-        const accessToken = this.resolveAccessTokenFromChannelMeta(
-          output.channelMeta?.encryptedCredentials,
-        );
-        if (!accessToken) {
+        let accessToken: string;
+        try {
+          accessToken = this.resolveAccessTokenOrThrow(
+            output.channelMeta?.encryptedCredentials,
+          );
+        } catch (err) {
           this.logger.warn(
-            `[Instagram] Unable to send outbound message for instagramAccountId=${instagramAccountId}: missing credentials.`,
+            `[Instagram] Unable to send outbound for instagramAccountId=${instagramAccountId}: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
           );
           continue;
         }
@@ -188,9 +194,25 @@ export class InstagramService {
     }
   }
 
-  private resolveAccessTokenFromChannelMeta(
-    encryptedCredentials: unknown,
-  ): string | undefined {
+  /**
+   * Resolves access token: use DB when present and valid, else env fallback.
+   * Throws when neither source yields a valid token.
+   */
+  private resolveAccessTokenOrThrow(encryptedCredentials: unknown): string {
+    const fromDb = this.tryDbAccessToken(encryptedCredentials);
+    if (fromDb) {
+      return fromDb;
+    }
+    const fromEnv = this.channelEnvService.getInstagramCredentials();
+    if (fromEnv?.accessToken) {
+      return fromEnv.accessToken;
+    }
+    throw new Error(
+      '[Instagram] No credentials: provide accessToken in channel config or set INSTAGRAM_ACCESS_TOKEN in .env.',
+    );
+  }
+
+  private tryDbAccessToken(encryptedCredentials: unknown): string | undefined {
     if (
       !encryptedCredentials ||
       typeof encryptedCredentials !== 'object' ||
@@ -199,9 +221,10 @@ export class InstagramService {
       return undefined;
     }
 
-    const decryptedCredentials = decryptRecord(
+    const decrypted = decryptRecord(
       encryptedCredentials as Record<string, any>,
     );
-    return decryptedCredentials.accessToken;
+    const token = decrypted?.accessToken;
+    return typeof token === 'string' && token.length > 0 ? token : undefined;
   }
 }

@@ -8,5 +8,7 @@ export interface AgentOutput {
   channelMeta?: {
     encryptedCredentials?: unknown;
     provider?: ChannelProviderValue;
+    /** Routing identifier from DB (phoneNumberId, instagramAccountId, tiktokUserId). Never from .env. */
+    routeChannelIdentifier?: string;
   };
 }

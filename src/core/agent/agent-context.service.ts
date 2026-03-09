@@ -40,6 +40,13 @@ export class AgentContextService {
         : process.env.OPENAI_API_KEY ?? '';
     const apiKey = decrypt(rawApiKey);
 
+    const channelConfigDecrypted =
+      channelConfig.credentials &&
+      typeof channelConfig.credentials === 'object' &&
+      Object.keys(channelConfig.credentials).length > 0
+        ? decryptRecord(channelConfig.credentials)
+        : {};
+
     const rawContext: AgentContext = {
       agentId: clientAgent.agentId,
       agentName: agent.name,
@@ -51,7 +58,7 @@ export class AgentContextService {
         apiKey,
         model: channelConfig.llmConfig.model || 'gpt-4o',
       },
-      channelConfig: decryptRecord(channelConfig.credentials),
+      channelConfig: channelConfigDecrypted,
     };
 
     return rawContext;

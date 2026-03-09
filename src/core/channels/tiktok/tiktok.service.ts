@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { decryptRecord } from '@shared/crypto.util';
+import { ChannelEnvService } from '@channels/config/channel-env.service';
 import {
   buildMessagesUrl,
   loadTikTokConfig,
@@ -16,6 +17,7 @@ export class TiktokService {
 
   constructor(
     private readonly incomingMessageOrchestrator: IncomingMessageOrchestrator,
+    private readonly channelEnvService: ChannelEnvService,
   ) {
     this.config = loadTikTokConfig();
   }
@@ -81,12 +83,16 @@ export class TiktokService {
       return;
     }
 
-    const accessToken = this.resolveAccessTokenFromChannelConfig(
-      output.channelMeta?.encryptedCredentials,
-    );
-    if (!accessToken) {
+    let accessToken: string;
+    try {
+      accessToken = this.resolveAccessTokenOrThrow(
+        output.channelMeta?.encryptedCredentials,
+      );
+    } catch (err) {
       this.logger.warn(
-        `[TikTok] Unable to send outbound message for tiktokUserId=${recipientUserId}: missing credentials.`,
+        `[TikTok] Unable to send outbound for tiktokUserId=${recipientUserId}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
       );
       return;
     }
@@ -110,9 +116,25 @@ export class TiktokService {
     }
   }
 
-  private resolveAccessTokenFromChannelConfig(
-    encryptedCredentials: unknown,
-  ): string | undefined {
+  /**
+   * Resolves access token: use DB when present and valid, else env fallback.
+   * Throws when neither source yields a valid token.
+   */
+  private resolveAccessTokenOrThrow(encryptedCredentials: unknown): string {
+    const fromDb = this.tryDbAccessToken(encryptedCredentials);
+    if (fromDb) {
+      return fromDb;
+    }
+    const fromEnv = this.channelEnvService.getTikTokCredentials();
+    if (fromEnv?.accessToken) {
+      return fromEnv.accessToken;
+    }
+    throw new Error(
+      '[TikTok] No credentials: provide accessToken in channel config or set TIKTOK_ACCESS_TOKEN in .env.',
+    );
+  }
+
+  private tryDbAccessToken(encryptedCredentials: unknown): string | undefined {
     if (
       !encryptedCredentials ||
       typeof encryptedCredentials !== 'object' ||
@@ -121,10 +143,11 @@ export class TiktokService {
       return undefined;
     }
 
-    const decryptedCredentials = decryptRecord(
+    const decrypted = decryptRecord(
       encryptedCredentials as Record<string, any>,
     );
-    return decryptedCredentials.accessToken;
+    const token = decrypted?.accessToken;
+    return typeof token === 'string' && token.length > 0 ? token : undefined;
   }
 
   private async sendMessage(params: {

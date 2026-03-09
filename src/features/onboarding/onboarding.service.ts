@@ -208,13 +208,42 @@ export class OnboardingService {
           channel.monthlyMessageQuota ??
           null;
 
-        // Credentials & Phone Logic
+        // Routing identifiers: from credentials when present, else from routingIdentifier (meaning depends on channel.type)
         let phoneNumberId: string | undefined;
+        let tiktokUserId: string | undefined;
+        let instagramAccountId: string | undefined;
+
         if (
           channelConfig.credentials &&
-          'phoneNumberId' in channelConfig.credentials
+          typeof channelConfig.credentials === 'object'
         ) {
-          phoneNumberId = channelConfig.credentials.phoneNumberId;
+          if ('phoneNumberId' in channelConfig.credentials) {
+            phoneNumberId = channelConfig.credentials.phoneNumberId;
+          }
+          if ('tiktokUserId' in channelConfig.credentials) {
+            tiktokUserId = channelConfig.credentials.tiktokUserId;
+          }
+          if ('instagramAccountId' in channelConfig.credentials) {
+            instagramAccountId = channelConfig.credentials.instagramAccountId;
+          }
+        }
+        if (channelConfig.routingIdentifier?.trim()) {
+          const rid = channelConfig.routingIdentifier.trim();
+          if (channel.type === 'whatsapp') {
+            phoneNumberId = phoneNumberId ?? rid;
+          } else if (channel.type === 'instagram') {
+            instagramAccountId = instagramAccountId ?? rid;
+          } else if (channel.type === 'tiktok') {
+            tiktokUserId = tiktokUserId ?? rid;
+          }
+        }
+
+        const hasRoutingId =
+          phoneNumberId || tiktokUserId || instagramAccountId;
+        if (!hasRoutingId) {
+          throw new BadRequestException(
+            `Channel "${channel.name}" requires either credentials (with the appropriate routing field) or routingIdentifier.`,
+          );
         }
 
         if (phoneNumberId) {
@@ -228,27 +257,18 @@ export class OnboardingService {
           );
         }
 
-        let tiktokUserId: string | undefined;
-        if (
+        const credentialsToStore =
           channelConfig.credentials &&
-          'tiktokUserId' in channelConfig.credentials
-        ) {
-          tiktokUserId = channelConfig.credentials.tiktokUserId;
-        }
-
-        let instagramAccountId: string | undefined;
-        if (
-          channelConfig.credentials &&
-          'instagramAccountId' in channelConfig.credentials
-        ) {
-          instagramAccountId = channelConfig.credentials.instagramAccountId;
-        }
+          typeof channelConfig.credentials === 'object' &&
+          Object.keys(channelConfig.credentials).length > 0
+            ? encryptRecord(channelConfig.credentials)
+            : undefined;
 
         hireChannels.push({
           channelId: channelIdObj,
           provider: normalizedProvider,
           status: 'active',
-          credentials: encryptRecord(channelConfig.credentials),
+          credentials: credentialsToStore,
           phoneNumberId,
           tiktokUserId,
           instagramAccountId,
