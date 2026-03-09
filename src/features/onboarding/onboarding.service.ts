@@ -238,9 +238,13 @@ export class OnboardingService {
           }
         }
 
+        const needsRoutingId =
+          channel.type === 'whatsapp' ||
+          channel.type === 'instagram' ||
+          channel.type === 'tiktok';
         const hasRoutingId =
           phoneNumberId || tiktokUserId || instagramAccountId;
-        if (!hasRoutingId) {
+        if (needsRoutingId && !hasRoutingId) {
           throw new BadRequestException(
             `Channel "${channel.name}" requires either credentials (with the appropriate routing field) or routingIdentifier.`,
           );
