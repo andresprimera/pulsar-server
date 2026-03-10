@@ -12,6 +12,7 @@ describe('FlowIntegrity', () => {
       read('src/core/channels/whatsapp/whatsapp-channel.service.ts'),
       read('src/core/channels/whatsapp/providers/meta.adapter.ts'),
       read('src/core/channels/whatsapp/providers/dialog360.adapter.ts'),
+      read('src/core/channels/whatsapp/providers/twilio.adapter.ts'),
       read('src/core/channels/instagram/instagram.service.ts'),
       read('src/core/channels/tiktok/tiktok.service.ts'),
       read('src/core/channels/gateway/messaging-gateway.service.ts'),

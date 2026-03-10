@@ -14,6 +14,11 @@ export interface WhatsApp360EnvCredentials {
   apiKey: string;
 }
 
+export interface WhatsAppTwilioEnvCredentials {
+  accountSid: string;
+  authToken: string;
+}
+
 export interface InstagramEnvCredentials {
   accessToken: string;
 }
@@ -51,6 +56,18 @@ export class ChannelEnvService {
   }
 
   /**
+   * WhatsApp Twilio: WHATSAPP_TWILIO_ACCOUNT_SID and WHATSAPP_TWILIO_AUTH_TOKEN only (no phoneNumberId from env).
+   */
+  getWhatsAppTwilioCredentials(): WhatsAppTwilioEnvCredentials | undefined {
+    const accountSid = process.env.WHATSAPP_TWILIO_ACCOUNT_SID?.trim();
+    const authToken = process.env.WHATSAPP_TWILIO_AUTH_TOKEN?.trim();
+    if (!accountSid || !authToken) {
+      return undefined;
+    }
+    return { accountSid, authToken };
+  }
+
+  /**
    * Instagram: INSTAGRAM_ACCESS_TOKEN only (no account ID from env).
    */
   getInstagramCredentials(): InstagramEnvCredentials | undefined {
@@ -84,6 +101,16 @@ export class ChannelEnvService {
    */
   hasAnyWhatsApp360Env(): boolean {
     return Boolean(process.env.WHATSAPP_DIALOG360_API_KEY?.trim());
+  }
+
+  /**
+   * Returns true if any env var for WhatsApp Twilio is set.
+   */
+  hasAnyWhatsAppTwilioEnv(): boolean {
+    return (
+      Boolean(process.env.WHATSAPP_TWILIO_ACCOUNT_SID?.trim()) ||
+      Boolean(process.env.WHATSAPP_TWILIO_AUTH_TOKEN?.trim())
+    );
   }
 
   /**

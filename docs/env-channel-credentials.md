@@ -26,6 +26,13 @@ When a channel config has **no credentials** (or invalid/incomplete credentials)
 |----------|-------------|
 | `WHATSAPP_DIALOG360_API_KEY` | API key (fallback when DB credentials missing) |
 
+### WhatsApp Twilio
+
+| Variable | Description |
+|----------|-------------|
+| `WHATSAPP_TWILIO_ACCOUNT_SID` | Twilio account SID (auth only; routing identifier always from DB, never from env) |
+| `WHATSAPP_TWILIO_AUTH_TOKEN` | Twilio auth token (auth only; routing identifier always from DB, never from env) |
+
 ### Instagram
 
 | Variable | Description |

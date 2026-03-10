@@ -40,6 +40,7 @@ describe('WhatsAppChannelService', () => {
           useValue: {
             getWhatsAppMetaCredentials: jest.fn().mockReturnValue(undefined),
             getWhatsApp360Credentials: jest.fn().mockReturnValue(undefined),
+            getWhatsAppTwilioCredentials: jest.fn().mockReturnValue(undefined),
           },
         },
       ],
@@ -207,6 +208,52 @@ describe('WhatsAppChannelService', () => {
       await expect(
         service.handleIncoming(createPayload(), ChannelProvider.Meta),
       ).resolves.not.toThrow();
+    });
+
+    it('sends outbound with Twilio provider using routeChannelIdentifier and env fallback', async () => {
+      const twilioAdapter: jest.Mocked<WhatsAppProviderAdapter> = {
+        provider: ChannelProvider.Twilio,
+        parseInbound: jest.fn().mockReturnValue({
+          phoneNumberId: '+14155238886',
+          senderId: '+15551234567',
+          messageId: 'msg123',
+          text: 'Hello',
+        }),
+        sendMessage: jest.fn().mockResolvedValue(undefined),
+      };
+      providerRouter.resolve.mockReturnValue(twilioAdapter);
+      channelEnvService.getWhatsAppTwilioCredentials.mockReturnValue({
+        accountSid: 'AC123',
+        authToken: 'env-token',
+      });
+      orchestrator.handle.mockResolvedValue({
+        reply: { type: 'text', text: 'Hi' },
+        channelMeta: {
+          routeChannelIdentifier: '+14155238886',
+          encryptedCredentials: undefined,
+          provider: ChannelProvider.Twilio,
+        },
+      });
+
+      await service.handleIncoming(
+        {
+          MessageSid: 'msg123',
+          From: 'whatsapp:+15551234567',
+          To: 'whatsapp:+14155238886',
+          Body: 'Hello',
+        },
+        ChannelProvider.Twilio,
+      );
+
+      expect(twilioAdapter.sendMessage).toHaveBeenCalledWith(
+        '+15551234567',
+        'Hi',
+        expect.objectContaining({
+          phoneNumberId: '+14155238886',
+          accountSid: 'AC123',
+          authToken: 'env-token',
+        }),
+      );
     });
 
     it('uses env fallback for accessToken when DB credentials missing but routeChannelIdentifier provided', async () => {

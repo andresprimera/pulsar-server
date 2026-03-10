@@ -14,6 +14,8 @@ describe('ChannelEnvService', () => {
   afterEach(() => {
     delete process.env.WHATSAPP_META_ACCESS_TOKEN;
     delete process.env.WHATSAPP_DIALOG360_API_KEY;
+    delete process.env.WHATSAPP_TWILIO_ACCOUNT_SID;
+    delete process.env.WHATSAPP_TWILIO_AUTH_TOKEN;
     delete process.env.INSTAGRAM_ACCESS_TOKEN;
     delete process.env.TIKTOK_ACCESS_TOKEN;
   });
@@ -41,6 +43,40 @@ describe('ChannelEnvService', () => {
       expect(service.getWhatsApp360Credentials()).toEqual({
         apiKey: 'key360',
       });
+    });
+  });
+
+  describe('getWhatsAppTwilioCredentials', () => {
+    it('returns undefined when either env var is missing', () => {
+      expect(service.getWhatsAppTwilioCredentials()).toBeUndefined();
+      process.env.WHATSAPP_TWILIO_ACCOUNT_SID = 'AC123';
+      expect(service.getWhatsAppTwilioCredentials()).toBeUndefined();
+      delete process.env.WHATSAPP_TWILIO_ACCOUNT_SID;
+      process.env.WHATSAPP_TWILIO_AUTH_TOKEN = 'token';
+      expect(service.getWhatsAppTwilioCredentials()).toBeUndefined();
+    });
+
+    it('returns accountSid and authToken when both set (no phoneNumberId from env)', () => {
+      process.env.WHATSAPP_TWILIO_ACCOUNT_SID = 'AC123';
+      process.env.WHATSAPP_TWILIO_AUTH_TOKEN = 'secret';
+      expect(service.getWhatsAppTwilioCredentials()).toEqual({
+        accountSid: 'AC123',
+        authToken: 'secret',
+      });
+    });
+  });
+
+  describe('hasAnyWhatsAppTwilioEnv', () => {
+    it('returns false when neither env var is set', () => {
+      expect(service.hasAnyWhatsAppTwilioEnv()).toBe(false);
+    });
+
+    it('returns true when either env var is set', () => {
+      process.env.WHATSAPP_TWILIO_ACCOUNT_SID = 'AC123';
+      expect(service.hasAnyWhatsAppTwilioEnv()).toBe(true);
+      delete process.env.WHATSAPP_TWILIO_ACCOUNT_SID;
+      process.env.WHATSAPP_TWILIO_AUTH_TOKEN = 'x';
+      expect(service.hasAnyWhatsAppTwilioEnv()).toBe(true);
     });
   });
 

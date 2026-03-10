@@ -24,9 +24,11 @@ describe('WhatsappController', () => {
           provide: WhatsAppProviderRouter,
           useValue: {
             hasAdapter: jest.fn((p: string) =>
-              [ChannelProvider.Meta, ChannelProvider.Dialog360].includes(
-                p as ChannelProvider,
-              ),
+              [
+                ChannelProvider.Meta,
+                ChannelProvider.Dialog360,
+                ChannelProvider.Twilio,
+              ].includes(p as ChannelProvider),
             ),
           },
         },

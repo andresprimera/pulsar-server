@@ -3,16 +3,23 @@ import { ChannelProvider } from '@domain/channels/channel-provider.enum';
 import { WhatsAppProviderRouter } from './provider-router';
 import { MetaWhatsAppAdapter } from './providers/meta.adapter';
 import { Dialog360WhatsAppAdapter } from './providers/dialog360.adapter';
+import { TwilioWhatsAppAdapter } from './providers/twilio.adapter';
 
 describe('WhatsAppProviderRouter', () => {
   let router: WhatsAppProviderRouter;
   let metaAdapter: MetaWhatsAppAdapter;
   let dialog360Adapter: Dialog360WhatsAppAdapter;
+  let twilioAdapter: TwilioWhatsAppAdapter;
 
   beforeEach(() => {
     metaAdapter = new MetaWhatsAppAdapter();
     dialog360Adapter = new Dialog360WhatsAppAdapter();
-    router = new WhatsAppProviderRouter(metaAdapter, dialog360Adapter);
+    twilioAdapter = new TwilioWhatsAppAdapter();
+    router = new WhatsAppProviderRouter(
+      metaAdapter,
+      dialog360Adapter,
+      twilioAdapter,
+    );
     jest.spyOn(Logger.prototype, 'warn').mockImplementation();
   });
 
@@ -27,6 +34,10 @@ describe('WhatsAppProviderRouter', () => {
 
     it('returns 360dialog adapter for ChannelProvider.Dialog360', () => {
       expect(router.resolve(ChannelProvider.Dialog360)).toBe(dialog360Adapter);
+    });
+
+    it('returns Twilio adapter for ChannelProvider.Twilio', () => {
+      expect(router.resolve(ChannelProvider.Twilio)).toBe(twilioAdapter);
     });
 
     it('defaults to Meta when provider is undefined', () => {
@@ -49,9 +60,13 @@ describe('WhatsAppProviderRouter', () => {
       expect(router.hasAdapter(ChannelProvider.Dialog360)).toBe(true);
     });
 
+    it('returns true for Twilio', () => {
+      expect(router.hasAdapter(ChannelProvider.Twilio)).toBe(true);
+      expect(router.hasAdapter('twilio')).toBe(true);
+    });
+
     it('returns false for unregistered providers', () => {
       expect(router.hasAdapter('unknown')).toBe(false);
-      expect(router.hasAdapter('twilio')).toBe(false);
     });
   });
 });

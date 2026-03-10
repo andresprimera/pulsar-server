@@ -29,8 +29,9 @@
     "test:architecture": "jest --config ./test/jest-architecture.json",
     "check:cycles": "madge --circular src --extensions ts --ts-config ./tsconfig.json",
     "review:architecture": "git diff main...HEAD | claude --agent architecture-steward -p 'Review the following git diff for architectural compliance. Output your full review with a Final Verdict.'",
-    "dump:staged": "echo '# Staged Changes\n' > staged-changes.md && echo '```diff' >> staged-changes.md && git diff --cached >> staged-changes.md && echo '```' >> staged-changes.md",
-    "dump:src": "node scripts/dump-src.mjs"
+    "dump:staged": "node scripts/dump-staged.mjs",
+    "dump:unstaged": "node scripts/dump-unstaged.mjs",
+    "dump:project": "node scripts/dump-project.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.34",
