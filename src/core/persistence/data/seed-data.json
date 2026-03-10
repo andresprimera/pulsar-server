@@ -134,6 +134,9 @@
               "channelName": "WhatsApp",
               "provider": "dialog360",
               "status": "active",
+              "credentials": {
+                "phoneNumberId": "573332809804"
+              },
               "llmConfig": {
                 "provider": "openai",
                 "apiKey": "__REPLACE_ME_API_KEY__",
@@ -162,12 +165,10 @@
           "channels": [
             {
               "channelName": "WhatsApp",
-              "provider": "meta",
+              "provider": "dialog360",
               "status": "active",
               "credentials": {
-                "phoneNumberId": "573332809804",
-                "accessToken": "__REPLACE_ME_ACCESS_TOKEN__",
-                "webhookVerifyToken": "__REPLACE_ME_VERIFY_TOKEN__"
+                "phoneNumberId": "573332809804"
               },
               "llmConfig": {
                 "provider": "openai",

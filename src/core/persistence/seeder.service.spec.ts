@@ -549,7 +549,7 @@ describe('SeederService', () => {
         expect(mockClientPhoneRepository.resolveOrCreate).toHaveBeenCalledWith(
           '507f1f77bcf86cd799439011',
           expectedPhoneNumberId,
-          { provider: 'meta' },
+          { provider: 'dialog360' },
         );
       } finally {
         (SEED_DATA as any).users = originalUsers;
