@@ -134,10 +134,6 @@
               "channelName": "WhatsApp",
               "provider": "dialog360",
               "status": "active",
-              "credentials": {
-                "phoneNumberId": "573332809804",
-                "apiKey": "__REPLACE_ME_D360_API_KEY__"
-              },
               "llmConfig": {
                 "provider": "openai",
                 "apiKey": "__REPLACE_ME_API_KEY__",

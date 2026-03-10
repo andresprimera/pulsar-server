@@ -428,9 +428,10 @@ describe('SeederService', () => {
               channelId: 'wa-channel-id',
               provider: 'meta',
               credentials: expect.objectContaining({
-                phoneNumberId:
-                  SEED_DATA.users[0].agentHirings[0].channels[0].credentials
-                    .phoneNumberId,
+                phoneNumberId: (
+                  SEED_DATA.users[0].agentHirings[0].channels[0]
+                    .credentials as { phoneNumberId: string }
+                ).phoneNumberId,
               }),
             }),
             expect.objectContaining({
