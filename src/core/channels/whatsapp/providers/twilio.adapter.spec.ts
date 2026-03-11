@@ -15,6 +15,7 @@ describe('TwilioWhatsAppAdapter', () => {
 
   afterEach(() => {
     fetchSpy.mockRestore();
+    delete process.env.WHATSAPP_TWILIO_API_BASE_URL;
   });
 
   it('has provider set to ChannelProvider.Twilio', () => {
@@ -136,6 +137,23 @@ describe('TwilioWhatsAppAdapter', () => {
       const params = new URLSearchParams(body as string);
       expect(params.get('From')).toBe('whatsapp:+14155238886');
       expect(params.get('To')).toBe('whatsapp:+15559999999');
+    });
+
+    it('uses WHATSAPP_TWILIO_API_BASE_URL from env when set', async () => {
+      process.env.WHATSAPP_TWILIO_API_BASE_URL =
+        'https://api.custom-twilio.example.com/2010-04-01';
+      const adapterWithCustomUrl = new TwilioWhatsAppAdapter();
+
+      await adapterWithCustomUrl.sendMessage('+15559999999', 'Hi', {
+        phoneNumberId: '+14155238886',
+        accountSid: 'AC123',
+        authToken: 'token',
+      });
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'https://api.custom-twilio.example.com/2010-04-01/Accounts/AC123/Messages.json',
+        expect.any(Object),
+      );
     });
 
     it('throws on non-ok response', async () => {

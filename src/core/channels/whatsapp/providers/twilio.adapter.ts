@@ -10,7 +10,9 @@ import {
   stripWhatsAppPrefix,
 } from '@channels/whatsapp/utils/whatsapp-address.util';
 
-const TWILIO_MESSAGES_URL = 'https://api.twilio.com/2010-04-01';
+interface TwilioConfig {
+  apiBaseUrl: string;
+}
 
 interface TwilioWebhookPayload {
   MessageSid?: string;
@@ -34,6 +36,15 @@ function isTwilioPayload(payload: unknown): payload is TwilioWebhookPayload {
 export class TwilioWhatsAppAdapter implements WhatsAppProviderAdapter {
   readonly provider = ChannelProvider.Twilio;
   private readonly logger = new Logger(TwilioWhatsAppAdapter.name);
+  private readonly config: TwilioConfig;
+
+  constructor() {
+    this.config = {
+      apiBaseUrl:
+        process.env.WHATSAPP_TWILIO_API_BASE_URL ||
+        'https://api.twilio.com/2010-04-01',
+    };
+  }
 
   parseInbound(payload: unknown): ParsedWhatsAppInbound | undefined {
     if (!isTwilioPayload(payload)) {
@@ -79,7 +90,7 @@ export class TwilioWhatsAppAdapter implements WhatsAppProviderAdapter {
     text: string,
     credentials: TwilioCredentials,
   ): Promise<void> {
-    const url = `${TWILIO_MESSAGES_URL}/Accounts/${credentials.accountSid}/Messages.json`;
+    const url = `${this.config.apiBaseUrl}/Accounts/${credentials.accountSid}/Messages.json`;
     const from = ensureWhatsAppPrefix(credentials.phoneNumberId);
     const toAddress = ensureWhatsAppPrefix(to);
 
