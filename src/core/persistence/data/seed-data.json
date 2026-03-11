@@ -132,10 +132,12 @@
           "channels": [
             {
               "channelName": "WhatsApp",
-              "provider": "dialog360",
+              "provider": "twilio",
               "status": "active",
               "credentials": {
-                "phoneNumberId": "573332809804"
+                "phoneNumberId": "573332809804",
+                "accountSid": "__REPLACE_ME_TWILIO_ACCOUNT_SID__",
+                "authToken": "__REPLACE_ME_TWILIO_AUTH_TOKEN__"
               },
               "llmConfig": {
                 "provider": "openai",
@@ -165,10 +167,12 @@
           "channels": [
             {
               "channelName": "WhatsApp",
-              "provider": "dialog360",
+              "provider": "twilio",
               "status": "active",
               "credentials": {
-                "phoneNumberId": "573332809804"
+                "phoneNumberId": "573332809804",
+                "accountSid": "__REPLACE_ME_TWILIO_ACCOUNT_SID__",
+                "authToken": "__REPLACE_ME_TWILIO_AUTH_TOKEN__"
               },
               "llmConfig": {
                 "provider": "openai",

@@ -17,6 +17,8 @@ describe('ChannelEnvValidator', () => {
             getWhatsAppMetaCredentials: jest.fn(),
             hasAnyWhatsApp360Env: jest.fn(),
             getWhatsApp360Credentials: jest.fn(),
+            hasAnyWhatsAppTwilioEnv: jest.fn(),
+            getWhatsAppTwilioCredentials: jest.fn(),
             hasAnyInstagramEnv: jest.fn(),
             getInstagramCredentials: jest.fn(),
             hasAnyTikTokEnv: jest.fn(),
@@ -32,6 +34,9 @@ describe('ChannelEnvValidator', () => {
   it('does not throw when no env is set', () => {
     jest.mocked(channelEnvService.hasAnyWhatsAppMetaEnv).mockReturnValue(false);
     jest.mocked(channelEnvService.hasAnyWhatsApp360Env).mockReturnValue(false);
+    jest
+      .mocked(channelEnvService.hasAnyWhatsAppTwilioEnv)
+      .mockReturnValue(false);
     jest.mocked(channelEnvService.hasAnyInstagramEnv).mockReturnValue(false);
     jest.mocked(channelEnvService.hasAnyTikTokEnv).mockReturnValue(false);
     expect(() => validator.onModuleInit()).not.toThrow();
@@ -43,10 +48,29 @@ describe('ChannelEnvValidator', () => {
       .mocked(channelEnvService.getWhatsAppMetaCredentials)
       .mockReturnValue(undefined);
     jest.mocked(channelEnvService.hasAnyWhatsApp360Env).mockReturnValue(false);
+    jest
+      .mocked(channelEnvService.hasAnyWhatsAppTwilioEnv)
+      .mockReturnValue(false);
     jest.mocked(channelEnvService.hasAnyInstagramEnv).mockReturnValue(false);
     jest.mocked(channelEnvService.hasAnyTikTokEnv).mockReturnValue(false);
     expect(() => validator.onModuleInit()).toThrow(
       /WHATSAPP_META_ACCESS_TOKEN/,
+    );
+  });
+
+  it('throws when WhatsApp Twilio env is set but credentials invalid', () => {
+    jest.mocked(channelEnvService.hasAnyWhatsAppMetaEnv).mockReturnValue(false);
+    jest.mocked(channelEnvService.hasAnyWhatsApp360Env).mockReturnValue(false);
+    jest
+      .mocked(channelEnvService.hasAnyWhatsAppTwilioEnv)
+      .mockReturnValue(true);
+    jest
+      .mocked(channelEnvService.getWhatsAppTwilioCredentials)
+      .mockReturnValue(undefined);
+    jest.mocked(channelEnvService.hasAnyInstagramEnv).mockReturnValue(false);
+    jest.mocked(channelEnvService.hasAnyTikTokEnv).mockReturnValue(false);
+    expect(() => validator.onModuleInit()).toThrow(
+      /WHATSAPP_TWILIO_ACCOUNT_SID/,
     );
   });
 
@@ -56,6 +80,26 @@ describe('ChannelEnvValidator', () => {
       accessToken: 't',
     });
     jest.mocked(channelEnvService.hasAnyWhatsApp360Env).mockReturnValue(false);
+    jest
+      .mocked(channelEnvService.hasAnyWhatsAppTwilioEnv)
+      .mockReturnValue(false);
+    jest.mocked(channelEnvService.hasAnyInstagramEnv).mockReturnValue(false);
+    jest.mocked(channelEnvService.hasAnyTikTokEnv).mockReturnValue(false);
+    expect(() => validator.onModuleInit()).not.toThrow();
+  });
+
+  it('does not throw when WhatsApp Twilio env is set and valid', () => {
+    jest.mocked(channelEnvService.hasAnyWhatsAppMetaEnv).mockReturnValue(false);
+    jest.mocked(channelEnvService.hasAnyWhatsApp360Env).mockReturnValue(false);
+    jest
+      .mocked(channelEnvService.hasAnyWhatsAppTwilioEnv)
+      .mockReturnValue(true);
+    jest
+      .mocked(channelEnvService.getWhatsAppTwilioCredentials)
+      .mockReturnValue({
+        accountSid: 'AC123',
+        authToken: 'token',
+      });
     jest.mocked(channelEnvService.hasAnyInstagramEnv).mockReturnValue(false);
     jest.mocked(channelEnvService.hasAnyTikTokEnv).mockReturnValue(false);
     expect(() => validator.onModuleInit()).not.toThrow();

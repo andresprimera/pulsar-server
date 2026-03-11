@@ -17,9 +17,16 @@ export interface Dialog360Credentials {
   apiKey: string;
 }
 
+export interface TwilioCredentials {
+  phoneNumberId: string;
+  accountSid: string;
+  authToken: string;
+}
+
 export type WhatsAppProviderCredentials =
   | MetaCredentials
-  | Dialog360Credentials;
+  | Dialog360Credentials
+  | TwilioCredentials;
 
 export interface WhatsAppProviderAdapter {
   readonly provider: ChannelProvider;

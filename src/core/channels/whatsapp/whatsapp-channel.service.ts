@@ -15,6 +15,7 @@ import { WhatsAppProviderRouter } from './provider-router';
 import {
   MetaCredentials,
   Dialog360Credentials,
+  TwilioCredentials,
   WhatsAppProviderCredentials,
 } from './providers/whatsapp-provider.interface';
 
@@ -187,6 +188,23 @@ export class WhatsAppChannelService implements ChannelAdapter {
         }
         return { phoneNumberId, apiKey } satisfies Dialog360Credentials;
       }
+      if (provider === ChannelProvider.Twilio) {
+        const twilioEnv = this.channelEnvService.getWhatsAppTwilioCredentials();
+        const accountSid: string | undefined =
+          (decrypted?.accountSid as string) || twilioEnv?.accountSid;
+        const authToken: string | undefined =
+          (decrypted?.authToken as string) || twilioEnv?.authToken;
+        if (!accountSid || !authToken) {
+          throw new Error(
+            `[WhatsApp/${provider}] No credentials: provide accountSid and authToken in channel config or set WHATSAPP_TWILIO_ACCOUNT_SID and WHATSAPP_TWILIO_AUTH_TOKEN in .env.`,
+          );
+        }
+        return {
+          phoneNumberId,
+          accountSid,
+          authToken,
+        } satisfies TwilioCredentials;
+      }
       const accessToken: string | undefined =
         (decrypted?.accessToken as string) ||
         this.channelEnvService.getWhatsAppMetaCredentials()?.accessToken;
@@ -245,6 +263,23 @@ export class WhatsAppChannelService implements ChannelAdapter {
         phoneNumberId,
         apiKey,
       } satisfies Dialog360Credentials;
+    }
+    if (provider === ChannelProvider.Twilio) {
+      const accountSid = decrypted.accountSid;
+      const authToken = decrypted.authToken;
+      if (
+        !accountSid ||
+        typeof accountSid !== 'string' ||
+        !authToken ||
+        typeof authToken !== 'string'
+      ) {
+        return undefined;
+      }
+      return {
+        phoneNumberId,
+        accountSid,
+        authToken,
+      } satisfies TwilioCredentials;
     }
     if (!decrypted.accessToken || typeof decrypted.accessToken !== 'string') {
       return undefined;

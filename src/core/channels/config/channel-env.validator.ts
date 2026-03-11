@@ -33,6 +33,15 @@ export class ChannelEnvValidator implements OnModuleInit {
       }
     }
 
+    if (this.channelEnvService.hasAnyWhatsAppTwilioEnv()) {
+      const creds = this.channelEnvService.getWhatsAppTwilioCredentials();
+      if (!creds) {
+        throw new Error(
+          'Channel env configuration error: Set WHATSAPP_TWILIO_ACCOUNT_SID and WHATSAPP_TWILIO_AUTH_TOKEN in .env, or leave both unset.',
+        );
+      }
+    }
+
     if (this.channelEnvService.hasAnyInstagramEnv()) {
       const creds = this.channelEnvService.getInstagramCredentials();
       if (!creds) {

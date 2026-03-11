@@ -5,6 +5,7 @@ import { WhatsAppChannelService } from './whatsapp-channel.service';
 import { WhatsAppProviderRouter } from './provider-router';
 import { MetaWhatsAppAdapter } from './providers/meta.adapter';
 import { Dialog360WhatsAppAdapter } from './providers/dialog360.adapter';
+import { TwilioWhatsAppAdapter } from './providers/twilio.adapter';
 
 @Module({
   imports: [OrchestratorModule],
@@ -12,6 +13,7 @@ import { Dialog360WhatsAppAdapter } from './providers/dialog360.adapter';
   providers: [
     MetaWhatsAppAdapter,
     Dialog360WhatsAppAdapter,
+    TwilioWhatsAppAdapter,
     WhatsAppProviderRouter,
     WhatsAppChannelService,
   ],

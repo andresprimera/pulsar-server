@@ -4,6 +4,7 @@ import { ChannelProviderValue } from '@shared/channel-provider.constants';
 import { WhatsAppProviderAdapter } from './providers/whatsapp-provider.interface';
 import { MetaWhatsAppAdapter } from './providers/meta.adapter';
 import { Dialog360WhatsAppAdapter } from './providers/dialog360.adapter';
+import { TwilioWhatsAppAdapter } from './providers/twilio.adapter';
 
 @Injectable()
 export class WhatsAppProviderRouter {
@@ -13,10 +14,12 @@ export class WhatsAppProviderRouter {
   constructor(
     private readonly metaAdapter: MetaWhatsAppAdapter,
     private readonly dialog360Adapter: Dialog360WhatsAppAdapter,
+    private readonly twilioAdapter: TwilioWhatsAppAdapter,
   ) {
     this.adapters = new Map<string, WhatsAppProviderAdapter>([
       [ChannelProvider.Meta, this.metaAdapter],
       [ChannelProvider.Dialog360, this.dialog360Adapter],
+      [ChannelProvider.Twilio, this.twilioAdapter],
     ]);
   }
 
