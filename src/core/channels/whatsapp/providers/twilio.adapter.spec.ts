@@ -95,6 +95,13 @@ describe('TwilioWhatsAppAdapter', () => {
       expect(result?.phoneNumberId).toBe('+14155238886');
     });
 
+    it('normalizes phoneNumberId to E.164 when To has no leading + (so routing matches DB)', () => {
+      const result = adapter.parseInbound(
+        createPayload({ To: 'whatsapp:14155238886' }),
+      );
+      expect(result?.phoneNumberId).toBe('+14155238886');
+    });
+
     it('normalizes senderId to E.164 (strips whatsapp: prefix from From)', () => {
       const result = adapter.parseInbound(createPayload());
       expect(result?.senderId).toBe('+15551234567');
@@ -114,13 +121,18 @@ describe('TwilioWhatsAppAdapter', () => {
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
-            'Content-Type': 'application/x-www-form-urlencoded',
             Authorization: expect.stringMatching(/^Basic /),
           }),
         }),
       );
-      const body = fetchSpy.mock.calls[0][1].body;
-      const params = new URLSearchParams(body as string);
+      const rawBody = fetchSpy.mock.calls[0][1].body;
+      const bodyStr =
+        rawBody instanceof URLSearchParams
+          ? rawBody.toString()
+          : typeof rawBody === 'string'
+          ? rawBody
+          : '';
+      const params = new URLSearchParams(bodyStr);
       expect(params.get('From')).toBe('whatsapp:+14155238886');
       expect(params.get('To')).toBe('whatsapp:+15559999999');
       expect(params.get('Body')).toBe('Hi');
@@ -133,8 +145,14 @@ describe('TwilioWhatsAppAdapter', () => {
         authToken: 'token',
       });
 
-      const body = fetchSpy.mock.calls[0][1].body;
-      const params = new URLSearchParams(body as string);
+      const rawBody = fetchSpy.mock.calls[0][1].body;
+      const bodyStr =
+        rawBody instanceof URLSearchParams
+          ? rawBody.toString()
+          : typeof rawBody === 'string'
+          ? rawBody
+          : '';
+      const params = new URLSearchParams(bodyStr);
       expect(params.get('From')).toBe('whatsapp:+14155238886');
       expect(params.get('To')).toBe('whatsapp:+15559999999');
     });

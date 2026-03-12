@@ -135,9 +135,7 @@
               "provider": "twilio",
               "status": "active",
               "credentials": {
-                "phoneNumberId": "573332809804",
-                "accountSid": "__REPLACE_ME_TWILIO_ACCOUNT_SID__",
-                "authToken": "__REPLACE_ME_TWILIO_AUTH_TOKEN__"
+                "phoneNumberId": "+14155238886"
               },
               "llmConfig": {
                 "provider": "openai",
@@ -165,21 +163,6 @@
           "agentName": "Lead Qualifier & Sales Agent",
           "price": 100,
           "channels": [
-            {
-              "channelName": "WhatsApp",
-              "provider": "twilio",
-              "status": "active",
-              "credentials": {
-                "phoneNumberId": "573332809804",
-                "accountSid": "__REPLACE_ME_TWILIO_ACCOUNT_SID__",
-                "authToken": "__REPLACE_ME_TWILIO_AUTH_TOKEN__"
-              },
-              "llmConfig": {
-                "provider": "openai",
-                "apiKey": "__REPLACE_ME_API_KEY__",
-                "model": "gpt-4o"
-              }
-            },
             {
               "channelName": "TikTok",
               "provider": "tiktok",

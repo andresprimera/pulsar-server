@@ -7,6 +7,7 @@ import {
 } from './whatsapp-provider.interface';
 import {
   ensureWhatsAppPrefix,
+  normalizeToE164,
   stripWhatsAppPrefix,
 } from '@channels/whatsapp/utils/whatsapp-address.util';
 
@@ -74,12 +75,12 @@ export class TwilioWhatsAppAdapter implements WhatsAppProviderAdapter {
       return undefined;
     }
 
-    const phoneNumberId = stripWhatsAppPrefix(to);
+    const phoneNumberId = normalizeToE164(stripWhatsAppPrefix(to));
     const text = String(body).trim();
 
     return {
       phoneNumberId,
-      senderId: stripWhatsAppPrefix(from),
+      senderId: normalizeToE164(stripWhatsAppPrefix(from)),
       messageId: messageSid,
       text,
     };
@@ -94,30 +95,34 @@ export class TwilioWhatsAppAdapter implements WhatsAppProviderAdapter {
     const from = ensureWhatsAppPrefix(credentials.phoneNumberId);
     const toAddress = ensureWhatsAppPrefix(to);
 
-    const params = new URLSearchParams({
-      From: from,
-      To: toAddress,
-      Body: text,
-    });
+    const params = new URLSearchParams();
+    params.append('From', from);
+    params.append('To', toAddress);
+    params.append('Body', text);
 
-    this.logger.log(
-      `Sending message phoneNumberId=${credentials.phoneNumberId} to=${to}`,
-    );
+    this.logger.log(`From=${from}`);
+    this.logger.log(`To=${toAddress}`);
+    this.logger.log(`Body=${text}`);
+    this.logger.log(`Encoded form=${params.toString()}`);
 
     const basicAuth = Buffer.from(
       `${credentials.accountSid}:${credentials.authToken}`,
       'utf8',
     ).toString('base64');
 
+    this.logger.log(`Twilio Account SID: ${credentials.accountSid}`);
+    this.logger.log(`Auth token length: ${credentials.authToken?.length}`);
+    this.logger.log(`Basic auth length: ${basicAuth.length}`);
+    this.logger.log(`Request URL: ${url}`);
+
     let response: Response;
     try {
       response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
           Authorization: `Basic ${basicAuth}`,
         },
-        body: params.toString(),
+        body: params,
       });
     } catch (error) {
       const cause = error instanceof Error ? (error as any).cause : undefined;

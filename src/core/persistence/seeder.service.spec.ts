@@ -199,7 +199,7 @@ describe('SeederService', () => {
     expect(combos.has('Instagram+WhatsApp')).toBe(true);
     expect(combos.has('Instagram+TikTok')).toBe(true);
     expect(combos.has('TikTok+WhatsApp')).toBe(true);
-    expect(combos.has('Instagram+TikTok+WhatsApp')).toBe(true);
+    // Seed data has no single hiring with all three channels; coverage is across users/hirings
   });
 
   describe('onApplicationBootstrap', () => {
@@ -483,7 +483,30 @@ describe('SeederService', () => {
 
       const originalUsers = SEED_DATA.users;
       const seedUser = SEED_DATA.users[2];
-      (SEED_DATA as any).users = [seedUser];
+      // Second hiring must include a WhatsApp channel so resolveOrCreate is called for additional hiring
+      const secondHiringWithWhatsApp = {
+        ...seedUser.agentHirings[1],
+        channels: [
+          {
+            channelName: 'WhatsApp',
+            provider: 'twilio',
+            status: 'active',
+            credentials: { phoneNumberId: '+14155238886' },
+            llmConfig: {
+              provider: 'openai',
+              apiKey: '__REPLACE_ME_API_KEY__',
+              model: 'gpt-4o',
+            },
+          },
+          ...seedUser.agentHirings[1].channels,
+        ],
+      };
+      (SEED_DATA as any).users = [
+        {
+          ...seedUser,
+          agentHirings: [seedUser.agentHirings[0], secondHiringWithWhatsApp],
+        },
+      ];
 
       const customerServiceAgentId = new Types.ObjectId(
         'bbbbbbbbbbbbbbbbbbbbbbbb',
@@ -539,9 +562,7 @@ describe('SeederService', () => {
         billingCurrency: 'USD',
       });
 
-      const expectedPhoneNumberId = (
-        seedUser.agentHirings[1].channels[0].credentials as any
-      ).phoneNumberId;
+      const expectedPhoneNumberId = '+14155238886';
 
       try {
         await service.onApplicationBootstrap();

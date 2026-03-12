@@ -19,8 +19,12 @@ export class WhatsappIdentifierExtractor
 
   extractRaw(payload: unknown): string {
     const source = payload as any;
+    // Meta Cloud API: entry[0].changes[0].value.messages[0].from
+    // Twilio webhook: From (form field name is capital F)
+    // Generic: from
     const from =
       source?.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.from ??
+      source?.From ??
       source?.from;
 
     if (typeof from !== 'string') {
