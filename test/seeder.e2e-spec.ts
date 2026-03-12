@@ -490,7 +490,7 @@ describe('Seeder (e2e)', () => {
       expect(flattenedChannelIds).toContain(instagramChannel._id.toString());
     });
 
-    it('should keep distinct WhatsApp phoneNumberId per hired agent for User 3', async () => {
+    it('should set WhatsApp phoneNumberId on hiring that has WhatsApp for User 3', async () => {
       const user = await connection
         .collection('users')
         .findOne({ email: seedUser3.email });
@@ -518,7 +518,7 @@ describe('Seeder (e2e)', () => {
         (channel) => channel.phoneNumberId,
       )?.phoneNumberId;
 
-      // Both hirings use the same phoneNumberId from seed data
+      // First hiring has WhatsApp in seed; second hiring has only TikTok + Instagram
       const expectedPhone = (
         seedUser3.agentHirings[0].channels.find(
           (c) => (c.credentials as any).phoneNumberId,
@@ -526,7 +526,7 @@ describe('Seeder (e2e)', () => {
       )?.phoneNumberId;
 
       expect(hiring1Phone).toBe(expectedPhone);
-      expect(hiring2Phone).toBe(expectedPhone);
+      expect(hiring2Phone).toBeUndefined();
     });
   });
 
