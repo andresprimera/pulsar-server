@@ -16,14 +16,5 @@ export function stripWhatsAppPrefix(value: string): string {
   return trimmed;
 }
 
-/**
- * Ensures a phone number has a leading + for E.164 (so routing lookup matches DB-stored values).
- * Idempotent if already E.164; adds + when value is digits-only.
- */
-export function normalizeToE164(value: string): string {
-  if (!value || typeof value !== 'string') return value;
-  const trimmed = value.trim();
-  if (trimmed.startsWith('+')) return trimmed;
-  if (/^\d+$/.test(trimmed)) return '+' + trimmed;
-  return trimmed;
-}
+/** Re-export shared E.164 normalizer so routing and DB-stored values match. */
+export { normalizeToE164 } from '@shared/e164.util';

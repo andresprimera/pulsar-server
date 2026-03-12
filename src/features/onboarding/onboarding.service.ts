@@ -261,12 +261,16 @@ export class OnboardingService {
           );
         }
 
-        const credentialsToStore =
+        let credentialsToStore: Record<string, unknown> | undefined;
+        if (
           channelConfig.credentials &&
           typeof channelConfig.credentials === 'object' &&
           Object.keys(channelConfig.credentials).length > 0
-            ? encryptRecord(channelConfig.credentials)
-            : undefined;
+        ) {
+          credentialsToStore = encryptRecord({
+            ...channelConfig.credentials,
+          });
+        }
 
         hireChannels.push({
           channelId: channelIdObj,

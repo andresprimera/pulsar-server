@@ -51,15 +51,22 @@ describe('Dialog360WhatsAppAdapter', () => {
   });
 
   describe('parseInbound', () => {
-    it('delegates to shared Cloud API parser and returns result', () => {
+    it('delegates to shared Cloud API parser and returns canonical E.164 numbers', () => {
       const result = adapter.parseInbound(createPayload());
 
       expect(result).toEqual({
         phoneNumberId: 'phone456',
-        senderId: '1234567890',
+        senderId: '+1234567890',
         messageId: 'msg456',
         text: 'Hi from 360dialog',
       });
+    });
+
+    it('normalizes digits-only phone_number_id to E.164', () => {
+      const result = adapter.parseInbound(
+        createPayload({ metadata: { phone_number_id: '14155238886' } }),
+      );
+      expect(result?.phoneNumberId).toBe('+14155238886');
     });
 
     it('returns undefined for invalid payload', () => {

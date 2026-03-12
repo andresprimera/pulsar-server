@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model } from 'mongoose';
 import { ClientAgent } from '@persistence/schemas/client-agent.schema';
+import { normalizeToE164 } from '@shared/e164.util';
 
 @Injectable()
 export class ClientAgentRepository {
@@ -22,8 +23,9 @@ export class ClientAgentRepository {
     data: Partial<ClientAgent>,
     session?: ClientSession,
   ): Promise<ClientAgent> {
+    const normalized = this.normalizeChannelPhoneNumbers(data);
     const opts = session ? { session } : {};
-    const [doc] = await this.model.create([data], opts);
+    const [doc] = await this.model.create([normalized], opts);
     return doc;
   }
 
@@ -55,7 +57,23 @@ export class ClientAgentRepository {
     id: string,
     data: Partial<ClientAgent>,
   ): Promise<ClientAgent | null> {
-    return this.model.findByIdAndUpdate(id, data, { new: true }).exec();
+    const normalized = this.normalizeChannelPhoneNumbers(data);
+    return this.model.findByIdAndUpdate(id, normalized, { new: true }).exec();
+  }
+
+  /** Ensures channel.phoneNumberId is stored as E.164 (single place for persistence format). */
+  private normalizeChannelPhoneNumbers(
+    data: Partial<ClientAgent>,
+  ): Partial<ClientAgent> {
+    if (!data?.channels?.length) return data;
+    return {
+      ...data,
+      channels: data.channels.map((ch) =>
+        ch.phoneNumberId
+          ? { ...ch, phoneNumberId: normalizeToE164(ch.phoneNumberId) }
+          : ch,
+      ),
+    };
   }
 
   /**
@@ -75,13 +93,14 @@ export class ClientAgentRepository {
   async findActiveByPhoneNumberId(
     phoneNumberId: string,
   ): Promise<ClientAgent[]> {
+    const canonical = normalizeToE164(phoneNumberId);
     return this.model
       .find({
         status: 'active',
         channels: {
           $elemMatch: {
             status: 'active',
-            phoneNumberId,
+            phoneNumberId: canonical,
           },
         },
       })

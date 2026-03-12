@@ -6,6 +6,7 @@ import {
   MetaCredentials,
 } from './whatsapp-provider.interface';
 import { parseCloudApiWebhook } from '@channels/whatsapp-common/cloud-api-webhook.parser';
+import { normalizeToE164 } from '@shared/e164.util';
 
 interface MetaCloudApiConfig {
   apiHost: string;
@@ -28,7 +29,13 @@ export class MetaWhatsAppAdapter implements WhatsAppProviderAdapter {
   }
 
   parseInbound(payload: unknown): ParsedWhatsAppInbound | undefined {
-    return parseCloudApiWebhook(payload);
+    const parsed = parseCloudApiWebhook(payload);
+    if (!parsed) return undefined;
+    return {
+      ...parsed,
+      phoneNumberId: normalizeToE164(parsed.phoneNumberId),
+      senderId: normalizeToE164(parsed.senderId),
+    };
   }
 
   async sendMessage(

@@ -354,7 +354,7 @@ describe('OnboardingService', () => {
 
       expect(mockClientPhoneRepository.resolveOrCreate).toHaveBeenCalledWith(
         'client-1', // client ID (string from mock)
-        '123',
+        '123', // repo will normalize to E.164 on persist
         expect.objectContaining({
           provider: 'meta',
           session: mockSession,

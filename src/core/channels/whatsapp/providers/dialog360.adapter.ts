@@ -6,6 +6,7 @@ import {
   Dialog360Credentials,
 } from './whatsapp-provider.interface';
 import { parseCloudApiWebhook } from '@channels/whatsapp-common/cloud-api-webhook.parser';
+import { normalizeToE164 } from '@shared/e164.util';
 
 interface Dialog360Config {
   apiHost: string;
@@ -24,7 +25,13 @@ export class Dialog360WhatsAppAdapter implements WhatsAppProviderAdapter {
   }
 
   parseInbound(payload: unknown): ParsedWhatsAppInbound | undefined {
-    return parseCloudApiWebhook(payload);
+    const parsed = parseCloudApiWebhook(payload);
+    if (!parsed) return undefined;
+    return {
+      ...parsed,
+      phoneNumberId: normalizeToE164(parsed.phoneNumberId),
+      senderId: normalizeToE164(parsed.senderId),
+    };
   }
 
   async sendMessage(

@@ -160,11 +160,13 @@ export class ClientAgentsService {
         instagramAccountId = channelConfig.credentials.instagramAccountId;
       }
 
+      const credentialsToStore = channelConfig.credentials;
+
       channels.push({
         channelId: channelIdObj,
         provider: normalizedProvider,
         status: 'active',
-        credentials: encryptRecord(channelConfig.credentials),
+        credentials: encryptRecord(credentialsToStore),
         phoneNumberId,
         tiktokUserId,
         instagramAccountId,
