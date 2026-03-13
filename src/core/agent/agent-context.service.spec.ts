@@ -96,6 +96,37 @@ describe('AgentContextService', () => {
     expect(result.systemPrompt).toBe(contextWithAgent.systemPrompt);
   });
 
+  it('should enrich context with client brandVoice when set', async () => {
+    clientRepository.findById.mockResolvedValue({
+      _id: 'client-1',
+      name: 'Acme Corp',
+      type: 'organization',
+      status: 'active',
+      brandVoice: 'Our brand voice is calm, trustworthy, and professional.',
+    } as any);
+
+    const result = await service.enrichContext(baseContext);
+
+    expect(result.clientName).toBe('Acme Corp');
+    expect(result.brandVoice).toBe(
+      'Our brand voice is calm, trustworthy, and professional.',
+    );
+  });
+
+  it('should not add brandVoice to context when client has none', async () => {
+    clientRepository.findById.mockResolvedValue({
+      _id: 'client-1',
+      name: 'Acme Corp',
+      type: 'organization',
+      status: 'active',
+    } as any);
+
+    const result = await service.enrichContext(baseContext);
+
+    expect(result.clientName).toBe('Acme Corp');
+    expect(result.brandVoice).toBeUndefined();
+  });
+
   it('should return context unchanged when client is not found', async () => {
     clientRepository.findById.mockResolvedValue(null);
 

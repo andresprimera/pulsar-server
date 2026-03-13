@@ -12,6 +12,8 @@ export interface AgentContext {
     name: string;
     promptTemplate: string;
   };
+  /** Optional client brand voice instructions; refines tone alongside personality. */
+  brandVoice?: string;
   llmConfig: {
     provider: LlmProvider;
     apiKey: string;

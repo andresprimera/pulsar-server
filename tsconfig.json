@@ -21,7 +21,8 @@
       "@clients/*": ["src/features/clients/*"],
       "@client-agents/*": ["src/features/client-agents/*"],
       "@users/*": ["src/features/users/*"],
-      "@onboarding/*": ["src/features/onboarding/*"]
+      "@onboarding/*": ["src/features/onboarding/*"],
+      "@personalities/*": ["src/features/personalities/*"]
     },
     "incremental": true,
     "skipLibCheck": true,

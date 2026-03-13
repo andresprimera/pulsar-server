@@ -22,7 +22,20 @@ export class PersonalityRepository {
     return this.model.find().exec();
   }
 
+  async findByStatus(
+    status: 'active' | 'inactive' | 'archived',
+  ): Promise<Personality[]> {
+    return this.model.find({ status }).exec();
+  }
+
   async create(data: Partial<Personality>): Promise<Personality> {
     return this.model.create(data);
+  }
+
+  async update(
+    id: string,
+    data: Partial<Personality>,
+  ): Promise<Personality | null> {
+    return this.model.findByIdAndUpdate(id, data, { new: true }).exec();
   }
 }

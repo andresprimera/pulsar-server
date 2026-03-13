@@ -49,6 +49,13 @@ export class Client extends Document {
     provider: string;
     defaultModel: string;
   };
+
+  /**
+   * Optional client-specific brand voice instructions. Refines tone/style
+   * without replacing personality. Injected into the prompt alongside personality.
+   */
+  @Prop({ required: false })
+  brandVoice?: string;
 }
 
 export const ClientSchema = SchemaFactory.createForClass(Client);

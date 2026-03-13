@@ -9,10 +9,12 @@ import { InstagramModule } from './core/channels/instagram/instagram.module';
 import { AgentsModule } from './features/agents/agents.module';
 import { AgentPricesModule } from './features/agent-prices/agent-prices.module';
 import { ChannelPricesModule } from './features/channel-prices/channel-prices.module';
+import { ChannelsModule } from './features/channels/channels.module';
 import { UsersModule } from './features/users/users.module';
 import { ClientsModule } from './features/clients/clients.module';
 import { ClientAgentsModule } from './features/client-agents/client-agents.module';
 import { OnboardingModule } from './features/onboarding/onboarding.module';
+import { PersonalitiesModule } from './features/personalities/personalities.module';
 
 @Module({
   imports: [
@@ -25,9 +27,11 @@ import { OnboardingModule } from './features/onboarding/onboarding.module';
     AgentsModule,
     AgentPricesModule,
     ChannelPricesModule,
+    ChannelsModule,
     UsersModule,
     ClientsModule,
     ClientAgentsModule,
+    PersonalitiesModule,
     OnboardingModule,
   ],
 

@@ -57,6 +57,25 @@ describe('PromptBuilderService', () => {
     expect(result).toContain('Always be warm and use casual language.');
   });
 
+  it('should include [Brand Voice] when context has brandVoice', () => {
+    const contextWithBrandVoice: AgentContext = {
+      ...baseContext,
+      brandVoice: 'Our brand voice is calm, trustworthy, and professional.',
+    };
+
+    const result = service.build(contextWithBrandVoice, {}, undefined);
+
+    expect(result).toContain('[Brand Voice]');
+    expect(result).toContain(
+      'Our brand voice is calm, trustworthy, and professional.',
+    );
+  });
+
+  it('should not include [Brand Voice] when brandVoice is empty or missing', () => {
+    const result = service.build(baseContext, {}, undefined);
+    expect(result).not.toContain('[Brand Voice]');
+  });
+
   it('should include [Client Context] when clientName and agentName are set', () => {
     const contextWithClient: AgentContext = {
       ...baseContext,
@@ -84,10 +103,11 @@ describe('PromptBuilderService', () => {
     expect(result).toContain('first name');
   });
 
-  it('should order sections: Agent Instructions, Personality, Client, Contact, Safety', () => {
+  it('should order sections: Agent Instructions, Personality, Brand Voice, Client, Contact, Safety', () => {
     const context: AgentContext = {
       ...baseContext,
       clientName: 'Co',
+      brandVoice: 'Be elegant.',
       personality: {
         id: 'p-1',
         name: 'P',
@@ -99,12 +119,14 @@ describe('PromptBuilderService', () => {
 
     const agentIdx = result.indexOf('[Agent Instructions]');
     const personalityIdx = result.indexOf('[Personality]');
+    const brandVoiceIdx = result.indexOf('[Brand Voice]');
     const clientIdx = result.indexOf('[Client Context]');
     const contactIdx = result.indexOf('[Contact Context]');
     const safetyIdx = result.indexOf('[Safety Rules]');
 
     expect(agentIdx).toBeLessThan(personalityIdx);
-    expect(personalityIdx).toBeLessThan(clientIdx);
+    expect(personalityIdx).toBeLessThan(brandVoiceIdx);
+    expect(brandVoiceIdx).toBeLessThan(clientIdx);
     expect(clientIdx).toBeLessThan(contactIdx);
     expect(contactIdx).toBeLessThan(safetyIdx);
   });
