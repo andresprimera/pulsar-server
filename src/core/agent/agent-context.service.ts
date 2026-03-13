@@ -139,6 +139,9 @@ export class AgentContextService {
     return {
       ...context,
       clientName: client.name,
+      ...(client.brandVoice != null && client.brandVoice !== ''
+        ? { brandVoice: client.brandVoice }
+        : {}),
     };
   }
 }

@@ -10,4 +10,8 @@ export class CreateClientDto {
     message: 'billingCurrency must be a valid ISO 4217 code (e.g. USD, EUR)',
   })
   billingCurrency?: string;
+
+  @IsOptional()
+  @IsString()
+  brandVoice?: string;
 }

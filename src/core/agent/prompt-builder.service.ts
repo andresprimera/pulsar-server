@@ -31,6 +31,11 @@ export class PromptBuilderService {
       );
     }
 
+    // [Brand Voice] — client-specific tone/style; does not replace personality
+    if (context.brandVoice?.trim()) {
+      sections.push(`[Brand Voice]\n${context.brandVoice.trim()}`);
+    }
+
     // [Client Context]
     const clientLines: string[] = [];
     if (context.clientName?.trim()) {

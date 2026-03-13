@@ -31,8 +31,9 @@ function getFilesInLayer(files: string[], layer: string): string[] {
 describe('Architecture Boundaries', () => {
   const files = getAllFiles(SRC_ROOT);
 
+  // Transport layer only: src/core/channels/ (excludes src/features/channels/ API)
   it('Channel layer must not import persistence layer', () => {
-    const channelFiles = getFilesInLayer(files, 'channels');
+    const channelFiles = getFilesInLayer(files, 'core/channels');
 
     for (const file of channelFiles) {
       const content = fs.readFileSync(file, 'utf8');
@@ -43,7 +44,7 @@ describe('Architecture Boundaries', () => {
   });
 
   it('Channel layer must not import agent layer directly', () => {
-    const channelFiles = getFilesInLayer(files, 'channels');
+    const channelFiles = getFilesInLayer(files, 'core/channels');
 
     for (const file of channelFiles) {
       const content = fs.readFileSync(file, 'utf8');
