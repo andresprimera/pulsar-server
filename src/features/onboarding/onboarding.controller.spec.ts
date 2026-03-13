@@ -54,7 +54,7 @@ describe('OnboardingController', () => {
       const dto = {
         user: { email: 'test@example.com', name: 'Test' },
         client: { type: 'individual' as const },
-        agentHiring: { agentId: 'agent-1' },
+        agentHiring: { agentId: 'agent-1', personalityId: 'personality-1' },
         channels: [],
       };
 

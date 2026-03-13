@@ -15,6 +15,7 @@ import { UserRepository } from '@persistence/repositories/user.repository';
 import { AgentRepository } from '@persistence/repositories/agent.repository';
 import { ChannelRepository } from '@persistence/repositories/channel.repository';
 import { ClientAgentRepository } from '@persistence/repositories/client-agent.repository';
+import { PersonalityRepository } from '@persistence/repositories/personality.repository';
 import { AgentPriceRepository } from '@persistence/repositories/agent-price.repository';
 import { ChannelPriceRepository } from '@persistence/repositories/channel-price.repository';
 import { ClientPhoneRepository } from '@persistence/repositories/client-phone.repository';
@@ -53,6 +54,7 @@ export class OnboardingService {
     private readonly agentRepository: AgentRepository,
     private readonly channelRepository: ChannelRepository,
     private readonly clientAgentRepository: ClientAgentRepository,
+    private readonly personalityRepository: PersonalityRepository,
     private readonly agentPriceRepository: AgentPriceRepository,
     private readonly channelPriceRepository: ChannelPriceRepository,
     private readonly clientPhoneRepository: ClientPhoneRepository,
@@ -71,14 +73,22 @@ export class OnboardingService {
       dto.agentHiring.agentId,
     );
 
-    // 3. Validate client name for organization type
+    // 3. Validate personality is active
+    const personality = await this.personalityRepository.findActiveById(
+      dto.agentHiring.personalityId,
+    );
+    if (!personality) {
+      throw new BadRequestException('Personality not found or not active');
+    }
+
+    // 4. Validate client name for organization type
     if (dto.client.type === 'organization' && !dto.client.name) {
       throw new BadRequestException(
         'Client name is required for organization type',
       );
     }
 
-    // 4. Channels are validated during processing below
+    // 5. Channels are validated during processing below
 
     // TRANSACTION (atomic writes)
     const session = await this.connection.startSession();
@@ -301,11 +311,12 @@ export class OnboardingService {
         );
       }
 
-      // 9. Create ClientAgent (pricing snapshot + channels)
+      // 9. Create ClientAgent (pricing snapshot + channels + personality)
       clientAgent = await this.clientAgentRepository.create(
         {
           clientId: (client._id as Types.ObjectId).toString(),
           agentId: dto.agentHiring.agentId,
+          personalityId: new Types.ObjectId(dto.agentHiring.personalityId),
           agentPricing,
           billingAnchor: new Date(),
           status: 'active',

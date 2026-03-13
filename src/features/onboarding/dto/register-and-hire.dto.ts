@@ -61,6 +61,9 @@ class AgentHiringDto {
   @IsMongoId()
   agentId: string;
 
+  @IsMongoId()
+  personalityId: string;
+
   @IsOptional()
   @ValidateNested()
   @Type(() => PricingOverrideDto)

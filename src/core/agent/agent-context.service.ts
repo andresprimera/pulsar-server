@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Types } from 'mongoose';
 import { AgentContext } from './contracts/agent-context';
 import { AgentRepository } from '@persistence/repositories/agent.repository';
 import { ClientRepository } from '@persistence/repositories/client.repository';
+import { PersonalityRepository } from '@persistence/repositories/personality.repository';
 import {
   ClientAgent,
   HireChannelConfig,
@@ -16,6 +18,7 @@ export class AgentContextService {
   constructor(
     private readonly agentRepository: AgentRepository,
     private readonly clientRepository: ClientRepository,
+    private readonly personalityRepository: PersonalityRepository,
   ) {}
 
   /**
@@ -47,12 +50,32 @@ export class AgentContextService {
         ? decryptRecord(channelConfig.credentials)
         : {};
 
+    let personality: AgentContext['personality'] | undefined;
+    const personalityId = clientAgent.personalityId;
+    if (personalityId) {
+      const personalityIdStr =
+        typeof personalityId === 'string'
+          ? personalityId
+          : (personalityId as Types.ObjectId).toString();
+      const personalityDoc = await this.personalityRepository.findActiveById(
+        personalityIdStr,
+      );
+      if (personalityDoc) {
+        personality = {
+          id: (personalityDoc._id as Types.ObjectId).toString(),
+          name: personalityDoc.name,
+          promptTemplate: personalityDoc.promptTemplate,
+        };
+      }
+    }
+
     const rawContext: AgentContext = {
       agentId: clientAgent.agentId,
       agentName: agent.name,
       clientId: clientAgent.clientId,
       channelId: channelConfig.channelId.toString(),
       systemPrompt: agent.systemPrompt,
+      personality,
       llmConfig: {
         provider: (channelConfig.llmConfig.provider || 'openai') as any,
         apiKey,
@@ -99,38 +122,23 @@ export class AgentContextService {
     return client?.billingAnchor ?? null;
   }
 
+  /**
+   * Enriches context with clientName and agentName for PromptBuilder.
+   * Does not build or mutate systemPrompt; that is done by PromptBuilder.
+   */
   async enrichContext(context: AgentContext): Promise<AgentContext> {
     const client = await this.clientRepository.findById(context.clientId);
 
     if (!client) {
       this.logger.warn(
-        `Client ${context.clientId} not found. Using original system prompt.`,
+        `Client ${context.clientId} not found. Context will have no client name.`,
       );
       return context;
     }
 
-    const contextLines: string[] = [];
-    if (client.name) {
-      contextLines.push(`You are representing "${client.name}".`);
-    }
-    if (context.agentName) {
-      contextLines.push(`Your role is "${context.agentName}".`);
-    }
-    if (contextLines.length > 0) {
-      contextLines.push(
-        'In your first message to a new user, introduce yourself by mentioning the company you represent and your role.',
-      );
-    }
-
-    const enrichedPrompt =
-      contextLines.length > 0
-        ? `${context.systemPrompt}\n\n${contextLines.join(' ')}`
-        : context.systemPrompt;
-
     return {
       ...context,
       clientName: client.name,
-      systemPrompt: enrichedPrompt,
     };
   }
 }

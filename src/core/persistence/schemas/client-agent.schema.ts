@@ -67,6 +67,14 @@ export class ClientAgent extends Document {
   agentId: string;
 
   @Prop({
+    type: Types.ObjectId,
+    ref: 'Personality',
+    required: true,
+    index: true,
+  })
+  personalityId: Types.ObjectId;
+
+  @Prop({
     required: true,
     enum: ['active', 'inactive', 'archived'],
     default: 'active',

@@ -7,6 +7,7 @@ import { MessagePersistenceService } from '@persistence/message-persistence.serv
 import { ConversationSummaryService } from './conversation-summary.service';
 import { MetadataExposureService } from './metadata-exposure.service';
 import { LlmUsageLogRepository } from '@persistence/repositories/llm-usage-log.repository';
+import { PromptBuilderService } from './prompt-builder.service';
 import * as llmFactory from './llm/llm.factory';
 import * as ai from 'ai';
 import { Logger } from '@nestjs/common';
@@ -24,6 +25,7 @@ describe('AgentService', () => {
   let service: AgentService;
   let messagePersistenceService: jest.Mocked<MessagePersistenceService>;
   let llmUsageLogRepository: jest.Mocked<LlmUsageLogRepository>;
+  let promptBuilder: jest.Mocked<PromptBuilderService>;
   let logSpy: jest.SpyInstance;
   let errorSpy: jest.SpyInstance;
 
@@ -76,20 +78,47 @@ describe('AgentService', () => {
             create: jest.fn().mockResolvedValue({}),
           },
         },
+        {
+          provide: PromptBuilderService,
+          useValue: {
+            build: jest.fn().mockImplementation((ctx, metadata) => {
+              const parts = [ctx.systemPrompt];
+              if (Object.keys(metadata || {}).length > 0) {
+                parts.push(
+                  `Safe contact metadata: ${JSON.stringify(metadata)}`,
+                );
+              }
+              if (
+                metadata?.firstName &&
+                typeof metadata.firstName === 'string' &&
+                metadata.firstName.trim()
+              ) {
+                parts.push(
+                  `If you greet the contact, you may use their first name: ${metadata.firstName.trim()}.`,
+                );
+              }
+              parts.push(
+                'Do not imply prior-conversation memory or continuity unless it is explicitly present in this conversation history.',
+              );
+              return parts.join('\n\n');
+            }),
+          },
+        },
       ],
     }).compile();
 
     service = module.get<AgentService>(AgentService);
     messagePersistenceService = module.get(MessagePersistenceService);
     llmUsageLogRepository = module.get(LlmUsageLogRepository);
+    promptBuilder = module.get(PromptBuilderService);
     logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
     errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
     jest.clearAllMocks();
   });
 
   afterEach(() => {
-    logSpy.mockRestore();
-    errorSpy.mockRestore();
+    logSpy?.mockRestore();
+    errorSpy?.mockRestore();
   });
 
   it('should be defined', () => {
@@ -133,16 +162,22 @@ describe('AgentService', () => {
         expect.anything(),
       );
 
+      expect(promptBuilder.build).toHaveBeenCalledWith(
+        mockContext,
+        expect.objectContaining({ firstName: 'Ana', language: 'es' }),
+        undefined,
+      );
       expect(llmFactory.createLLMModel).toHaveBeenCalledWith(
         mockContext.llmConfig,
       );
+      const expectedSystem = (promptBuilder.build as jest.Mock)(
+        mockContext,
+        { firstName: 'Ana', language: 'es' },
+        undefined,
+      );
       expect(ai.generateText).toHaveBeenCalledWith({
         model: mockModel,
-        system:
-          `${mockContext.systemPrompt}\n\n` +
-          'Safe contact metadata: {"firstName":"Ana","language":"es"}\n' +
-          'If you greet the contact, you may use their first name: Ana.\n' +
-          'Do not imply prior-conversation memory or continuity unless it is explicitly present in this conversation history.',
+        system: expectedSystem,
         messages: [
           { role: 'user', content: 'Previous message' },
           {

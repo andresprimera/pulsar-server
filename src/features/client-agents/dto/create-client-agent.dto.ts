@@ -76,6 +76,10 @@ export class CreateClientAgentDto {
   @IsNotEmpty()
   agentId: string;
 
+  @IsMongoId()
+  @IsNotEmpty()
+  personalityId: string;
+
   @IsOptional()
   @ValidateNested()
   @Type(() => PricingOverrideDto)

@@ -7,6 +7,11 @@ export interface AgentContext {
   clientName?: string;
   channelId: string;
   systemPrompt: string;
+  personality?: {
+    id: string;
+    name: string;
+    promptTemplate: string;
+  };
   llmConfig: {
     provider: LlmProvider;
     apiKey: string;
