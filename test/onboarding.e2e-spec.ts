@@ -9,6 +9,7 @@ describe('Onboarding (e2e)', () => {
   let app: INestApplication;
   let connection: Connection;
   let testAgentId: string;
+  let testPersonalityId: string;
 
   const cleanup = async () => {
     if (connection) {
@@ -73,6 +74,25 @@ describe('Onboarding (e2e)', () => {
       .put(`/agents/${testAgentId}/prices/USD`)
       .send({ amount: 0 })
       .expect(200);
+
+    // Get or create a personality for agentHiring (required)
+    const personality = await connection
+      .collection('personalities')
+      .findOne({ status: 'active' });
+    if (!personality) {
+      const inserted = await connection.collection('personalities').insertOne({
+        name: 'E2E Onboarding Default',
+        description: 'E2E test personality',
+        promptTemplate: 'Be helpful.',
+        status: 'active',
+        version: 1,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      testPersonalityId = inserted.insertedId.toString();
+    } else {
+      testPersonalityId = (personality._id as Types.ObjectId).toString();
+    }
   });
 
   afterAll(async () => {
@@ -131,6 +151,7 @@ describe('Onboarding (e2e)', () => {
           },
           agentHiring: {
             agentId: testAgentId,
+            personalityId: testPersonalityId,
             pricingOverride: { agentAmount: 99.99 },
           },
           channels: [
@@ -222,6 +243,7 @@ describe('Onboarding (e2e)', () => {
           },
           agentHiring: {
             agentId: testAgentId,
+            personalityId: testPersonalityId,
             price: 199.99,
           },
           channels: [
@@ -263,6 +285,7 @@ describe('Onboarding (e2e)', () => {
           },
           agentHiring: {
             agentId: testAgentId,
+            personalityId: testPersonalityId,
             price: 50,
           },
           channels: [
@@ -298,7 +321,11 @@ describe('Onboarding (e2e)', () => {
         .send({
           user: { email: uniqueEmail, name: 'First User' },
           client: { type: 'individual' },
-          agentHiring: { agentId: testAgentId, price: 100 },
+          agentHiring: {
+            agentId: testAgentId,
+            personalityId: testPersonalityId,
+            price: 100,
+          },
           channels: [
             {
               channelId: channelId1,
@@ -319,7 +346,11 @@ describe('Onboarding (e2e)', () => {
         .send({
           user: { email: uniqueEmail, name: 'Second User' },
           client: { type: 'individual' },
-          agentHiring: { agentId: testAgentId, price: 100 },
+          agentHiring: {
+            agentId: testAgentId,
+            personalityId: testPersonalityId,
+            price: 100,
+          },
           channels: [
             {
               channelId: channelId2,
@@ -350,7 +381,11 @@ describe('Onboarding (e2e)', () => {
             name: 'First User',
           },
           client: { type: 'individual' },
-          agentHiring: { agentId: testAgentId, price: 100 },
+          agentHiring: {
+            agentId: testAgentId,
+            personalityId: testPersonalityId,
+            price: 100,
+          },
           channels: [
             {
               channelId: channelId1,
@@ -378,7 +413,11 @@ describe('Onboarding (e2e)', () => {
             name: 'Second User',
           },
           client: { type: 'individual' },
-          agentHiring: { agentId: testAgentId, price: 100 },
+          agentHiring: {
+            agentId: testAgentId,
+            personalityId: testPersonalityId,
+            price: 100,
+          },
           channels: [
             {
               channelId: channelId2,
@@ -425,6 +464,7 @@ describe('Onboarding (e2e)', () => {
           client: { type: 'individual' },
           agentHiring: {
             agentId: inactiveAgentResponse.body._id,
+            personalityId: testPersonalityId,
             price: 100,
           },
           channels: [
@@ -455,6 +495,7 @@ describe('Onboarding (e2e)', () => {
           client: { type: 'individual' },
           agentHiring: {
             agentId: '507f1f77bcf86cd799439011',
+            personalityId: testPersonalityId,
             price: 100,
           },
           channels: [
@@ -483,7 +524,11 @@ describe('Onboarding (e2e)', () => {
             name: 'Test User',
           },
           client: { type: 'organization' },
-          agentHiring: { agentId: testAgentId, price: 100 },
+          agentHiring: {
+            agentId: testAgentId,
+            personalityId: testPersonalityId,
+            price: 100,
+          },
           channels: [
             {
               channelId,
@@ -510,7 +555,11 @@ describe('Onboarding (e2e)', () => {
           .send({
             user: { email: 'not-an-email', name: 'Test' },
             client: { type: 'individual' },
-            agentHiring: { agentId: testAgentId, price: 100 },
+            agentHiring: {
+              agentId: testAgentId,
+              personalityId: testPersonalityId,
+              price: 100,
+            },
             channels: [
               {
                 channelId,
@@ -540,7 +589,11 @@ describe('Onboarding (e2e)', () => {
           .send({
             user: { email: 'test@example.com', name: 'Test' },
             client: { type: 'invalid-type' },
-            agentHiring: { agentId: testAgentId, price: 100 },
+            agentHiring: {
+              agentId: testAgentId,
+              personalityId: testPersonalityId,
+              price: 100,
+            },
             channels: [
               {
                 channelId,
@@ -570,7 +623,11 @@ describe('Onboarding (e2e)', () => {
           .send({
             user: { email: 'test@example.com', name: 'Test' },
             client: { type: 'individual' },
-            agentHiring: { agentId: 'not-a-mongo-id', price: 100 },
+            agentHiring: {
+              agentId: 'not-a-mongo-id',
+              personalityId: testPersonalityId,
+              price: 100,
+            },
             channels: [
               {
                 channelId,
@@ -602,6 +659,7 @@ describe('Onboarding (e2e)', () => {
             client: { type: 'individual' },
             agentHiring: {
               agentId: testAgentId,
+              personalityId: testPersonalityId,
               pricingOverride: { agentAmount: -1 },
             },
             channels: [
@@ -633,7 +691,11 @@ describe('Onboarding (e2e)', () => {
           .send({
             user: { email: 'test@example.com', name: 'Test' },
             client: { type: 'individual' },
-            agentHiring: { agentId: testAgentId, price: 100 },
+            agentHiring: {
+              agentId: testAgentId,
+              personalityId: testPersonalityId,
+              price: 100,
+            },
             channels: [
               {
                 channelId,
@@ -663,7 +725,11 @@ describe('Onboarding (e2e)', () => {
           .send({
             user: { email: 'test@example.com', name: 'Test' },
             client: { type: 'individual' },
-            agentHiring: { agentId: testAgentId, price: 100 },
+            agentHiring: {
+              agentId: testAgentId,
+              personalityId: testPersonalityId,
+              price: 100,
+            },
             channels: [
               {
                 channelId,
@@ -691,7 +757,11 @@ describe('Onboarding (e2e)', () => {
           .send({
             user: { email: 'test@example.com', name: 'Test' },
             client: { type: 'individual' },
-            agentHiring: { agentId: testAgentId, price: 100 },
+            agentHiring: {
+              agentId: testAgentId,
+              personalityId: testPersonalityId,
+              price: 100,
+            },
             channels: [],
           })
           .expect(400);
@@ -713,7 +783,11 @@ describe('Onboarding (e2e)', () => {
               name: 'Test',
             },
             client: { type: 'individual' },
-            agentHiring: { agentId: testAgentId, price: 100 },
+            agentHiring: {
+              agentId: testAgentId,
+              personalityId: testPersonalityId,
+              price: 100,
+            },
             channels: [
               {
                 channelId,
