@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AgentContextService } from './agent-context.service';
 import { AgentRepository } from '@persistence/repositories/agent.repository';
 import { ClientRepository } from '@persistence/repositories/client.repository';
+import { PersonalityRepository } from '@persistence/repositories/personality.repository';
 import { AgentContext } from './contracts/agent-context';
 import { LlmProvider } from './llm/provider.enum';
 import { Logger } from '@nestjs/common';
@@ -39,6 +40,12 @@ describe('AgentContextService', () => {
             findById: jest.fn(),
           },
         },
+        {
+          provide: PersonalityRepository,
+          useValue: {
+            findActiveById: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -55,7 +62,7 @@ describe('AgentContextService', () => {
     expect(service).toBeDefined();
   });
 
-  it('should enrich context with client name in system prompt', async () => {
+  it('should enrich context with client name (PromptBuilder builds prompt; systemPrompt unchanged)', async () => {
     clientRepository.findById.mockResolvedValue({
       _id: 'client-1',
       name: 'Acme Corp',
@@ -66,12 +73,10 @@ describe('AgentContextService', () => {
     const result = await service.enrichContext(baseContext);
 
     expect(result.clientName).toBe('Acme Corp');
-    expect(result.systemPrompt).toBe(
-      'You are a helpful assistant.\n\nYou are representing "Acme Corp". In your first message to a new user, introduce yourself by mentioning the company you represent and your role.',
-    );
+    expect(result.systemPrompt).toBe(baseContext.systemPrompt);
   });
 
-  it('should include agent name in system prompt when provided', async () => {
+  it('should include agent name on context when provided (systemPrompt unchanged)', async () => {
     clientRepository.findById.mockResolvedValue({
       _id: 'client-1',
       name: 'Acme Corp',
@@ -86,9 +91,9 @@ describe('AgentContextService', () => {
 
     const result = await service.enrichContext(contextWithAgent);
 
-    expect(result.systemPrompt).toBe(
-      'You are a helpful assistant.\n\nYou are representing "Acme Corp". Your role is "Customer Service Agent". In your first message to a new user, introduce yourself by mentioning the company you represent and your role.',
-    );
+    expect(result.clientName).toBe('Acme Corp');
+    expect(result.agentName).toBe('Customer Service Agent');
+    expect(result.systemPrompt).toBe(contextWithAgent.systemPrompt);
   });
 
   it('should return context unchanged when client is not found', async () => {
@@ -96,7 +101,7 @@ describe('AgentContextService', () => {
 
     const result = await service.enrichContext(baseContext);
 
-    expect(result).toBe(baseContext);
+    expect(result).toEqual(baseContext);
     expect(result.clientName).toBeUndefined();
     expect(result.systemPrompt).toBe('You are a helpful assistant.');
     expect(warnSpy).toHaveBeenCalledWith(
@@ -122,6 +127,7 @@ describe('AgentContextService', () => {
     expect(result.agentId).toBe('agent-1');
     expect(result.clientId).toBe('client-1');
     expect(result.channelId).toBe('channel-1');
+    expect(result.systemPrompt).toBe(baseContext.systemPrompt);
     expect(result.llmConfig).toEqual(baseContext.llmConfig);
     expect(result.channelConfig).toEqual({ phoneNumberId: '123' });
   });

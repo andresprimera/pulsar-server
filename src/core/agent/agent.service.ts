@@ -9,6 +9,7 @@ import { MessagePersistenceService } from '@persistence/message-persistence.serv
 import { ConversationSummaryService } from './conversation-summary.service';
 import { MetadataExposureService } from './metadata-exposure.service';
 import { LlmUsageLogRepository } from '@persistence/repositories/llm-usage-log.repository';
+import { PromptBuilderService } from './prompt-builder.service';
 
 @Injectable()
 export class AgentService {
@@ -19,6 +20,7 @@ export class AgentService {
     private readonly conversationSummaryService: ConversationSummaryService,
     private readonly metadataExposureService: MetadataExposureService,
     private readonly llmUsageLogRepository: LlmUsageLogRepository,
+    private readonly promptBuilder: PromptBuilderService,
   ) {}
 
   async run(input: AgentInput, context: AgentContext): Promise<AgentOutput> {
@@ -81,15 +83,15 @@ export class AgentService {
         input.contactMetadata as Record<string, any>,
       );
 
-      const systemPrompt = this.buildSystemPrompt(
-        context.systemPrompt,
+      const finalPrompt = this.promptBuilder.build(
+        context,
         safeMetadata,
         input.contactSummary,
       );
 
       const { text, usage } = await generateText({
         model,
-        system: systemPrompt,
+        system: finalPrompt,
         messages,
       });
 
@@ -157,42 +159,5 @@ export class AgentService {
         },
       };
     }
-  }
-
-  private buildSystemPrompt(
-    baseSystemPrompt: string,
-    safeMetadata: Record<string, any>,
-    contactSummary?: string,
-  ): string {
-    const contextLines: string[] = [];
-
-    if (contactSummary?.trim()) {
-      contextLines.push(`Contact summary: ${contactSummary.trim()}`);
-    }
-
-    if (Object.keys(safeMetadata).length > 0) {
-      contextLines.push(
-        `Safe contact metadata: ${JSON.stringify(safeMetadata)}`,
-      );
-    }
-
-    if (
-      typeof safeMetadata.firstName === 'string' &&
-      safeMetadata.firstName.trim()
-    ) {
-      contextLines.push(
-        `If you greet the contact, you may use their first name: ${safeMetadata.firstName.trim()}.`,
-      );
-    }
-
-    contextLines.push(
-      'Do not imply prior-conversation memory or continuity unless it is explicitly present in this conversation history.',
-    );
-
-    if (contextLines.length === 0) {
-      return baseSystemPrompt;
-    }
-
-    return `${baseSystemPrompt}\n\n${contextLines.join('\n')}`;
   }
 }

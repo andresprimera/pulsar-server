@@ -8,6 +8,7 @@ import { getConnectionToken } from '@nestjs/mongoose';
 describe('ClientAgents (e2e)', () => {
   let app: INestApplication;
   let connection: Connection;
+  let testPersonalityId: string;
 
   const createdClientIds: Types.ObjectId[] = [];
   const createdAgentIds: string[] = [];
@@ -129,6 +130,25 @@ describe('ClientAgents (e2e)', () => {
     await app.init();
 
     connection = moduleFixture.get<Connection>(getConnectionToken());
+
+    // Get or create a personality for client-agent creation (required)
+    const personality = await connection
+      .collection('personalities')
+      .findOne({ status: 'active' });
+    if (!personality) {
+      const inserted = await connection.collection('personalities').insertOne({
+        name: 'E2E ClientAgents Default',
+        description: 'E2E test personality',
+        promptTemplate: 'Be helpful.',
+        status: 'active',
+        version: 1,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      testPersonalityId = inserted.insertedId.toString();
+    } else {
+      testPersonalityId = (personality._id as Types.ObjectId).toString();
+    }
   });
 
   afterEach(async () => {
@@ -155,6 +175,7 @@ describe('ClientAgents (e2e)', () => {
       .send({
         clientId,
         agentId,
+        personalityId: testPersonalityId,
         price: 149,
         channels: [
           {
@@ -199,6 +220,7 @@ describe('ClientAgents (e2e)', () => {
       .send({
         clientId,
         agentId,
+        personalityId: testPersonalityId,
         price: 100,
         channels: [],
       })
@@ -224,6 +246,7 @@ describe('ClientAgents (e2e)', () => {
       .send({
         clientId,
         agentId,
+        personalityId: testPersonalityId,
         price: 100,
         channels: [
           {
@@ -268,6 +291,7 @@ describe('ClientAgents (e2e)', () => {
       .send({
         clientId,
         agentId,
+        personalityId: testPersonalityId,
         price: 100,
         channels: [
           {
@@ -307,6 +331,7 @@ describe('ClientAgents (e2e)', () => {
       .send({
         clientId: clientAId,
         agentId,
+        personalityId: testPersonalityId,
         price: 100,
         channels: [
           {
@@ -333,6 +358,7 @@ describe('ClientAgents (e2e)', () => {
       .send({
         clientId: clientBId,
         agentId,
+        personalityId: testPersonalityId,
         price: 100,
         channels: [
           {

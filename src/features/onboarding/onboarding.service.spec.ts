@@ -12,6 +12,7 @@ import { UserRepository } from '@persistence/repositories/user.repository';
 import { AgentRepository } from '@persistence/repositories/agent.repository';
 import { ChannelRepository } from '@persistence/repositories/channel.repository';
 import { ClientAgentRepository } from '@persistence/repositories/client-agent.repository';
+import { PersonalityRepository } from '@persistence/repositories/personality.repository';
 import { ClientPhoneRepository } from '@persistence/repositories/client-phone.repository';
 import { AgentPriceRepository } from '@persistence/repositories/agent-price.repository';
 import { ChannelPriceRepository } from '@persistence/repositories/channel-price.repository';
@@ -27,6 +28,7 @@ describe('OnboardingService', () => {
   let mockAgentRepository: any;
   let mockChannelRepository: any;
   let mockClientAgentRepository: any;
+  let mockPersonalityRepository: any;
   let mockClientPhoneRepository: any;
   let mockAgentPriceRepository: any;
   let mockChannelPriceRepository: any;
@@ -140,6 +142,15 @@ describe('OnboardingService', () => {
       create: jest.fn().mockResolvedValue(mockClientAgent),
     };
 
+    const mockPersonality = {
+      _id: '507f1f77bcf86cd799439099',
+      name: 'Default',
+      status: 'active',
+    };
+    mockPersonalityRepository = {
+      findActiveById: jest.fn().mockResolvedValue(mockPersonality),
+    };
+
     mockClientPhoneRepository = {
       findByPhoneNumber: jest.fn().mockResolvedValue(null),
       resolveOrCreate: jest.fn().mockResolvedValue(mockClientPhone),
@@ -166,6 +177,7 @@ describe('OnboardingService', () => {
         { provide: AgentRepository, useValue: mockAgentRepository },
         { provide: ChannelRepository, useValue: mockChannelRepository },
         { provide: ClientAgentRepository, useValue: mockClientAgentRepository },
+        { provide: PersonalityRepository, useValue: mockPersonalityRepository },
         { provide: AgentPriceRepository, useValue: mockAgentPriceRepository },
         {
           provide: ChannelPriceRepository,
@@ -183,10 +195,11 @@ describe('OnboardingService', () => {
   });
 
   describe('registerAndHire', () => {
+    const mockPersonalityId = '507f1f77bcf86cd799439099';
     const validDto = {
       user: { email: 'TEST@example.com', name: 'Test User' },
       client: { type: 'individual' as const, billingCurrency: 'USD' },
-      agentHiring: { agentId: mockAgentId },
+      agentHiring: { agentId: mockAgentId, personalityId: mockPersonalityId },
       channels: [
         {
           channelId: '507f1f77bcf86cd799439011',

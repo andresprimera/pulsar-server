@@ -12,6 +12,7 @@ import { ChannelRepository } from '@persistence/repositories/channel.repository'
 import { ClientPhoneRepository } from '@persistence/repositories/client-phone.repository';
 import { AgentPriceRepository } from '@persistence/repositories/agent-price.repository';
 import { ChannelPriceRepository } from '@persistence/repositories/channel-price.repository';
+import { PersonalityRepository } from '@persistence/repositories/personality.repository';
 import { encrypt, encryptRecord } from '@shared/crypto.util';
 
 import { assertCurrencyMatch } from '@domain/billing/currency.validator';
@@ -34,6 +35,7 @@ export class ClientAgentsService {
     private readonly clientPhoneRepository: ClientPhoneRepository,
     private readonly agentPriceRepository: AgentPriceRepository,
     private readonly channelPriceRepository: ChannelPriceRepository,
+    private readonly personalityRepository: PersonalityRepository,
   ) {}
 
   async create(data: CreateClientAgentDto): Promise<ClientAgent> {
@@ -49,6 +51,13 @@ export class ClientAgentsService {
     const agent = await this.agentsService.findOne(data.agentId);
     if (!agent || agent.status !== 'active') {
       throw new BadRequestException('Agent not found or not active');
+    }
+
+    const personality = await this.personalityRepository.findActiveById(
+      data.personalityId,
+    );
+    if (!personality) {
+      throw new BadRequestException('Personality not found or not active');
     }
 
     const currency = client.billingCurrency;
@@ -195,6 +204,7 @@ export class ClientAgentsService {
       return await this.clientAgentRepository.create({
         clientId: data.clientId,
         agentId: data.agentId,
+        personalityId: new Types.ObjectId(data.personalityId),
         agentPricing,
         billingAnchor: new Date(),
         status: 'active',
@@ -223,7 +233,22 @@ export class ClientAgentsService {
       throw new BadRequestException('Cannot update archived ClientAgent');
     }
 
-    const updated = await this.clientAgentRepository.update(id, data);
+    const updatePayload: Partial<ClientAgent> = {};
+    if (data.personalityId !== undefined) {
+      const personality = await this.personalityRepository.findActiveById(
+        data.personalityId,
+      );
+      if (!personality) {
+        throw new BadRequestException('Personality not found or not active');
+      }
+      updatePayload.personalityId = new Types.ObjectId(data.personalityId);
+    }
+
+    if (Object.keys(updatePayload).length === 0) {
+      return clientAgent;
+    }
+
+    const updated = await this.clientAgentRepository.update(id, updatePayload);
     if (!updated)
       throw new NotFoundException('ClientAgent not found after update');
     return updated;

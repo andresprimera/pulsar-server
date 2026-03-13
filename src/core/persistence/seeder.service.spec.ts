@@ -9,6 +9,7 @@ import { UserRepository } from './repositories/user.repository';
 import { ChannelRepository } from './repositories/channel.repository';
 import { ClientRepository } from './repositories/client.repository';
 import { ClientAgentRepository } from './repositories/client-agent.repository';
+import { PersonalityRepository } from './repositories/personality.repository';
 import { ClientPhoneRepository } from './repositories/client-phone.repository';
 import { AgentPriceRepository } from './repositories/agent-price.repository';
 import { ChannelPriceRepository } from './repositories/channel-price.repository';
@@ -26,6 +27,7 @@ describe('SeederService', () => {
   let mockChannelRepository: any;
   let mockClientRepository: any;
   let mockClientAgentRepository: any;
+  let mockPersonalityRepository: any;
   let mockClientPhoneRepository: any;
   let mockAgentPriceRepository: any;
   let mockChannelPriceRepository: any;
@@ -107,6 +109,19 @@ describe('SeederService', () => {
       }),
     };
 
+    const defaultPersonalityId = new Types.ObjectId('507f1f77bcf86cd799439099');
+    mockPersonalityRepository = {
+      findAll: jest.fn().mockResolvedValue([]),
+      create: jest.fn().mockResolvedValue({
+        _id: defaultPersonalityId,
+        name: 'Default',
+        description: '',
+        promptTemplate: '',
+        status: 'active',
+        version: 1,
+      }),
+    };
+
     mockClientPhoneRepository = {
       resolveOrCreate: jest.fn(),
     };
@@ -143,6 +158,10 @@ describe('SeederService', () => {
         { provide: ChannelRepository, useValue: mockChannelRepository },
         { provide: ClientRepository, useValue: mockClientRepository },
         { provide: ClientAgentRepository, useValue: mockClientAgentRepository },
+        {
+          provide: PersonalityRepository,
+          useValue: mockPersonalityRepository,
+        },
         {
           provide: ClientPhoneRepository,
           useValue: mockClientPhoneRepository,

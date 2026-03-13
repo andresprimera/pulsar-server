@@ -12,6 +12,7 @@ import { ChannelRepository } from '@persistence/repositories/channel.repository'
 import { ClientPhoneRepository } from '@persistence/repositories/client-phone.repository';
 import { AgentPriceRepository } from '@persistence/repositories/agent-price.repository';
 import { ChannelPriceRepository } from '@persistence/repositories/channel-price.repository';
+import { PersonalityRepository } from '@persistence/repositories/personality.repository';
 
 describe('ClientAgentsService', () => {
   let service: ClientAgentsService;
@@ -22,14 +23,23 @@ describe('ClientAgentsService', () => {
   let mockClientPhoneRepository: any;
   let mockAgentPriceRepository: any;
   let mockChannelPriceRepository: any;
+  let mockPersonalityRepository: any;
 
   const mockClientAgent = {
     id: 'ca-1',
     clientId: 'client-1',
     agentId: 'agent-1',
+    personalityId: 'personality-1',
     status: 'active',
     agentPricing: { amount: 100, currency: 'USD', monthlyTokenQuota: null },
     billingAnchor: new Date(),
+  };
+
+  const mockPersonality = {
+    _id: 'personality-1',
+    name: 'Default',
+    promptTemplate: 'Be helpful.',
+    status: 'active',
   };
 
   const mockClient = {
@@ -82,6 +92,10 @@ describe('ClientAgentsService', () => {
         .mockResolvedValue({ amount: 0 }),
     };
 
+    mockPersonalityRepository = {
+      findActiveById: jest.fn().mockResolvedValue(mockPersonality),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ClientAgentsService,
@@ -113,6 +127,10 @@ describe('ClientAgentsService', () => {
           provide: ChannelPriceRepository,
           useValue: mockChannelPriceRepository,
         },
+        {
+          provide: PersonalityRepository,
+          useValue: mockPersonalityRepository,
+        },
       ],
     }).compile();
 
@@ -127,6 +145,7 @@ describe('ClientAgentsService', () => {
     const baseDto: any = {
       clientId: '507f1f77bcf86cd799439011',
       agentId: '507f1f77bcf86cd799439012',
+      personalityId: '507f1f77bcf86cd799439099',
       channels: [
         {
           channelId: '507f1f77bcf86cd799439013',
@@ -168,10 +187,14 @@ describe('ClientAgentsService', () => {
       expect(
         mockClientAgentRepository.findByClientAndAgent,
       ).toHaveBeenCalledWith(baseDto.clientId, baseDto.agentId);
+      expect(mockPersonalityRepository.findActiveById).toHaveBeenCalledWith(
+        baseDto.personalityId,
+      );
       expect(mockClientAgentRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           clientId: baseDto.clientId,
           agentId: baseDto.agentId,
+          personalityId: expect.anything(),
           agentPricing: expect.objectContaining({
             amount: 100,
             currency: 'USD',
@@ -261,6 +284,19 @@ describe('ClientAgentsService', () => {
 
       const dto = { ...baseDto };
       await expect(service.create(dto)).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException if personality not found or inactive', async () => {
+      mockClientsService.findById.mockResolvedValue(mockClient);
+      mockAgentsService.findOne.mockResolvedValue(mockAgent);
+      mockPersonalityRepository.findActiveById.mockResolvedValue(null);
+
+      await expect(service.create(baseDto as any)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.create(baseDto as any)).rejects.toThrow(
+        'Personality not found or not active',
+      );
     });
 
     it('should throw ConflictException if agent already hired by client', async () => {
@@ -391,16 +427,38 @@ describe('ClientAgentsService', () => {
   });
 
   describe('update', () => {
-    it('should update client agent', async () => {
+    it('should return client agent unchanged when no updates provided', async () => {
       mockClientAgentRepository.findById.mockResolvedValue(mockClientAgent);
-      mockClientAgentRepository.update.mockResolvedValue(mockClientAgent);
 
       const result = await service.update('ca-1', {} as any);
+      expect(mockClientAgentRepository.update).not.toHaveBeenCalled();
+      expect(result).toEqual(mockClientAgent);
+    });
+
+    it('should update client agent when personalityId is provided', async () => {
+      mockClientAgentRepository.findById.mockResolvedValue(mockClientAgent);
+      mockPersonalityRepository.findActiveById.mockResolvedValue(
+        mockPersonality,
+      );
+      mockClientAgentRepository.update.mockResolvedValue({
+        ...mockClientAgent,
+        personalityId: 'personality-1',
+      });
+
+      const result = await service.update('ca-1', {
+        personalityId: '507f1f77bcf86cd799439099',
+      } as any);
+      expect(mockPersonalityRepository.findActiveById).toHaveBeenCalledWith(
+        '507f1f77bcf86cd799439099',
+      );
       expect(mockClientAgentRepository.update).toHaveBeenCalledWith(
         'ca-1',
-        expect.any(Object),
+        expect.objectContaining({ personalityId: expect.anything() }),
       );
-      expect(result).toEqual(mockClientAgent);
+      expect(result).toEqual({
+        ...mockClientAgent,
+        personalityId: 'personality-1',
+      });
     });
 
     it('should throw NotFoundException if not found', async () => {

@@ -18,6 +18,8 @@ import { ClientAgentRepository } from './repositories/client-agent.repository';
 import { ClientPhoneRepository } from './repositories/client-phone.repository';
 import { AgentPriceRepository } from './repositories/agent-price.repository';
 import { ChannelPriceRepository } from './repositories/channel-price.repository';
+import { PersonalityRepository } from './repositories/personality.repository';
+import { Personality } from './schemas/personality.schema';
 import { encryptRecord, encrypt } from '@shared/crypto.util';
 import * as SEED_DATA from './data/seed-data.json';
 import { ClientRepository } from './repositories/client.repository';
@@ -41,6 +43,7 @@ export class SeederService implements OnApplicationBootstrap {
     private readonly clientPhoneRepository: ClientPhoneRepository,
     private readonly agentPriceRepository: AgentPriceRepository,
     private readonly channelPriceRepository: ChannelPriceRepository,
+    private readonly personalityRepository: PersonalityRepository,
     @InjectModel(ClientAgent.name)
     private readonly clientAgentModel: Model<ClientAgent>,
   ) {}
@@ -102,7 +105,13 @@ export class SeederService implements OnApplicationBootstrap {
         return;
       }
 
-      // 1. Ensure Agents exist (required for onboarding)
+      // 1. Ensure Personalities exist (required for onboarding)
+      const personalitiesList = (SEED_DATA as any).personalities ?? [];
+      const defaultPersonalityId = await this.ensurePersonalitiesAndGetDefault(
+        personalitiesList,
+      );
+
+      // 2. Ensure Agents exist (required for onboarding)
       const agentsMap = new Map();
       for (const agentSeed of SEED_DATA.agents) {
         let agent = await this.agentModel
@@ -127,7 +136,7 @@ export class SeederService implements OnApplicationBootstrap {
         agentsMap.set(agentSeed.name, agent);
       }
 
-      // 2. Ensure Channels exist (Infrastructure provisioning)
+      // 3. Ensure Channels exist (Infrastructure provisioning)
       this.logger.log('Provisioning channels...');
       const channelsMap = new Map();
       for (const channelSeed of SEED_DATA.channels) {
@@ -148,7 +157,7 @@ export class SeederService implements OnApplicationBootstrap {
         channelsMap.set(channelSeed.name, { channel });
       }
 
-      // 3. Pre-seed full catalog (AgentPrice + ChannelPrice) in default currency before any user
+      // 4. Pre-seed full catalog (AgentPrice + ChannelPrice) in default currency before any user
       const defaultCurrency = (SEED_DATA as any).billingCurrency ?? 'USD';
       this.logger.log(
         `Seeding catalog prices (${defaultCurrency}) for all agents and channels...`,
@@ -178,14 +187,14 @@ export class SeederService implements OnApplicationBootstrap {
         );
       }
 
-      // Ensure indexes are built before transaction starts to avoid "catalog changes" error
+      // Ensure indexes are built before transaction starts
       this.logger.log('Ensuring indexes are built...');
       await Promise.all([
         this.clientPhoneModel.createIndexes(),
         this.clientAgentModel.createIndexes(),
       ]);
 
-      // 4. Process each user
+      // 5. Process each user
       for (const userSeed of SEED_DATA.users) {
         const resolveHiringChannels = (hiringSeed: any) => {
           const channelsFromHiring = Array.isArray(hiringSeed.channels)
@@ -291,6 +300,7 @@ export class SeederService implements OnApplicationBootstrap {
           },
           agentHiring: {
             agentId: firstAgent._id.toString(),
+            personalityId: defaultPersonalityId,
           },
           channels: channelsDto as any,
         });
@@ -434,6 +444,7 @@ export class SeederService implements OnApplicationBootstrap {
                 await this.clientAgentRepository.create({
                   clientId: result.client._id,
                   agentId: additionalAgent._id.toString(),
+                  personalityId: new Types.ObjectId(defaultPersonalityId),
                   agentPricing: {
                     amount: additionalHiring.price ?? 0,
                     currency: client.billingCurrency,
@@ -501,6 +512,72 @@ export class SeederService implements OnApplicationBootstrap {
 
   private async sleep(ms: number): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Creates personalities from seed data and returns the id of the first (default) personality.
+   * Required for ClientAgent creation.
+   * Fetches existing personalities once and uses a map for O(1) lookups.
+   */
+  private async ensurePersonalitiesAndGetDefault(
+    personalitiesSeed: any[],
+  ): Promise<string> {
+    if (!personalitiesSeed || personalitiesSeed.length === 0) {
+      throw new Error(
+        'Seed data must include at least one personality. Add a "personalities" array to seed-data.json.',
+      );
+    }
+
+    const existing = await this.personalityRepository.findAll();
+    const existingByName = new Map(
+      existing.map((p) => [p.name, p as Personality]),
+    );
+
+    let defaultPersonality: Personality | null = null;
+
+    for (const seed of personalitiesSeed) {
+      const found = existingByName.get(seed.name);
+      if (found) {
+        if (!defaultPersonality) defaultPersonality = found;
+        this.logger.log(
+          `Personality "${seed.name}" already exists (${found._id})`,
+        );
+        continue;
+      }
+
+      this.logger.log(`Creating Personality: ${seed.name}`);
+      const created = await this.personalityRepository.create({
+        name: seed.name,
+        description: seed.description ?? '',
+        promptTemplate: seed.promptTemplate ?? '',
+        status: seed.status ?? 'active',
+        version: seed.version ?? 1,
+        ...(seed.tone ? { tone: seed.tone } : {}),
+        ...(seed.communicationStyle
+          ? { communicationStyle: seed.communicationStyle }
+          : {}),
+        ...(seed.guardrails ? { guardrails: seed.guardrails } : {}),
+        ...(Array.isArray(seed.examplePhrases)
+          ? { examplePhrases: seed.examplePhrases }
+          : {}),
+      });
+      existingByName.set(seed.name, created as Personality);
+      if (!defaultPersonality) defaultPersonality = created as Personality;
+    }
+
+    if (!defaultPersonality) {
+      const firstFromSeed = personalitiesSeed[0];
+      defaultPersonality =
+        (firstFromSeed && existingByName.get(firstFromSeed.name)) ?? null;
+    }
+    if (!defaultPersonality) {
+      const first = await this.personalityRepository.findAll();
+      defaultPersonality = (first[0] as Personality) ?? null;
+    }
+    if (!defaultPersonality) {
+      throw new Error('Failed to create or find a default personality.');
+    }
+    return (defaultPersonality._id as Types.ObjectId).toString();
   }
 
   /**
