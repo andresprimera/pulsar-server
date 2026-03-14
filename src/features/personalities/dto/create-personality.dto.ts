@@ -14,14 +14,6 @@ export class CreatePersonalityDto {
   promptTemplate: string;
 
   @IsOptional()
-  @IsString()
-  tone?: string;
-
-  @IsOptional()
-  @IsString()
-  communicationStyle?: string;
-
-  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   examplePhrases?: string[];

@@ -552,10 +552,6 @@ export class SeederService implements OnApplicationBootstrap {
         promptTemplate: seed.promptTemplate ?? '',
         status: seed.status ?? 'active',
         version: seed.version ?? 1,
-        ...(seed.tone ? { tone: seed.tone } : {}),
-        ...(seed.communicationStyle
-          ? { communicationStyle: seed.communicationStyle }
-          : {}),
         ...(seed.guardrails ? { guardrails: seed.guardrails } : {}),
         ...(Array.isArray(seed.examplePhrases)
           ? { examplePhrases: seed.examplePhrases }

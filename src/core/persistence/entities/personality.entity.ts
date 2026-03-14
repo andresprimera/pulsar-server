@@ -2,8 +2,6 @@ export interface Personality {
   id: string;
   name: string;
   description: string;
-  tone?: string;
-  communicationStyle?: string;
   examplePhrases: string[];
   guardrails?: string;
   promptTemplate: string;

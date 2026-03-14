@@ -5,7 +5,8 @@ const SECTION_SEP = '\n\n';
 
 /**
  * Centralized prompt construction. Builds the final system prompt in deterministic
- * section order: [Agent Instructions] → [Personality] → [Client Context] → [Contact Context] → [Safety Rules].
+ * section order: [Agent Instructions] → [Personality] → [Personality Examples] →
+ * [Personality Guardrails] → [Brand Voice] → [Client Context] → [Contact Context] → [Safety Rules].
  */
 @Injectable()
 export class PromptBuilderService {
@@ -28,6 +29,26 @@ export class PromptBuilderService {
     ) {
       sections.push(
         `[Personality]\n${context.personality.promptTemplate.trim()}`,
+      );
+    }
+
+    // [Personality Examples]
+    if (context.personality?.examplePhrases?.length) {
+      const examples = context.personality.examplePhrases
+        .map((p) => `• ${(p ?? '').trim()}`)
+        .filter((line) => line !== '• ')
+        .join('\n');
+      if (examples) {
+        sections.push(
+          `[Personality Examples]\nExamples of how you should speak:\n\n${examples}`,
+        );
+      }
+    }
+
+    // [Personality Guardrails]
+    if (context.personality?.guardrails?.trim()) {
+      sections.push(
+        `[Personality Guardrails]\n${context.personality.guardrails.trim()}`,
       );
     }
 

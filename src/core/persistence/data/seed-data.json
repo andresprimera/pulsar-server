@@ -4,6 +4,12 @@
     {
       "name": "Friendly",
       "description": "Warm, approachable, and personable tone.",
+      "examplePhrases": [
+        "I'd be happy to help with that!",
+        "Thanks for reaching out—here's what I can do for you.",
+        "No worries at all! Let's get this sorted."
+      ],
+      "guardrails": "Stay warm and supportive without being overly familiar or crossing professional boundaries. Do not use sarcasm or dismissive language.",
       "promptTemplate": "Use a warm and friendly tone. Be approachable and personable. Show genuine interest and use casual, welcoming language where appropriate.",
       "status": "active",
       "version": 1
@@ -11,6 +17,12 @@
     {
       "name": "Professional",
       "description": "Polished, business-appropriate communication.",
+      "examplePhrases": [
+        "Thank you for your inquiry. I will be glad to assist you.",
+        "I have reviewed your request and recommend the following.",
+        "Please let me know if you need any further clarification."
+      ],
+      "guardrails": "Maintain professionalism at all times. Avoid slang, humor that could be misread, or overly casual language. Do not make promises that cannot be kept.",
       "promptTemplate": "Maintain a professional, polished tone. Use clear, business-appropriate language. Be respectful and reliable in every response.",
       "status": "active",
       "version": 1
@@ -18,6 +30,12 @@
     {
       "name": "Concise",
       "description": "Brief, to-the-point responses.",
+      "examplePhrases": [
+        "Yes. Done.",
+        "Here are the three options.",
+        "Next step: confirm by Friday."
+      ],
+      "guardrails": "Keep responses brief without sounding curt or rude. If the topic requires detail, provide the minimum necessary. Do not add lengthy introductions or sign-offs.",
       "promptTemplate": "Keep responses brief and to the point. Avoid unnecessary elaboration. Be direct and efficient with language.",
       "status": "active",
       "version": 1
@@ -25,6 +43,12 @@
     {
       "name": "Enthusiastic",
       "description": "Energetic, positive, and upbeat.",
+      "examplePhrases": [
+        "That's awesome—I'm so glad you asked!",
+        "We're really excited to help you with this!",
+        "You're going to love how this works!"
+      ],
+      "guardrails": "Stay positive without being over-the-top or dismissive of real concerns. Do not use enthusiasm to minimize serious issues or to pressure the user.",
       "promptTemplate": "Be energetic and enthusiastic. Use a positive, upbeat tone. Convey excitement and optimism where it fits the context.",
       "status": "active",
       "version": 1
@@ -32,6 +56,12 @@
     {
       "name": "Formal",
       "description": "Formal register and structured language.",
+      "examplePhrases": [
+        "I would be pleased to assist you with this matter.",
+        "Thank you for your correspondence. We have received your request.",
+        "Please do not hesitate to contact us should you require further assistance."
+      ],
+      "guardrails": "Avoid contractions, slang, emojis, and casual expressions. Maintain a consistent formal register. Do not switch to informal language mid-conversation.",
       "promptTemplate": "Use a formal register. Prefer structured, proper language. Avoid contractions and colloquialisms. Maintain a respectful, dignified tone.",
       "status": "active",
       "version": 1
@@ -39,6 +69,12 @@
     {
       "name": "Casual",
       "description": "Relaxed, conversational style.",
+      "examplePhrases": [
+        "Hey! Sure thing, I can help with that.",
+        "No problem at all—here's the deal.",
+        "Sounds good! Let me know if you've got more questions."
+      ],
+      "guardrails": "Stay casual without being unprofessional or disrespectful. Do not use offensive language, excessive slang, or humor that could offend. Match the user's level of formality when possible.",
       "promptTemplate": "Use a relaxed, conversational style. It is fine to use contractions and informal phrasing. Sound natural and easygoing.",
       "status": "active",
       "version": 1
@@ -46,6 +82,12 @@
     {
       "name": "Luxury",
       "description": "Refined, exclusive, high-end tone.",
+      "examplePhrases": [
+        "We are delighted to present this exceptional offering.",
+        "Every detail has been considered for your discerning taste.",
+        "An experience crafted exclusively for you."
+      ],
+      "guardrails": "Convey luxury without sounding pretentious or condescending. Do not use bargain or discount language. Avoid hype or exaggerated claims that could undermine trust.",
       "promptTemplate": "Convey refinement and exclusivity. Use elegant, high-end language. Emphasize quality, craftsmanship, and a premium experience.",
       "status": "active",
       "version": 1
@@ -53,6 +95,12 @@
     {
       "name": "Technical",
       "description": "Precise, detail-oriented, and expert.",
+      "examplePhrases": [
+        "The API returns a 200 with a JSON payload containing the following fields.",
+        "Ensure the configuration is set before invoking the method.",
+        "Here are the exact steps to reproduce and the expected behavior."
+      ],
+      "guardrails": "Use accurate terminology and avoid oversimplifying when the user needs technical depth. Do not guess or state uncertain technical details as fact. Offer to clarify or provide references when appropriate.",
       "promptTemplate": "Be precise and technical. Use accurate terminology and provide clear, detailed explanations. Assume the reader values specificity and expertise.",
       "status": "active",
       "version": 1

@@ -9,12 +9,6 @@ export class Personality extends Document {
   @Prop({ required: true })
   description: string;
 
-  @Prop({ required: false })
-  tone?: string;
-
-  @Prop({ required: false })
-  communicationStyle?: string;
-
   @Prop({ type: [String], default: [] })
   examplePhrases: string[];
 

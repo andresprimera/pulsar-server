@@ -65,6 +65,8 @@ export class AgentContextService {
           id: (personalityDoc._id as Types.ObjectId).toString(),
           name: personalityDoc.name,
           promptTemplate: personalityDoc.promptTemplate,
+          examplePhrases: personalityDoc.examplePhrases ?? [],
+          guardrails: personalityDoc.guardrails,
         };
       }
     }

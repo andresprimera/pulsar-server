@@ -10,14 +10,6 @@ export class UpdatePersonalityDto {
   description?: string;
 
   @IsOptional()
-  @IsString()
-  tone?: string;
-
-  @IsOptional()
-  @IsString()
-  communicationStyle?: string;
-
-  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   examplePhrases?: string[];

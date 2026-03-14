@@ -11,6 +11,8 @@ export interface AgentContext {
     id: string;
     name: string;
     promptTemplate: string;
+    examplePhrases?: string[];
+    guardrails?: string;
   };
   /** Optional client brand voice instructions; refines tone alongside personality. */
   brandVoice?: string;

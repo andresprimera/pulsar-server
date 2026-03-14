@@ -103,7 +103,83 @@ describe('PromptBuilderService', () => {
     expect(result).toContain('first name');
   });
 
-  it('should order sections: Agent Instructions, Personality, Brand Voice, Client, Contact, Safety', () => {
+  it('should include [Personality Examples] when context has examplePhrases', () => {
+    const contextWithExamples: AgentContext = {
+      ...baseContext,
+      personality: {
+        id: 'p-1',
+        name: 'Friendly',
+        promptTemplate: 'Be warm.',
+        examplePhrases: [
+          "I'd be happy to help with that!",
+          'Thanks for reaching out.',
+        ],
+      },
+    };
+
+    const result = service.build(contextWithExamples, {}, undefined);
+
+    expect(result).toContain('[Personality Examples]');
+    expect(result).toContain('Examples of how you should speak:');
+    expect(result).toContain("• I'd be happy to help with that!");
+    expect(result).toContain('• Thanks for reaching out.');
+  });
+
+  it('should not include [Personality Examples] when examplePhrases is empty or missing', () => {
+    const result = service.build(baseContext, {}, undefined);
+    expect(result).not.toContain('[Personality Examples]');
+
+    const contextEmptyPhrases: AgentContext = {
+      ...baseContext,
+      personality: {
+        id: 'p-1',
+        name: 'P',
+        promptTemplate: 'Be brief.',
+        examplePhrases: [],
+      },
+    };
+    const result2 = service.build(contextEmptyPhrases, {}, undefined);
+    expect(result2).not.toContain('[Personality Examples]');
+  });
+
+  it('should include [Personality Guardrails] when context has guardrails', () => {
+    const contextWithGuardrails: AgentContext = {
+      ...baseContext,
+      personality: {
+        id: 'p-1',
+        name: 'Professional',
+        promptTemplate: 'Be professional.',
+        guardrails:
+          'Stay professional. Do not use slang or make promises you cannot keep.',
+      },
+    };
+
+    const result = service.build(contextWithGuardrails, {}, undefined);
+
+    expect(result).toContain('[Personality Guardrails]');
+    expect(result).toContain(
+      'Stay professional. Do not use slang or make promises you cannot keep.',
+    );
+  });
+
+  it('should not include [Personality Guardrails] when guardrails is empty or missing', () => {
+    const result = service.build(baseContext, {}, undefined);
+    expect(result).not.toContain('[Personality Guardrails]');
+
+    const contextEmptyGuardrails: AgentContext = {
+      ...baseContext,
+      personality: {
+        id: 'p-1',
+        name: 'P',
+        promptTemplate: 'Be brief.',
+        guardrails: '   ',
+      },
+    };
+    const result2 = service.build(contextEmptyGuardrails, {}, undefined);
+    expect(result2).not.toContain('[Personality Guardrails]');
+  });
+
+  it('should order sections: Agent Instructions, Personality, Personality Examples, Personality Guardrails, Brand Voice, Client, Contact, Safety', () => {
     const context: AgentContext = {
       ...baseContext,
       clientName: 'Co',
@@ -112,6 +188,8 @@ describe('PromptBuilderService', () => {
         id: 'p-1',
         name: 'P',
         promptTemplate: 'Personality text',
+        examplePhrases: ['Example one.'],
+        guardrails: 'Do not be rude.',
       },
     };
 
@@ -119,15 +197,38 @@ describe('PromptBuilderService', () => {
 
     const agentIdx = result.indexOf('[Agent Instructions]');
     const personalityIdx = result.indexOf('[Personality]');
+    const examplesIdx = result.indexOf('[Personality Examples]');
+    const guardrailsIdx = result.indexOf('[Personality Guardrails]');
     const brandVoiceIdx = result.indexOf('[Brand Voice]');
     const clientIdx = result.indexOf('[Client Context]');
     const contactIdx = result.indexOf('[Contact Context]');
     const safetyIdx = result.indexOf('[Safety Rules]');
 
     expect(agentIdx).toBeLessThan(personalityIdx);
-    expect(personalityIdx).toBeLessThan(brandVoiceIdx);
+    expect(personalityIdx).toBeLessThan(examplesIdx);
+    expect(examplesIdx).toBeLessThan(guardrailsIdx);
+    expect(guardrailsIdx).toBeLessThan(brandVoiceIdx);
     expect(brandVoiceIdx).toBeLessThan(clientIdx);
     expect(clientIdx).toBeLessThan(contactIdx);
     expect(contactIdx).toBeLessThan(safetyIdx);
+  });
+
+  it('should place Personality Examples before Brand Voice when both exist', () => {
+    const context: AgentContext = {
+      ...baseContext,
+      brandVoice: 'Brand voice here.',
+      personality: {
+        id: 'p-1',
+        name: 'P',
+        promptTemplate: 'Personality.',
+        examplePhrases: ['Say this.'],
+      },
+    };
+
+    const result = service.build(context, {}, undefined);
+
+    const examplesIdx = result.indexOf('[Personality Examples]');
+    const brandVoiceIdx = result.indexOf('[Brand Voice]');
+    expect(examplesIdx).toBeLessThan(brandVoiceIdx);
   });
 });
