@@ -30,17 +30,19 @@ export class ChannelPriceRepository {
     amount: number,
   ): Promise<ChannelPrice> {
     const normalized = currency.trim().toUpperCase();
-    const active = await this.model
-      .findOne({
-        channelId,
-        currency: normalized,
-        status: 'active',
-      })
+    const existing = await this.model
+      .findOne({ channelId, currency: normalized })
       .exec();
-    if (active) {
-      await this.model
-        .updateOne({ _id: active._id }, { status: 'deprecated' })
+    if (existing) {
+      const updated = await this.model
+        .findByIdAndUpdate(
+          existing._id,
+          { amount, status: 'active' },
+          { new: true },
+        )
         .exec();
+      if (!updated) throw new Error('Channel price update failed');
+      return updated;
     }
     const [doc] = await this.model.create([
       { channelId, currency: normalized, amount, status: 'active' },
