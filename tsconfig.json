@@ -11,6 +11,7 @@
     "outDir": "./dist",
     "baseUrl": "./",
     "paths": {
+      "@core/*": ["src/core/*"],
       "@channels/*": ["src/core/channels/*"],
       "@agent/*": ["src/core/agent/*"],
       "@orchestrator/*": ["src/core/orchestrator/*"],

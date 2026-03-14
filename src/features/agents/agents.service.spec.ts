@@ -2,10 +2,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { AgentsService } from './agents.service';
 import { AgentRepository } from '@persistence/repositories/agent.repository';
+import { AgentPriceRepository } from '@persistence/repositories/agent-price.repository';
 
 describe('AgentsService', () => {
   let service: AgentsService;
   let mockAgentRepository: any;
+  let mockAgentPriceRepository: any;
 
   const mockAgent = {
     _id: 'agent-1',
@@ -13,6 +15,11 @@ describe('AgentsService', () => {
     systemPrompt: 'You are helpful.',
     status: 'active',
   };
+
+  const agentWithPrices = (agent: any, prices: any[] = []) => ({
+    ...agent,
+    prices,
+  });
 
   beforeEach(async () => {
     mockAgentRepository = {
@@ -22,6 +29,9 @@ describe('AgentsService', () => {
       findByStatus: jest.fn(),
       update: jest.fn(),
     };
+    mockAgentPriceRepository = {
+      findByAgentIds: jest.fn().mockResolvedValue([]),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -29,6 +39,10 @@ describe('AgentsService', () => {
         {
           provide: AgentRepository,
           useValue: mockAgentRepository,
+        },
+        {
+          provide: AgentPriceRepository,
+          useValue: mockAgentPriceRepository,
         },
       ],
     }).compile();
@@ -56,6 +70,7 @@ describe('AgentsService', () => {
         status: 'active',
       });
       expect(result.status).toBe('active');
+      expect(result.prices).toEqual([]);
     });
   });
 
@@ -66,7 +81,7 @@ describe('AgentsService', () => {
       const result = await service.findAll();
 
       expect(mockAgentRepository.findAll).toHaveBeenCalled();
-      expect(result).toEqual([mockAgent]);
+      expect(result).toEqual([agentWithPrices(mockAgent)]);
     });
 
     it('should filter by status when provided', async () => {
@@ -75,7 +90,7 @@ describe('AgentsService', () => {
       const result = await service.findAll('active');
 
       expect(mockAgentRepository.findByStatus).toHaveBeenCalledWith('active');
-      expect(result).toEqual([mockAgent]);
+      expect(result).toEqual([agentWithPrices(mockAgent)]);
     });
   });
 
@@ -86,7 +101,7 @@ describe('AgentsService', () => {
       const result = await service.findAvailable();
 
       expect(mockAgentRepository.findByStatus).toHaveBeenCalledWith('active');
-      expect(result).toEqual([mockAgent]);
+      expect(result).toEqual([agentWithPrices(mockAgent)]);
     });
   });
 
@@ -97,7 +112,7 @@ describe('AgentsService', () => {
       const result = await service.findOne('agent-1');
 
       expect(mockAgentRepository.findById).toHaveBeenCalledWith('agent-1');
-      expect(result).toEqual(mockAgent);
+      expect(result).toEqual(agentWithPrices(mockAgent));
     });
 
     it('should throw NotFoundException for invalid ID', async () => {
@@ -123,6 +138,7 @@ describe('AgentsService', () => {
         name: 'Updated',
       });
       expect(result.name).toBe('Updated');
+      expect(result.prices).toEqual([]);
     });
 
     it('should throw NotFoundException for invalid ID', async () => {
@@ -162,6 +178,7 @@ describe('AgentsService', () => {
         status: 'inactive',
       });
       expect(result.status).toBe('inactive');
+      expect(result.prices).toEqual([]);
     });
 
     it('should throw NotFoundException for invalid ID', async () => {

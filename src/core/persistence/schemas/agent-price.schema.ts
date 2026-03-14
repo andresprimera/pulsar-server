@@ -17,4 +17,13 @@ export class AgentPrice extends Document {
 }
 
 export const AgentPriceSchema = SchemaFactory.createForClass(AgentPrice);
+// One document per (agent, currency)
 AgentPriceSchema.index({ agentId: 1, currency: 1 }, { unique: true });
+// Enforce at most one active price per (agent, currency)
+AgentPriceSchema.index(
+  { agentId: 1, currency: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { status: 'active' },
+  },
+);

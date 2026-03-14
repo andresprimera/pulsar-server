@@ -17,4 +17,13 @@ export class ChannelPrice extends Document {
 }
 
 export const ChannelPriceSchema = SchemaFactory.createForClass(ChannelPrice);
+// One document per (channel, currency)
 ChannelPriceSchema.index({ channelId: 1, currency: 1 }, { unique: true });
+// Enforce at most one active price per (channel, currency)
+ChannelPriceSchema.index(
+  { channelId: 1, currency: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { status: 'active' },
+  },
+);

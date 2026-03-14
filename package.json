@@ -96,6 +96,7 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "moduleNameMapper": {
+      "^@core/(.*)$": "<rootDir>/core/$1",
       "^@channels/(.*)$": "<rootDir>/core/channels/$1",
       "^@agent/(.*)$": "<rootDir>/core/agent/$1",
       "^@orchestrator/(.*)$": "<rootDir>/core/orchestrator/$1",

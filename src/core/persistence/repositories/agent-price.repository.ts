@@ -67,4 +67,12 @@ export class AgentPriceRepository {
   async findByAgent(agentId: Types.ObjectId): Promise<AgentPrice[]> {
     return this.model.find({ agentId }).sort({ currency: 1 }).exec();
   }
+
+  async findByAgentIds(agentIds: Types.ObjectId[]): Promise<AgentPrice[]> {
+    if (agentIds.length === 0) return [];
+    return this.model
+      .find({ agentId: { $in: agentIds } })
+      .sort({ currency: 1 })
+      .exec();
+  }
 }

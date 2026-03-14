@@ -27,7 +27,7 @@ Status filters where applicable: `active` | `inactive` | `archived`.
 | PATCH  | `/agents/:id`        | -          | Optional: `name`, `systemPrompt`, `llmOverride`, `monthlyTokenQuota` |
 | PATCH  | `/agents/:id/status` | -          | Body: `status` (`active` \| `inactive` \| `archived`). Archived agents cannot be modified |
 
-Response: `_id`, `name`, `systemPrompt`, `status`, optional `llmOverride`, `monthlyTokenQuota`, timestamps.
+Response: `_id`, `name`, `systemPrompt`, `status`, optional `llmOverride`, `monthlyTokenQuota`, `prices` (array of `{ currency, amount }` for active catalog prices only), timestamps.
 
 ---
 
@@ -90,7 +90,7 @@ Channels are created via seed; only listing and single-item retrieval are availa
 | GET    | `/channels`      | -            |
 | GET    | `/channels/:id`  | -            |
 
-Response: `_id`, `name`, `type` (e.g. whatsapp, tiktok, instagram), `supportedProviders[]`, `monthlyMessageQuota`.
+Response: `_id`, `name`, `type` (e.g. whatsapp, tiktok, instagram), `supportedProviders[]`, `monthlyMessageQuota`, `prices` (array of `{ currency, amount }` for active catalog prices only).
 
 ---
 

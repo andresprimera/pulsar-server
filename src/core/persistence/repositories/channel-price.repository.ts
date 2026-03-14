@@ -67,4 +67,14 @@ export class ChannelPriceRepository {
   async findByChannel(channelId: Types.ObjectId): Promise<ChannelPrice[]> {
     return this.model.find({ channelId }).sort({ currency: 1 }).exec();
   }
+
+  async findByChannelIds(
+    channelIds: Types.ObjectId[],
+  ): Promise<ChannelPrice[]> {
+    if (channelIds.length === 0) return [];
+    return this.model
+      .find({ channelId: { $in: channelIds } })
+      .sort({ currency: 1 })
+      .exec();
+  }
 }
