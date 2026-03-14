@@ -25,7 +25,8 @@ export function toChannelResponse(
     type: plain.type ?? '',
     supportedProviders,
     monthlyMessageQuota:
-      plain.monthlyMessageQuota !== undefined && plain.monthlyMessageQuota !== null
+      plain.monthlyMessageQuota !== undefined &&
+      plain.monthlyMessageQuota !== null
         ? plain.monthlyMessageQuota
         : null,
     prices: Array.isArray(prices) ? [...prices] : [],
@@ -41,16 +42,17 @@ export function toAgentResponse(
   prices: CatalogPrice[],
 ): Record<string, unknown> {
   const id = plain._id != null ? String(plain._id) : undefined;
-  const llmOverride = plain.llmOverride &&
+  const llmOverride =
+    plain.llmOverride &&
     typeof plain.llmOverride === 'object' &&
     plain.llmOverride !== null &&
     'provider' in plain.llmOverride &&
     'model' in plain.llmOverride
-    ? {
-        provider: (plain.llmOverride as { provider: string }).provider,
-        model: (plain.llmOverride as { model: string }).model,
-      }
-    : undefined;
+      ? {
+          provider: (plain.llmOverride as { provider: string }).provider,
+          model: (plain.llmOverride as { model: string }).model,
+        }
+      : undefined;
   return {
     id,
     name: plain.name ?? '',
