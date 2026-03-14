@@ -179,9 +179,16 @@ export class SeederService implements OnApplicationBootstrap {
       for (const channelSeed of SEED_DATA.channels) {
         const channelInfo = channelsMap.get(channelSeed.name);
         if (!channelInfo?.channel?._id) continue;
+        const channelId = channelInfo.channel._id as Types.ObjectId;
+        const existing =
+          await this.channelPriceRepository.findActiveByChannelAndCurrency(
+            channelId,
+            defaultCurrency,
+          );
+        if (existing) continue; // avoid creating history on re-seed
         const amount = (channelSeed as any).amount ?? 0;
         await this.channelPriceRepository.upsert(
-          channelInfo.channel._id as Types.ObjectId,
+          channelId,
           defaultCurrency,
           amount,
         );
