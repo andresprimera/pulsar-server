@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import { LlmConfig, LlmConfigSchema } from './llm-config.schema';
 
 @Schema({ collection: 'clients', timestamps: true })
 export class Client extends Document {
@@ -49,6 +50,13 @@ export class Client extends Document {
     provider: string;
     defaultModel: string;
   };
+
+  /**
+   * Optional client-level LLM config (provider, apiKey, model). All agents hired by this client use it.
+   * When absent or apiKey is REPLACE_ME/missing, runtime falls back to process.env (e.g. OPENAI_API_KEY).
+   */
+  @Prop({ type: LlmConfigSchema, required: false, select: false })
+  llmConfig?: LlmConfig;
 
   /**
    * Optional client-specific brand voice instructions. Refines tone/style

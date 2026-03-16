@@ -179,10 +179,6 @@ export class ClientAgentsService {
         phoneNumberId,
         tiktokUserId,
         instagramAccountId,
-        llmConfig: {
-          ...channelConfig.llmConfig,
-          apiKey: encrypt(channelConfig.llmConfig.apiKey),
-        },
         amount: channelAmount,
         currency,
         monthlyMessageQuota: channelMonthlyMessageQuota,

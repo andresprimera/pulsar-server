@@ -26,6 +26,18 @@ class UserDto {
   name: string;
 }
 
+class LlmConfigDto {
+  @Transform(({ value }) => value?.toLowerCase().trim())
+  @IsEnum(LlmProvider)
+  provider: LlmProvider;
+
+  @IsString()
+  apiKey: string;
+
+  @IsString()
+  model: string;
+}
+
 class ClientDto {
   @IsEnum(['individual', 'organization'])
   type: 'individual' | 'organization';
@@ -41,6 +53,11 @@ class ClientDto {
       'billingCurrency must be a valid ISO 4217 code (e.g. USD, EUR, BRL)',
   })
   billingCurrency?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LlmConfigDto)
+  llmConfig?: LlmConfigDto;
 }
 
 class PricingOverrideDto {
@@ -70,18 +87,6 @@ class AgentHiringDto {
   pricingOverride?: PricingOverrideDto;
 }
 
-class LlmConfigDto {
-  @Transform(({ value }) => value?.toLowerCase().trim())
-  @IsEnum(LlmProvider)
-  provider: LlmProvider;
-
-  @IsString()
-  apiKey: string;
-
-  @IsString()
-  model: string;
-}
-
 class HireChannelConfigDto {
   @IsMongoId()
   channelId: string;
@@ -98,10 +103,6 @@ class HireChannelConfigDto {
   @IsOptional()
   @IsString()
   routingIdentifier?: string;
-
-  @ValidateNested()
-  @Type(() => LlmConfigDto)
-  llmConfig: LlmConfigDto;
 
   @IsOptional()
   @Type(() => Number)

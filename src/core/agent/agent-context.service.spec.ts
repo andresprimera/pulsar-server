@@ -6,9 +6,16 @@ import { PersonalityRepository } from '@persistence/repositories/personality.rep
 import { AgentContext } from './contracts/agent-context';
 import { LlmProvider } from './llm/provider.enum';
 import { Logger } from '@nestjs/common';
+import { Types } from 'mongoose';
+
+jest.mock('@shared/crypto.util', () => ({
+  decrypt: jest.fn((x: string) => x),
+  decryptRecord: jest.fn((x: unknown) => x ?? {}),
+}));
 
 describe('AgentContextService', () => {
   let service: AgentContextService;
+  let moduleRef: TestingModule;
   let clientRepository: jest.Mocked<ClientRepository>;
   let warnSpy: jest.SpyInstance;
 
@@ -25,7 +32,7 @@ describe('AgentContextService', () => {
   };
 
   beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
+    const testingModule = await Test.createTestingModule({
       providers: [
         AgentContextService,
         {
@@ -38,6 +45,7 @@ describe('AgentContextService', () => {
           provide: ClientRepository,
           useValue: {
             findById: jest.fn(),
+            findByIdWithLlmCredentials: jest.fn(),
           },
         },
         {
@@ -49,8 +57,9 @@ describe('AgentContextService', () => {
       ],
     }).compile();
 
-    service = module.get<AgentContextService>(AgentContextService);
-    clientRepository = module.get(ClientRepository);
+    moduleRef = testingModule;
+    service = testingModule.get<AgentContextService>(AgentContextService);
+    clientRepository = testingModule.get(ClientRepository);
     warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
   });
 
@@ -140,6 +149,22 @@ describe('AgentContextService', () => {
     );
   });
 
+  it('should use passed-in client and not call findById when client is provided', async () => {
+    const passedClient = {
+      _id: 'client-1',
+      name: 'Passed Client',
+      type: 'organization',
+      status: 'active',
+      brandVoice: 'Custom voice',
+    } as any;
+
+    const result = await service.enrichContext(baseContext, passedClient);
+
+    expect(result.clientName).toBe('Passed Client');
+    expect(result.brandVoice).toBe('Custom voice');
+    expect(clientRepository.findById).not.toHaveBeenCalled();
+  });
+
   it('should preserve all other context fields', async () => {
     clientRepository.findById.mockResolvedValue({
       _id: 'client-1',
@@ -161,5 +186,128 @@ describe('AgentContextService', () => {
     expect(result.systemPrompt).toBe(baseContext.systemPrompt);
     expect(result.llmConfig).toEqual(baseContext.llmConfig);
     expect(result.channelConfig).toEqual({ phoneNumberId: '123' });
+  });
+
+  describe('buildContextFromRoute', () => {
+    const mockClientAgent = {
+      clientId: 'client-1',
+      agentId: 'agent-1',
+      personalityId: new Types.ObjectId(),
+      agentPricing: { amount: 100, currency: 'USD', monthlyTokenQuota: null },
+      billingAnchor: new Date(),
+      status: 'active',
+      channels: [],
+    } as any;
+    const mockChannelConfig = {
+      channelId: new Types.ObjectId(),
+      provider: 'meta',
+      status: 'active' as const,
+      credentials: {},
+      amount: 0,
+      currency: 'USD',
+      monthlyMessageQuota: null,
+    } as any;
+    const mockAgent = {
+      _id: 'agent-1',
+      name: 'Support Agent',
+      systemPrompt: 'You are helpful.',
+    } as any;
+    const mockPersonality = {
+      _id: new Types.ObjectId(),
+      name: 'Friendly',
+      promptTemplate: 'Be friendly.',
+      examplePhrases: [],
+      guardrails: '',
+    } as any;
+
+    beforeEach(() => {
+      const agentRepo = moduleRef.get(AgentRepository) as jest.Mocked<AgentRepository>;
+      const personalityRepo = moduleRef.get(PersonalityRepository) as jest.Mocked<PersonalityRepository>;
+      agentRepo.findActiveById = jest.fn().mockResolvedValue(mockAgent);
+      personalityRepo.findActiveById = jest.fn().mockResolvedValue(mockPersonality);
+    });
+
+    it('should use client llmConfig when present and apiKey is valid', async () => {
+      const clientWithLlm = {
+        _id: 'client-1',
+        name: 'Acme',
+        type: 'organization',
+        status: 'active',
+        llmConfig: {
+          provider: LlmProvider.OpenAI,
+          apiKey: 'encrypted-client-key',
+          model: 'gpt-4o-mini',
+        },
+      } as any;
+      clientRepository.findByIdWithLlmCredentials.mockResolvedValue(clientWithLlm);
+
+      const { context, client } = await service.buildContextFromRoute(
+        mockClientAgent,
+        mockChannelConfig,
+      );
+
+      expect(context).not.toBeNull();
+      expect(context!.llmConfig.provider).toBe(LlmProvider.OpenAI);
+      expect(context!.llmConfig.model).toBe('gpt-4o-mini');
+      expect(context!.llmConfig.apiKey).toBe('encrypted-client-key');
+      expect(client).toBe(clientWithLlm);
+    });
+
+    it('should use env fallback when client has no llmConfig', async () => {
+      const clientNoLlm = {
+        _id: 'client-1',
+        name: 'Acme',
+        type: 'organization',
+        status: 'active',
+      } as any;
+      clientRepository.findByIdWithLlmCredentials.mockResolvedValue(clientNoLlm);
+      const envKey = 'env-openai-key';
+      const orig = process.env.OPENAI_API_KEY;
+      process.env.OPENAI_API_KEY = envKey;
+
+      try {
+        const { context } = await service.buildContextFromRoute(
+          mockClientAgent,
+          mockChannelConfig,
+        );
+        expect(context).not.toBeNull();
+        expect(context!.llmConfig.apiKey).toBe(envKey);
+        expect(context!.llmConfig.provider).toBe(LlmProvider.OpenAI);
+        expect(context!.llmConfig.model).toBe('gpt-4o');
+      } finally {
+        process.env.OPENAI_API_KEY = orig;
+      }
+    });
+
+    it('should use env fallback when client llmConfig.apiKey is REPLACE_ME', async () => {
+      const clientReplaceMe = {
+        _id: 'client-1',
+        name: 'Acme',
+        type: 'organization',
+        status: 'active',
+        llmConfig: {
+          provider: LlmProvider.OpenAI,
+          apiKey: 'REPLACE_ME',
+          model: 'gpt-4o',
+        },
+      } as any;
+      clientRepository.findByIdWithLlmCredentials.mockResolvedValue(clientReplaceMe);
+      const envKey = 'fallback-env-key';
+      const orig = process.env.OPENAI_API_KEY;
+      process.env.OPENAI_API_KEY = envKey;
+
+      try {
+        const { context } = await service.buildContextFromRoute(
+          mockClientAgent,
+          mockChannelConfig,
+        );
+        expect(context).not.toBeNull();
+        expect(context!.llmConfig.apiKey).toBe(envKey);
+        expect(context!.llmConfig.provider).toBe(LlmProvider.OpenAI);
+        expect(context!.llmConfig.model).toBe('gpt-4o');
+      } finally {
+        process.env.OPENAI_API_KEY = orig;
+      }
+    });
   });
 });

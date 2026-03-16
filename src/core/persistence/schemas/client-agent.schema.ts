@@ -1,6 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
-import { LlmConfig, LlmConfigSchema } from './llm-config.schema';
 import { CHANNEL_PROVIDER_VALUES } from '@shared/channel-provider.constants';
 
 @Schema({ _id: false })
@@ -41,9 +40,6 @@ export class HireChannelConfig {
 
   @Prop({ type: String, required: false, index: true })
   instagramAccountId?: string;
-
-  @Prop({ type: LlmConfigSchema, required: true })
-  llmConfig: LlmConfig;
 
   @Prop({ required: true, min: 0, default: 0 })
   amount: number;

@@ -27,6 +27,17 @@ export class ClientRepository {
     return this.model.findById(id).exec();
   }
 
+  /**
+   * Returns the client with llmConfig.apiKey included (for agent context building only).
+   * Default findById does not expose apiKey (select: false).
+   */
+  async findByIdWithLlmCredentials(id: string): Promise<Client | null> {
+    return this.model
+      .findById(id)
+      .select('+llmConfig.apiKey')
+      .exec();
+  }
+
   async findByStatus(
     status: 'active' | 'inactive' | 'archived',
   ): Promise<Client[]> {

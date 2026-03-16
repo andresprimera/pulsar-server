@@ -277,7 +277,6 @@ export class SeederService implements OnApplicationBootstrap {
             status: channelSeed.status || 'active',
             credentials: channelSeed.credentials,
             routingIdentifier: channelSeed.routingIdentifier,
-            llmConfig: channelSeed.llmConfig,
           });
         }
 
@@ -295,16 +294,30 @@ export class SeederService implements OnApplicationBootstrap {
         this.logger.log(
           `Running onboarding flow for user "${userSeed.email}" with agent "${firstAgentHiring.agentName}"...`,
         );
+        const clientPayload: {
+          type: any;
+          name?: string;
+          billingCurrency: string;
+          llmConfig?: { provider: string; apiKey: string; model: string };
+        } = {
+          type: userSeed.client.type as any,
+          ...(userSeed.client.name ? { name: userSeed.client.name } : {}),
+          billingCurrency,
+        };
+        const clientLlmConfig = (userSeed.client as any)?.llmConfig;
+        if (clientLlmConfig?.apiKey != null) {
+          clientPayload.llmConfig = {
+            provider: clientLlmConfig.provider,
+            apiKey: encrypt(clientLlmConfig.apiKey),
+            model: clientLlmConfig.model ?? 'gpt-4o',
+          };
+        }
         const result = await this.runOnboardingWithRetry({
           user: {
             email: userSeed.email,
             name: userSeed.name,
           },
-          client: {
-            type: userSeed.client.type as any,
-            ...(userSeed.client.name ? { name: userSeed.client.name } : {}),
-            billingCurrency,
-          },
+          client: clientPayload,
           agentHiring: {
             agentId: firstAgent._id.toString(),
             personalityId: defaultPersonalityId,
@@ -432,10 +445,6 @@ export class SeederService implements OnApplicationBootstrap {
                   phoneNumberId,
                   tiktokUserId,
                   instagramAccountId,
-                  llmConfig: {
-                    ...channelSeed.llmConfig,
-                    apiKey: encrypt(channelSeed.llmConfig.apiKey),
-                  },
                   amount: 0,
                   currency: client.billingCurrency,
                   monthlyMessageQuota:

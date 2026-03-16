@@ -4,12 +4,14 @@ import { AgentContext } from './contracts/agent-context';
 import { AgentRepository } from '@persistence/repositories/agent.repository';
 import { ClientRepository } from '@persistence/repositories/client.repository';
 import { PersonalityRepository } from '@persistence/repositories/personality.repository';
+import { Client } from '@persistence/schemas/client.schema';
 import {
   ClientAgent,
   HireChannelConfig,
 } from '@persistence/schemas/client-agent.schema';
 import { decrypt, decryptRecord } from '@shared/crypto.util';
 import { RouteCandidate } from '@domain/routing/agent-routing.service';
+import { LlmProvider } from '@domain/llm/provider.enum';
 
 @Injectable()
 export class AgentContextService {
@@ -23,25 +25,41 @@ export class AgentContextService {
 
   /**
    * Builds full AgentContext from route candidate, loading agent and decrypting
-   * credentials in the agent layer. Returns null if agent is not active.
+   * credentials in the agent layer. Returns { context, client } so the orchestrator
+   * can pass the client to enrichContext and avoid a second client load.
+   * Returns context: null if agent is not active.
    */
   async buildContextFromRoute(
     clientAgent: ClientAgent,
     channelConfig: HireChannelConfig,
-  ): Promise<AgentContext | null> {
+  ): Promise<{ context: AgentContext | null; client: Client | null }> {
     const agent = await this.agentRepository.findActiveById(
       clientAgent.agentId,
     );
     if (!agent) {
-      return null;
+      return { context: null, client: null };
     }
 
-    const rawApiKey =
-      channelConfig.llmConfig.apiKey &&
-      !String(channelConfig.llmConfig.apiKey).includes('REPLACE_ME')
-        ? channelConfig.llmConfig.apiKey
-        : process.env.OPENAI_API_KEY ?? '';
+    const client = await this.clientRepository.findByIdWithLlmCredentials(
+      clientAgent.clientId,
+    );
+
+    const useClientLlm =
+      client?.llmConfig?.apiKey != null &&
+      String(client.llmConfig.apiKey) !== '' &&
+      !String(client.llmConfig.apiKey).includes('REPLACE_ME');
+
+    const rawApiKey = useClientLlm
+      ? client!.llmConfig!.apiKey
+      : process.env.OPENAI_API_KEY ?? '';
     const apiKey = decrypt(rawApiKey);
+
+    const provider: LlmProvider = useClientLlm
+      ? (client!.llmConfig!.provider as LlmProvider)
+      : (client?.llmPreferences?.provider as LlmProvider) ?? LlmProvider.OpenAI;
+    const model = useClientLlm
+      ? client!.llmConfig!.model
+      : client?.llmPreferences?.defaultModel ?? 'gpt-4o';
 
     const channelConfigDecrypted =
       channelConfig.credentials &&
@@ -79,14 +97,14 @@ export class AgentContextService {
       systemPrompt: agent.systemPrompt,
       personality,
       llmConfig: {
-        provider: (channelConfig.llmConfig.provider || 'openai') as any,
+        provider,
         apiKey,
-        model: channelConfig.llmConfig.model || 'gpt-4o',
+        model,
       },
       channelConfig: channelConfigDecrypted,
     };
 
-    return rawContext;
+    return { context: rawContext, client };
   }
 
   /**
@@ -125,13 +143,17 @@ export class AgentContextService {
   }
 
   /**
-   * Enriches context with clientName and agentName for PromptBuilder.
-   * Does not build or mutate systemPrompt; that is done by PromptBuilder.
+   * Enriches context with clientName and brandVoice for PromptBuilder.
+   * When client is provided (e.g. from buildContextFromRoute), skips a second client load.
    */
-  async enrichContext(context: AgentContext): Promise<AgentContext> {
-    const client = await this.clientRepository.findById(context.clientId);
+  async enrichContext(
+    context: AgentContext,
+    client?: Client | null,
+  ): Promise<AgentContext> {
+    const resolvedClient =
+      client ?? (await this.clientRepository.findById(context.clientId));
 
-    if (!client) {
+    if (!resolvedClient) {
       this.logger.warn(
         `Client ${context.clientId} not found. Context will have no client name.`,
       );
@@ -140,9 +162,10 @@ export class AgentContextService {
 
     return {
       ...context,
-      clientName: client.name,
-      ...(client.brandVoice != null && client.brandVoice !== ''
-        ? { brandVoice: client.brandVoice }
+      clientName: resolvedClient.name,
+      ...(resolvedClient.brandVoice != null &&
+      resolvedClient.brandVoice !== ''
+        ? { brandVoice: resolvedClient.brandVoice }
         : {}),
     };
   }
