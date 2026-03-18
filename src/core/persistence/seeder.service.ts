@@ -304,6 +304,7 @@ export class SeederService implements OnApplicationBootstrap {
           ...(userSeed.client.name ? { name: userSeed.client.name } : {}),
           billingCurrency,
         };
+        // Seed apiKey values like __REPLACE_ME_API_KEY__ trigger env fallback at runtime (AgentContextService checks .includes('REPLACE_ME')).
         const clientLlmConfig = (userSeed.client as any)?.llmConfig;
         if (clientLlmConfig?.apiKey != null) {
           clientPayload.llmConfig = {

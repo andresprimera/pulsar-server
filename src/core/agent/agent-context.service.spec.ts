@@ -321,5 +321,44 @@ describe('AgentContextService', () => {
         process.env.OPENAI_API_KEY = orig;
       }
     });
+
+    it('should never use channelConfig.llmConfig (resolution from client or env only)', async () => {
+      const clientWithLlm = {
+        _id: 'client-1',
+        name: 'Acme',
+        type: 'organization',
+        status: 'active',
+        llmConfig: {
+          provider: LlmProvider.OpenAI,
+          apiKey: 'encrypted-client-key',
+          model: 'gpt-4o-mini',
+        },
+      } as any;
+      clientRepository.findByIdWithLlmCredentials.mockResolvedValue(
+        clientWithLlm,
+      );
+      const channelConfigWithFakeLlm = {
+        ...mockChannelConfig,
+        llmConfig: {
+          provider: LlmProvider.OpenAI,
+          apiKey: 'channel-api-key-should-be-ignored',
+          model: 'channel-model-should-be-ignored',
+        },
+      } as any;
+
+      const { context } = await service.buildContextFromRoute(
+        mockClientAgent,
+        channelConfigWithFakeLlm,
+      );
+
+      expect(context).not.toBeNull();
+      const ctx = context as NonNullable<typeof context>;
+      expect(ctx.llmConfig.apiKey).toBe('encrypted-client-key');
+      expect(ctx.llmConfig.model).toBe('gpt-4o-mini');
+      expect(ctx.llmConfig.apiKey).not.toBe(
+        'channel-api-key-should-be-ignored',
+      );
+      expect(ctx.llmConfig.model).not.toBe('channel-model-should-be-ignored');
+    });
   });
 });
