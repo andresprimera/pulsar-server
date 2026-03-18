@@ -82,10 +82,11 @@ export class IncomingMessageOrchestrator {
 
     const { clientAgent, channelConfig } = routeDecision.candidate;
 
-    const rawContext = await this.agentContextService.buildContextFromRoute(
-      clientAgent,
-      channelConfig,
-    );
+    const { context: rawContext, client } =
+      await this.agentContextService.buildContextFromRoute(
+        clientAgent,
+        channelConfig,
+      );
     if (!rawContext) {
       this.logger.warn(
         `[${logPrefix}] Agent ${clientAgent.agentId} is not active. Skipping message.`,
@@ -119,7 +120,10 @@ export class IncomingMessageOrchestrator {
       return undefined;
     }
 
-    const context = await this.agentContextService.enrichContext(rawContext);
+    const context = await this.agentContextService.enrichContext(
+      rawContext,
+      client,
+    );
 
     const contact = await this.contactIdentityResolver.resolveContact({
       channelType: event.channelId as ChannelType,

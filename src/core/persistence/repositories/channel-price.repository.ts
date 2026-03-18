@@ -57,7 +57,7 @@ export class ChannelPriceRepository {
     const normalized = currency.trim().toUpperCase();
     return this.model
       .findOneAndUpdate(
-        { channelId, currency: normalized },
+        { channelId, currency: normalized, status: 'active' },
         { status: 'deprecated' },
         { new: true },
       )
@@ -65,7 +65,10 @@ export class ChannelPriceRepository {
   }
 
   async findByChannel(channelId: Types.ObjectId): Promise<ChannelPrice[]> {
-    return this.model.find({ channelId }).sort({ currency: 1 }).exec();
+    return this.model
+      .find({ channelId })
+      .sort({ currency: 1, createdAt: -1 })
+      .exec();
   }
 
   async findByChannelIds(

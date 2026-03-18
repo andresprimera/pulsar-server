@@ -13,7 +13,7 @@ import { ClientPhoneRepository } from '@persistence/repositories/client-phone.re
 import { AgentPriceRepository } from '@persistence/repositories/agent-price.repository';
 import { ChannelPriceRepository } from '@persistence/repositories/channel-price.repository';
 import { PersonalityRepository } from '@persistence/repositories/personality.repository';
-import { encrypt, encryptRecord } from '@shared/crypto.util';
+import { encryptRecord } from '@shared/crypto.util';
 
 import { assertCurrencyMatch } from '@domain/billing/currency.validator';
 import { CreateClientAgentDto } from './dto/create-client-agent.dto';
@@ -179,10 +179,6 @@ export class ClientAgentsService {
         phoneNumberId,
         tiktokUserId,
         instagramAccountId,
-        llmConfig: {
-          ...channelConfig.llmConfig,
-          apiKey: encrypt(channelConfig.llmConfig.apiKey),
-        },
         amount: channelAmount,
         currency,
         monthlyMessageQuota: channelMonthlyMessageQuota,

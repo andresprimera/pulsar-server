@@ -133,11 +133,6 @@ describe('IncomingMessageOrchestrator', () => {
             phoneNumberId: 'phone123',
             accessToken: 'sk-wa-token',
           },
-          llmConfig: {
-            provider: LlmProvider.OpenAI,
-            apiKey: 'sk-mock-key',
-            model: 'gpt-4',
-          },
           monthlyMessageQuota: null,
         },
       ],
@@ -213,7 +208,7 @@ describe('IncomingMessageOrchestrator', () => {
       agentRoutingService.resolveRoute.mockResolvedValue(
         mockResolvedRoute as any,
       );
-      agentContextService.buildContextFromRoute.mockResolvedValue({
+      const mockContext = {
         agentId: 'agent-1',
         agentName: 'Support Bot',
         clientId: mockClientAgent.clientId,
@@ -225,6 +220,16 @@ describe('IncomingMessageOrchestrator', () => {
           model: 'gpt-4',
         },
         channelConfig: {},
+      };
+      const mockClient = {
+        _id: mockClientAgent.clientId,
+        name: 'Test Client',
+        type: 'organization',
+        status: 'active',
+      };
+      agentContextService.buildContextFromRoute.mockResolvedValue({
+        context: mockContext,
+        client: mockClient as any,
       });
       contactIdentityResolver.resolveContact.mockResolvedValue(
         mockContact as any,
@@ -274,7 +279,7 @@ describe('IncomingMessageOrchestrator', () => {
       agentRoutingService.resolveRoute.mockResolvedValue(
         mockResolvedRoute as any,
       );
-      agentContextService.buildContextFromRoute.mockResolvedValue({
+      const mockContext = {
         agentId: 'agent-1',
         agentName: 'Support Bot',
         clientId: mockClientAgent.clientId,
@@ -286,6 +291,16 @@ describe('IncomingMessageOrchestrator', () => {
           model: 'gpt-4',
         },
         channelConfig: {},
+      };
+      const mockClient = {
+        _id: mockClientAgent.clientId,
+        name: 'Test Client',
+        type: 'organization',
+        status: 'active',
+      };
+      agentContextService.buildContextFromRoute.mockResolvedValue({
+        context: mockContext,
+        client: mockClient as any,
       });
       contactIdentityResolver.resolveContact.mockResolvedValue(
         mockContact as any,

@@ -4,6 +4,8 @@ Base URL: `http://localhost:3000` (no global prefix).
 IDs in paths are MongoDB ObjectIds unless noted.  
 Status filters where applicable: `active` | `inactive` | `archived`.
 
+**Catalog prices:** Any endpoint that returns `prices` (e.g. agents, channels) uses the same shape: array of `{ currency: string, amount: number }` (ISO 4217 currency, numeric amount). Active catalog prices only.
+
 ---
 
 ## Health

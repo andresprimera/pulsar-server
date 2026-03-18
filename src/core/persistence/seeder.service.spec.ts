@@ -131,6 +131,7 @@ describe('SeederService', () => {
     };
 
     mockChannelPriceRepository = {
+      findActiveByChannelAndCurrency: jest.fn().mockResolvedValue(null),
       upsert: jest.fn().mockResolvedValue({}),
     };
 

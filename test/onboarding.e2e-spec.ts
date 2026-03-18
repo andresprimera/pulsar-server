@@ -148,6 +148,11 @@ describe('Onboarding (e2e)', () => {
           },
           client: {
             type: 'individual',
+            llmConfig: {
+              provider: 'openai',
+              apiKey: 'test-key',
+              model: 'gpt-4',
+            },
           },
           agentHiring: {
             agentId: testAgentId,
@@ -162,11 +167,6 @@ describe('Onboarding (e2e)', () => {
                 phoneNumberId: `e2e-phone-${suffix}`,
                 accessToken: 'test-token',
                 webhookVerifyToken: 'test-verify',
-              },
-              llmConfig: {
-                provider: 'openai',
-                apiKey: 'test-key',
-                model: 'gpt-4',
               },
               amountOverride: 0,
             },
@@ -206,8 +206,8 @@ describe('Onboarding (e2e)', () => {
       expect(savedClientAgent.channels[0].channelId.toString()).toBe(channelId);
       expect(savedClientAgent.channels[0].provider).toBe('meta');
       expect(savedClientAgent.channels[0].credentials).toBeDefined();
-
-      expect(savedClientAgent.channels[0].llmConfig).toHaveProperty('apiKey');
+      // LLM config is per-client only; channels no longer have llmConfig
+      expect(savedClientAgent.channels[0].llmConfig).toBeUndefined();
 
       // EDGE-3: Verify that GET /client-agents excludes credentials (select: false)
       const listResponse = await request(app.getHttpServer())
@@ -215,11 +215,10 @@ describe('Onboarding (e2e)', () => {
         .expect(200);
 
       expect(listResponse.body).toHaveLength(1);
-      // Credentials and apiKey should NOT be present in the list response
+      // Credentials should NOT be present in the list response; channels have no llmConfig
       const listedChannels = listResponse.body[0].channels;
       if (listedChannels && listedChannels.length > 0) {
         expect(listedChannels[0].credentials).toBeUndefined();
-        expect(listedChannels[0].llmConfig?.apiKey).toBeUndefined();
       }
     });
 
@@ -251,11 +250,6 @@ describe('Onboarding (e2e)', () => {
               channelId,
               provider: 'instagram',
               credentials: {},
-              llmConfig: {
-                provider: 'anthropic',
-                apiKey: 'test-key',
-                model: 'claude-3',
-              },
             },
           ],
         })
@@ -293,11 +287,6 @@ describe('Onboarding (e2e)', () => {
               channelId,
               provider: 'instagram',
               credentials: {},
-              llmConfig: {
-                provider: 'openai',
-                apiKey: 'test-key',
-                model: 'gpt-4',
-              },
             },
           ],
         })
@@ -331,7 +320,6 @@ describe('Onboarding (e2e)', () => {
               channelId: channelId1,
               provider: 'instagram',
               credentials: {},
-              llmConfig: { provider: 'openai', apiKey: 'key', model: 'gpt-4' },
             },
           ],
         })
@@ -356,7 +344,6 @@ describe('Onboarding (e2e)', () => {
               channelId: channelId2,
               provider: 'instagram',
               credentials: {},
-              llmConfig: { provider: 'openai', apiKey: 'key', model: 'gpt-4' },
             },
           ],
         })
@@ -395,7 +382,6 @@ describe('Onboarding (e2e)', () => {
                 accessToken: 'token',
                 webhookVerifyToken: 'verify',
               },
-              llmConfig: { provider: 'openai', apiKey: 'key', model: 'gpt-4' },
             },
           ],
         })
@@ -427,7 +413,6 @@ describe('Onboarding (e2e)', () => {
                 accessToken: 'token2',
                 webhookVerifyToken: 'verify2',
               },
-              llmConfig: { provider: 'openai', apiKey: 'key', model: 'gpt-4' },
             },
           ],
         })
@@ -472,7 +457,6 @@ describe('Onboarding (e2e)', () => {
               channelId,
               provider: 'instagram',
               credentials: {},
-              llmConfig: { provider: 'openai', apiKey: 'key', model: 'gpt-4' },
             },
           ],
         })
@@ -503,7 +487,6 @@ describe('Onboarding (e2e)', () => {
               channelId,
               provider: 'instagram',
               credentials: {},
-              llmConfig: { provider: 'openai', apiKey: 'key', model: 'gpt-4' },
             },
           ],
         })
@@ -534,7 +517,6 @@ describe('Onboarding (e2e)', () => {
               channelId,
               provider: 'instagram',
               credentials: {},
-              llmConfig: { provider: 'openai', apiKey: 'key', model: 'gpt-4' },
             },
           ],
         })
@@ -565,11 +547,6 @@ describe('Onboarding (e2e)', () => {
                 channelId,
                 provider: 'instagram',
                 credentials: {},
-                llmConfig: {
-                  provider: 'openai',
-                  apiKey: 'key',
-                  model: 'gpt-4',
-                },
               },
             ],
           })
@@ -599,11 +576,6 @@ describe('Onboarding (e2e)', () => {
                 channelId,
                 provider: 'instagram',
                 credentials: {},
-                llmConfig: {
-                  provider: 'openai',
-                  apiKey: 'key',
-                  model: 'gpt-4',
-                },
               },
             ],
           })
@@ -633,11 +605,6 @@ describe('Onboarding (e2e)', () => {
                 channelId,
                 provider: 'instagram',
                 credentials: {},
-                llmConfig: {
-                  provider: 'openai',
-                  apiKey: 'key',
-                  model: 'gpt-4',
-                },
               },
             ],
           })
@@ -667,11 +634,6 @@ describe('Onboarding (e2e)', () => {
                 channelId,
                 provider: 'instagram',
                 credentials: {},
-                llmConfig: {
-                  provider: 'openai',
-                  apiKey: 'key',
-                  model: 'gpt-4',
-                },
               },
             ],
           })
@@ -701,11 +663,6 @@ describe('Onboarding (e2e)', () => {
                 channelId,
                 provider: 'invalid-provider',
                 credentials: {},
-                llmConfig: {
-                  provider: 'openai',
-                  apiKey: 'key',
-                  model: 'gpt-4',
-                },
               },
             ],
           })
@@ -719,12 +676,20 @@ describe('Onboarding (e2e)', () => {
       it('should return 400 for invalid llm provider', async () => {
         const channelName = `e2e-test-channel-llm-${Date.now()}`;
         const channelId = await provisionChannel(channelName, 'web');
+        const uniqueEmail = `e2e-onboarding-llm-invalid-${Date.now()}@example.com`;
 
         const response = await request(app.getHttpServer())
           .post('/onboarding/register-and-hire')
           .send({
-            user: { email: 'test@example.com', name: 'Test' },
-            client: { type: 'individual' },
+            user: { email: uniqueEmail, name: 'Test' },
+            client: {
+              type: 'individual',
+              llmConfig: {
+                provider: 'invalid-provider',
+                apiKey: 'key',
+                model: 'gpt-4',
+              },
+            },
             agentHiring: {
               agentId: testAgentId,
               personalityId: testPersonalityId,
@@ -735,11 +700,6 @@ describe('Onboarding (e2e)', () => {
                 channelId,
                 provider: 'instagram',
                 credentials: {},
-                llmConfig: {
-                  provider: 'invalid-provider',
-                  apiKey: 'key',
-                  model: 'gpt-4',
-                },
               },
             ],
           })
@@ -793,21 +753,11 @@ describe('Onboarding (e2e)', () => {
                 channelId,
                 provider: 'instagram',
                 credentials: {},
-                llmConfig: {
-                  provider: 'openai',
-                  apiKey: 'key',
-                  model: 'gpt-4',
-                },
               },
               {
                 channelId, // Same ID
                 provider: 'instagram',
                 credentials: {},
-                llmConfig: {
-                  provider: 'openai',
-                  apiKey: 'key',
-                  model: 'gpt-4',
-                },
               },
             ],
           })

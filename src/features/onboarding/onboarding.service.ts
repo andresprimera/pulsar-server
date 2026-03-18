@@ -118,16 +118,21 @@ export class OnboardingService {
       if (!isValidCurrencyCode(billingCurrency)) {
         throw new BadRequestException('Invalid ISO 4217 currency code');
       }
-      client = await this.clientRepository.create(
-        {
-          name: clientName,
-          type: dto.client.type,
-          status: 'active',
-          billingCurrency,
-          billingAnchor: new Date(),
-        },
-        session,
-      );
+      const clientPayload: Parameters<ClientRepository['create']>[0] = {
+        name: clientName,
+        type: dto.client.type,
+        status: 'active',
+        billingCurrency,
+        billingAnchor: new Date(),
+      };
+      if (dto.client.llmConfig) {
+        clientPayload.llmConfig = {
+          provider: dto.client.llmConfig.provider,
+          apiKey: encrypt(dto.client.llmConfig.apiKey),
+          model: dto.client.llmConfig.model,
+        };
+      }
+      client = await this.clientRepository.create(clientPayload, session);
 
       // 7. Create User
       user = await this.userRepository.create(
@@ -290,10 +295,6 @@ export class OnboardingService {
           phoneNumberId,
           tiktokUserId,
           instagramAccountId,
-          llmConfig: {
-            ...channelConfig.llmConfig,
-            apiKey: encrypt(channelConfig.llmConfig.apiKey),
-          },
           amount: channelAmount,
           currency: billingCurrency,
           monthlyMessageQuota: channelMonthlyMessageQuota,

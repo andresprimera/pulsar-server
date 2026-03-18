@@ -140,7 +140,12 @@
       "email": "admin@homegroupd.com",
       "name": "Home Group User",
       "client": {
-        "type": "individual"
+        "type": "individual",
+        "llmConfig": {
+          "provider": "openai",
+          "apiKey": "__REPLACE_ME_API_KEY__",
+          "model": "gpt-4o"
+        }
       },
       "agentHirings": [
         {
@@ -155,11 +160,6 @@
                 "phoneNumberId": "+573332809804",
                 "accessToken": "__REPLACE_ME_ACCESS_TOKEN__",
                 "webhookVerifyToken": "__REPLACE_ME_VERIFY_TOKEN__"
-              },
-              "llmConfig": {
-                "provider": "openai",
-                "apiKey": "__REPLACE_ME_API_KEY__",
-                "model": "gpt-4o"
               }
             },
             {
@@ -169,11 +169,6 @@
               "credentials": {
                 "instagramAccountId": "17841400000000001",
                 "accessToken": "__REPLACE_ME_INSTAGRAM_ACCESS_TOKEN__"
-              },
-              "llmConfig": {
-                "provider": "openai",
-                "apiKey": "__REPLACE_ME_API_KEY__",
-                "model": "gpt-4o"
               }
             }
           ]
@@ -199,11 +194,6 @@
               "credentials": {
                 "tiktokUserId": "tiktok-recipient-2001",
                 "accessToken": "__REPLACE_ME_TIKTOK_ACCESS_TOKEN__"
-              },
-              "llmConfig": {
-                "provider": "openai",
-                "apiKey": "__REPLACE_ME_API_KEY__",
-                "model": "gpt-4o"
               }
             },
             {
@@ -213,11 +203,6 @@
               "credentials": {
                 "instagramAccountId": "17841400000000002",
                 "accessToken": "__REPLACE_ME_INSTAGRAM_ACCESS_TOKEN__"
-              },
-              "llmConfig": {
-                "provider": "openai",
-                "apiKey": "__REPLACE_ME_API_KEY__",
-                "model": "gpt-4o"
               }
             }
           ]
@@ -242,11 +227,6 @@
               "status": "active",
               "credentials": {
                 "phoneNumberId": "+14155238886"
-              },
-              "llmConfig": {
-                "provider": "openai",
-                "apiKey": "__REPLACE_ME_API_KEY__",
-                "model": "gpt-4o"
               }
             },
             {
@@ -256,11 +236,6 @@
               "credentials": {
                 "tiktokUserId": "tiktok-recipient-3001",
                 "accessToken": "__REPLACE_ME_TIKTOK_ACCESS_TOKEN__"
-              },
-              "llmConfig": {
-                "provider": "openai",
-                "apiKey": "__REPLACE_ME_API_KEY__",
-                "model": "gpt-4o"
               }
             }
           ]
@@ -276,11 +251,6 @@
               "credentials": {
                 "tiktokUserId": "tiktok-recipient-3002",
                 "accessToken": "__REPLACE_ME_TIKTOK_ACCESS_TOKEN__"
-              },
-              "llmConfig": {
-                "provider": "openai",
-                "apiKey": "__REPLACE_ME_API_KEY__",
-                "model": "gpt-4o"
               }
             },
             {
@@ -290,11 +260,6 @@
               "credentials": {
                 "instagramAccountId": "17841400000000003",
                 "accessToken": "__REPLACE_ME_INSTAGRAM_ACCESS_TOKEN__"
-              },
-              "llmConfig": {
-                "provider": "openai",
-                "apiKey": "__REPLACE_ME_API_KEY__",
-                "model": "gpt-4o"
               }
             }
           ]

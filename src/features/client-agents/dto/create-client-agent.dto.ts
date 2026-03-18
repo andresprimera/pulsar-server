@@ -8,23 +8,10 @@ import {
   ArrayMinSize,
   IsEnum,
   IsObject,
-  IsString,
   IsOptional,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ChannelProvider } from '@domain/channels/channel-provider.enum';
-import { LlmProvider } from '@domain/llm/provider.enum';
-
-class LlmConfigDto {
-  @IsEnum(LlmProvider)
-  provider: LlmProvider;
-
-  @IsString()
-  apiKey: string;
-
-  @IsString()
-  model: string;
-}
 
 class PricingOverrideDto {
   @IsOptional()
@@ -49,10 +36,6 @@ class HireChannelConfigDto {
 
   @IsObject()
   credentials: Record<string, any>;
-
-  @ValidateNested()
-  @Type(() => LlmConfigDto)
-  llmConfig: LlmConfigDto;
 
   @IsOptional()
   @Type(() => Number)
