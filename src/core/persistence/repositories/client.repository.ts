@@ -32,10 +32,7 @@ export class ClientRepository {
    * Default findById does not expose apiKey (select: false).
    */
   async findByIdWithLlmCredentials(id: string): Promise<Client | null> {
-    return this.model
-      .findById(id)
-      .select('+llmConfig.apiKey')
-      .exec();
+    return this.model.findById(id).select('+llmConfig.apiKey').exec();
   }
 
   async findByStatus(

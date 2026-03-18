@@ -221,10 +221,16 @@ describe('AgentContextService', () => {
     } as any;
 
     beforeEach(() => {
-      const agentRepo = moduleRef.get(AgentRepository) as jest.Mocked<AgentRepository>;
-      const personalityRepo = moduleRef.get(PersonalityRepository) as jest.Mocked<PersonalityRepository>;
+      const agentRepo = moduleRef.get(
+        AgentRepository,
+      ) as jest.Mocked<AgentRepository>;
+      const personalityRepo = moduleRef.get(
+        PersonalityRepository,
+      ) as jest.Mocked<PersonalityRepository>;
       agentRepo.findActiveById = jest.fn().mockResolvedValue(mockAgent);
-      personalityRepo.findActiveById = jest.fn().mockResolvedValue(mockPersonality);
+      personalityRepo.findActiveById = jest
+        .fn()
+        .mockResolvedValue(mockPersonality);
     });
 
     it('should use client llmConfig when present and apiKey is valid', async () => {
@@ -239,7 +245,9 @@ describe('AgentContextService', () => {
           model: 'gpt-4o-mini',
         },
       } as any;
-      clientRepository.findByIdWithLlmCredentials.mockResolvedValue(clientWithLlm);
+      clientRepository.findByIdWithLlmCredentials.mockResolvedValue(
+        clientWithLlm,
+      );
 
       const { context, client } = await service.buildContextFromRoute(
         mockClientAgent,
@@ -260,7 +268,9 @@ describe('AgentContextService', () => {
         type: 'organization',
         status: 'active',
       } as any;
-      clientRepository.findByIdWithLlmCredentials.mockResolvedValue(clientNoLlm);
+      clientRepository.findByIdWithLlmCredentials.mockResolvedValue(
+        clientNoLlm,
+      );
       const envKey = 'env-openai-key';
       const orig = process.env.OPENAI_API_KEY;
       process.env.OPENAI_API_KEY = envKey;
@@ -291,7 +301,9 @@ describe('AgentContextService', () => {
           model: 'gpt-4o',
         },
       } as any;
-      clientRepository.findByIdWithLlmCredentials.mockResolvedValue(clientReplaceMe);
+      clientRepository.findByIdWithLlmCredentials.mockResolvedValue(
+        clientReplaceMe,
+      );
       const envKey = 'fallback-env-key';
       const orig = process.env.OPENAI_API_KEY;
       process.env.OPENAI_API_KEY = envKey;

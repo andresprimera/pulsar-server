@@ -163,8 +163,7 @@ export class AgentContextService {
     return {
       ...context,
       clientName: resolvedClient.name,
-      ...(resolvedClient.brandVoice != null &&
-      resolvedClient.brandVoice !== ''
+      ...(resolvedClient.brandVoice != null && resolvedClient.brandVoice !== ''
         ? { brandVoice: resolvedClient.brandVoice }
         : {}),
     };
