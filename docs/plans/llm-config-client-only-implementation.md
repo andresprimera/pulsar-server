@@ -2,16 +2,17 @@
 
 ## 1. Feature Overview
 
-**Goal:** LLM configuration (provider, apiKey, model) lives only on the Client document as an optional `llmConfig` field. The client-agent document must not embed LLM config on any channel (`HireChannelConfig` has no `llmConfig`). At runtime, agent context resolves LLM from `client.llmConfig` when present and valid (apiKey set and not sentinel `REPLACE_ME`), otherwise from environment (e.g. `OPENAI_API_KEY`) and optional client-level preferences (`llmPreferences`). Create/update flows for client-agents and onboarding must not accept or persist `llmConfig` per channel. API responses and persisted documents must never expose per-channel LLM config; client `llmConfig.apiKey` is never returned by normal client APIs (`select: false`; only `findByIdWithLlmCredentials` when building agent context).
+**Goal:** LLM configuration (provider, apiKey, model) lives only on the Client document as an optional `llmConfig` field. The client-agent document must not embed LLM config on any channel (`HireChannelConfig` has no `llmConfig`). The catalog **Agent** document (`agents` collection) must not define a per-template LLM override (`llmOverride` removed from schema and agents DTOs). At runtime, agent context resolves LLM from `client.llmConfig` when present and valid (apiKey set and not sentinel `REPLACE_ME`), otherwise from environment (e.g. `OPENAI_API_KEY`) and optional client-level preferences (`llmPreferences`). `AgentContextService` does not read the Agent record for provider/model. Create/update flows for client-agents and onboarding must not accept or persist `llmConfig` per channel. API responses and persisted documents must never expose per-channel LLM config; client `llmConfig.apiKey` is never returned by normal client APIs (`select: false`; only `findByIdWithLlmCredentials` when building agent context).
 
 **Expected behavior:**
 - Client: optional `llmConfig` (provider, apiKey, model); apiKey stored encrypted; not returned by normal APIs.
+- Catalog Agent: no `llmOverride` in `agent.schema.ts`, `agent.entity.ts`, or agents feature DTOs; agents API does not accept or return LLM override fields.
 - ClientAgent channels: no `llmConfig` in schema, DTOs, or API responses.
 - Context resolution: client → `client.llmConfig` when valid, else env + `client.llmPreferences` or defaults (openai, gpt-4o).
 - Onboarding: may accept optional `client.llmConfig`; channels never include `llmConfig`.
 - Seed data and tests: no `llmConfig` inside channels; optional at client level only; tests assert persistence shape and context resolution.
 
-**Affected users/systems:** API consumers (onboarding, client-agents), seeder, orchestrator/agent context path.
+**Affected users/systems:** API consumers (onboarding, client-agents, **agents catalog**), seeder, orchestrator/agent context path.
 
 **Design protocol:** The underlying design (LLM config on Client only, resolution in agent layer) is already justified in `docs/plans/llm-config-per-client.md` (Concern Classification, Alternative Layer Rejection, Future Evolution Simulation, Contract Alignment, Dependency Impact). This document is a verification-and-test plan; no new structural change is introduced.
 
@@ -26,7 +27,7 @@
 | Agent            | AgentContextService resolves LLM from client then env; returns `{ context, client }`; enrichContext(context, client?). |
 | Orchestrator     | Passes client from buildContextFromRoute into enrichContext (single client load). |
 | Service (features)| OnboardingService sets client.llmConfig from DTO only; ClientAgentsService and OnboardingService do not write llmConfig to channels. |
-| API / DTOs       | ClientDto has optional llmConfig (onboarding); HireChannelConfigDto in both onboarding and client-agents has no llmConfig. |
+| API / DTOs       | ClientDto has optional llmConfig (onboarding); HireChannelConfigDto in both onboarding and client-agents has no llmConfig. CreateAgentDto / UpdateAgentDto have no llmOverride. |
 
 ### Affected Components
 
@@ -34,18 +35,22 @@
 |---------------|-----------|-----------------|
 | Schemas       | `client.schema.ts` | Verify already correct; no change. Optional llmConfig (LlmConfigSchema, select: false). |
 | Schemas       | `client-agent.schema.ts` (HireChannelConfig) | Verify already correct; no change. No llmConfig field. |
+| Schemas       | `agent.schema.ts` | No `llmOverride` (catalog agent is prompt/template only for LLM purposes). |
 | Schemas       | `llm-config.schema.ts` | Verify already correct; no change. apiKey has select: false. |
 | Repositories  | `client.repository.ts` | Verify already correct; no change. findByIdWithLlmCredentials(id) exists. |
-| Services      | `AgentContextService` | Verify already correct; no change. buildContextFromRoute loads client via findByIdWithLlmCredentials, resolves from client.llmConfig or env, returns { context, client }; enrichContext(context, client?). |
+| Services      | `AgentContextService` | Verify already correct; no change. buildContextFromRoute loads client via findByIdWithLlmCredentials, resolves from client.llmConfig or env (does not read Agent.llmOverride); returns { context, client }; enrichContext(context, client?). |
 | Services      | `IncomingMessageOrchestrator` | Verify already correct; no change. Passes client from buildContextFromRoute to enrichContext. |
 | Services      | `OnboardingService` | Verify already correct; no change. Sets client.llmConfig from DTO; hireChannels do not include llmConfig. |
 | Services      | `ClientAgentsService` | Verify already correct; no change. create() does not add llmConfig to channel objects. |
 | DTOs          | `register-and-hire.dto.ts` | Verify already correct; no change. ClientDto has optional llmConfig; HireChannelConfigDto has no llmConfig. |
 | DTOs          | `create-client-agent.dto.ts` | Verify already correct; no change. HireChannelConfigDto has no llmConfig. |
+| DTOs          | `create-agent.dto.ts`, `update-agent.dto.ts` | No llmOverride; agents API aligns with client-only LLM resolution. |
 | Seed           | `seed-data.json` | Verify already correct; no change. Optional client.llmConfig only (first user); no llmConfig in agentHirings[].channels. |
 | Seed           | `seeder.service.ts` | Verify already correct; no change. Passes client.llmConfig from userSeed.client; channelsDto and additionalChannels do not include llmConfig. |
 | Entity/type    | `client.entity.ts` (if used for API response typing) | Verify already correct; no change. llmConfig optional; apiKey optional; normal APIs do not return it. |
+| Entity/type    | `agent.entity.ts` | No llmOverride on catalog Agent type. |
 | Controllers   | OnboardingController, any ClientAgents controller | No change. DTOs and schema ensure no per-channel llmConfig in request or response. |
+| Controllers   | AgentsController | Request/response shapes match DTOs without llmOverride. |
 | Tests         | AgentContextService spec, onboarding e2e, orchestrator spec | Verify coverage; add or tighten assertions per verification steps below. |
 
 ---
@@ -124,18 +129,20 @@ Implementation is **already complete**. The following steps are **verification a
 1. **Verify persistence shape**
    - Confirm `client.schema.ts`: optional `llmConfig` (LlmConfigSchema, select: false).
    - Confirm `client-agent.schema.ts`: HireChannelConfig has no `llmConfig` (and no import of LlmConfigSchema for channels).
+   - Confirm `agent.schema.ts`: no `llmOverride` on catalog Agent.
    - Confirm `llm-config.schema.ts`: apiKey has select: false.
 
 2. **Verify repository**
    - Confirm `client.repository.ts`: findByIdWithLlmCredentials(id) exists and uses .select('+llmConfig.apiKey').
 
 3. **Verify agent context resolution**
-   - Confirm `agent-context.service.ts`: buildContextFromRoute uses client from findByIdWithLlmCredentials; resolution uses client.llmConfig when apiKey present and not REPLACE_ME, else env + llmPreferences/defaults; no reference to channelConfig.llmConfig; return type is { context, client }; enrichContext(context, client?) implemented.
+   - Confirm `agent-context.service.ts`: buildContextFromRoute uses client from findByIdWithLlmCredentials; resolution uses client.llmConfig when apiKey present and not REPLACE_ME, else env + llmPreferences/defaults; no reference to channelConfig.llmConfig or to Agent document fields for provider/model; return type is { context, client }; enrichContext(context, client?) implemented.
    - Confirm `incoming-message.orchestrator.ts`: calls enrichContext(rawContext, client) with client from buildContextFromRoute.
 
 4. **Verify DTOs**
    - Confirm `register-and-hire.dto.ts`: ClientDto has optional llmConfig; HireChannelConfigDto (and channels array) has no llmConfig.
    - Confirm `create-client-agent.dto.ts`: HireChannelConfigDto has no llmConfig.
+   - Confirm `create-agent.dto.ts` and `update-agent.dto.ts`: no `llmOverride` (agents API does not configure LLM execution).
 
 5. **Verify services do not write llmConfig to channels**
    - Confirm `onboarding.service.ts`: clientPayload.llmConfig set from dto.client.llmConfig only; hireChannels.push(...) object does not include llmConfig.
@@ -172,7 +179,8 @@ Implementation is **already complete**. The following steps are **verification a
 - [ ] DTOs: no llmConfig on HireChannelConfigDto (onboarding and client-agents); ClientDto may have optional llmConfig (onboarding).
 - [ ] OnboardingService: writes client.llmConfig from DTO; never writes llmConfig to hireChannels.
 - [ ] ClientAgentsService: never writes llmConfig to channels in create (or update, if applicable).
-- [ ] AgentContextService: resolves LLM from client then env; never uses channelConfig.llmConfig; returns { context, client }; enrichContext accepts optional client.
+- [ ] Catalog Agent: `agent.schema.ts` and `agent.entity.ts` have no llmOverride; agents create/update DTOs do not accept it.
+- [ ] AgentContextService: resolves LLM from client then env; never uses channelConfig.llmConfig or Agent-level LLM overrides; returns { context, client }; enrichContext accepts optional client.
 - [ ] Orchestrator: single client load; passes client to enrichContext.
 - [ ] Seed data: no llmConfig in channels; optional client.llmConfig.
 - [ ] Seeder: does not add llmConfig to any channel; passes client.llmConfig to onboarding when present.
@@ -182,11 +190,12 @@ Implementation is **already complete**. The following steps are **verification a
 
 ## 12. Summary
 
-The codebase **already implements** the requirement. This plan is a **verification-and-test** plan: confirm persistence shape, DTOs, resolution logic, seed data, and API behavior; add or update tests to explicitly assert no per-channel llmConfig and context resolution from client/env. No schema, repository, or service logic changes are required unless verification uncovers a discrepancy.
+The codebase **already implements** the requirement, including **no per-agent LLM override** on the catalog Agent model or `/agents` API. This plan is a **verification-and-test** plan: confirm persistence shape, DTOs, resolution logic, seed data, and API behavior; add or update tests to explicitly assert no per-channel llmConfig and context resolution from client/env only. No schema, repository, or service logic changes are required unless verification uncovers a discrepancy.
 
 **Files to verify (no change expected):**
 - `backend/src/core/persistence/schemas/client.schema.ts`
 - `backend/src/core/persistence/schemas/client-agent.schema.ts`
+- `backend/src/core/persistence/schemas/agent.schema.ts`
 - `backend/src/core/persistence/schemas/llm-config.schema.ts`
 - `backend/src/core/persistence/repositories/client.repository.ts`
 - `backend/src/core/agent/agent-context.service.ts`
@@ -198,8 +207,12 @@ The codebase **already implements** the requirement. This plan is a **verificati
 - `backend/src/core/persistence/data/seed-data.json`
 - `backend/src/core/persistence/seeder.service.ts`
 - `backend/src/core/persistence/entities/client.entity.ts` (if present)
+- `backend/src/core/persistence/entities/agent.entity.ts`
+- `backend/src/features/agents/dto/create-agent.dto.ts`
+- `backend/src/features/agents/dto/update-agent.dto.ts`
 
 **Tests to verify or extend:**
 - `backend/src/core/agent/agent-context.service.spec.ts`
 - `backend/test/onboarding.e2e-spec.ts`
+- `backend/test/agents.e2e-spec.ts` (must not assert `llmOverride` on create/patch; catalog agents do not expose LLM override)
 - Any client-agents e2e or unit specs
