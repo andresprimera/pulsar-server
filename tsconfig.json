@@ -26,6 +26,7 @@
       "@personalities/*": ["src/features/personalities/*"]
     },
     "incremental": true,
+    "preserveWatchOutput": true,
     "skipLibCheck": true,
     "strictNullChecks": false,
     "noImplicitAny": false,
