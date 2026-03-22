@@ -35,6 +35,7 @@ If any other document conflicts with this one, this document wins.
   - `docs/rules/credential-encryption.md` — Encrypting credentials, routing keys, `crypto.util.ts`.
   - `docs/rules/data-modeling.md` — Schemas, indexes, repositories, transactions.
 - **`docs/`** (root) — How the system works: routing, message flow, persistence (read when touching agents, channels, or conversations).
+  - `docs/llm-resolution.md` — Runtime LLM provider/model/apiKey resolution (client `llmConfig` and env; no catalog-agent override).
 
 Before changing layers, credentials, channels, or persistence, read the relevant doc above.
 
@@ -434,6 +435,7 @@ If any other document conflicts with this one, this document wins.
   - `docs/rules/credential-encryption.md` — Encrypting credentials, routing keys, `crypto.util.ts`.
   - `docs/rules/data-modeling.md` — Schemas, indexes, repositories, transactions.
 - **`docs/`** (root) — How the system works: routing, message flow, persistence (read when touching agents, channels, or conversations).
+  - `docs/llm-resolution.md` — Runtime LLM provider/model/apiKey resolution (client `llmConfig` and env; no catalog-agent override).
 
 Before changing layers, credentials, channels, or persistence, read the relevant doc above.
 
