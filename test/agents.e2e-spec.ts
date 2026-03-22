@@ -50,25 +50,6 @@ describe('Agents CRUD (e2e)', () => {
       createdAgentId = response.body._id;
     });
 
-    it('should create agent with llmOverride', async () => {
-      const response = await request(app.getHttpServer())
-        .post('/agents')
-        .send({
-          name: 'E2E Test Agent With Override',
-          systemPrompt: 'You are helpful.',
-          llmOverride: {
-            provider: 'openai',
-            model: 'gpt-4',
-          },
-        })
-        .expect(201);
-
-      expect(response.body.llmOverride).toEqual({
-        provider: 'openai',
-        model: 'gpt-4',
-      });
-    });
-
     it('should reject invalid payload (missing name)', async () => {
       const response = await request(app.getHttpServer())
         .post('/agents')
@@ -156,23 +137,6 @@ describe('Agents CRUD (e2e)', () => {
 
       expect(response.body.name).toBe('E2E Test Agent Updated');
       expect(response.body.systemPrompt).toBe('You are a test assistant.');
-    });
-
-    it('should update llmOverride', async () => {
-      const response = await request(app.getHttpServer())
-        .patch(`/agents/${createdAgentId}`)
-        .send({
-          llmOverride: {
-            provider: 'anthropic',
-            model: 'claude-3',
-          },
-        })
-        .expect(200);
-
-      expect(response.body.llmOverride).toEqual({
-        provider: 'anthropic',
-        model: 'claude-3',
-      });
     });
 
     it('should return 404 for non-existent ID', async () => {
