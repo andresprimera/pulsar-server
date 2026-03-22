@@ -220,6 +220,14 @@ describe('Onboarding (e2e)', () => {
       if (listedChannels && listedChannels.length > 0) {
         expect(listedChannels[0].credentials).toBeUndefined();
       }
+      // GET client-agents response channels must not include llmConfig
+      listResponse.body.forEach(
+        (ca: { channels?: Array<{ llmConfig?: unknown }> }) => {
+          ca.channels?.forEach((ch) => {
+            expect(ch.llmConfig).toBeUndefined();
+          });
+        },
+      );
     });
 
     it('should use explicit client name when provided', async () => {
