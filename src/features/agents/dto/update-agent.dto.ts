@@ -1,22 +1,5 @@
-import {
-  IsEnum,
-  IsString,
-  IsOptional,
-  ValidateNested,
-  IsInt,
-  Min,
-} from 'class-validator';
-import { Transform, Type } from 'class-transformer';
-import { LlmProvider } from '@domain/llm/provider.enum';
-
-class LlmOverrideDto {
-  @Transform(({ value }) => value?.toLowerCase().trim())
-  @IsEnum(LlmProvider)
-  provider: LlmProvider;
-
-  @IsString()
-  model: string;
-}
+import { IsString, IsOptional, IsInt, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class UpdateAgentDto {
   @IsOptional()
@@ -26,11 +9,6 @@ export class UpdateAgentDto {
   @IsOptional()
   @IsString()
   systemPrompt?: string;
-
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => LlmOverrideDto)
-  llmOverride?: LlmOverrideDto;
 
   @IsOptional()
   @Type(() => Number)

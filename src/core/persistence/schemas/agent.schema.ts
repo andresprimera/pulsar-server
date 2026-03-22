@@ -17,12 +17,6 @@ export class Agent extends Document {
   })
   status: 'active' | 'inactive' | 'archived';
 
-  @Prop({ type: Object })
-  llmOverride?: {
-    provider: string;
-    model: string;
-  };
-
   @Prop({ default: false })
   createdBySeeder: boolean;
 
