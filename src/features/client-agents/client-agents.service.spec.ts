@@ -462,6 +462,20 @@ describe('ClientAgentsService', () => {
       });
     });
 
+    it('should unset promptSupplement when cleared with whitespace-only string', async () => {
+      mockClientAgentRepository.findById.mockResolvedValue(mockClientAgent);
+      mockClientAgentRepository.updateWithQuery.mockResolvedValue({
+        ...mockClientAgent,
+      });
+
+      await service.update('ca-1', { promptSupplement: '   \n  ' } as any);
+
+      expect(mockClientAgentRepository.updateWithQuery).toHaveBeenCalledWith(
+        'ca-1',
+        { $unset: { promptSupplement: '' } },
+      );
+    });
+
     it('should throw NotFoundException if not found', async () => {
       mockClientAgentRepository.findById.mockResolvedValue(null);
       await expect(service.update('unknown', {} as any)).rejects.toThrow(

@@ -166,9 +166,11 @@ export class AgentContextService {
     }
 
     const companyBriefTrimmed = resolvedClient.companyBrief?.trim();
+    const contextBase: AgentContext = { ...context };
+    delete contextBase.companyBrief;
 
     return {
-      ...context,
+      ...contextBase,
       clientName: resolvedClient.name,
       ...(companyBriefTrimmed ? { companyBrief: companyBriefTrimmed } : {}),
     };

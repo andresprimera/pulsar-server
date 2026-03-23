@@ -4,7 +4,7 @@ import { AgentRepository } from '@persistence/repositories/agent.repository';
 import { ClientRepository } from '@persistence/repositories/client.repository';
 import { PersonalityRepository } from '@persistence/repositories/personality.repository';
 import { AgentContext } from './contracts/agent-context';
-import { LlmProvider } from './llm/provider.enum';
+import { LlmProvider } from '@domain/llm/provider.enum';
 import { Logger } from '@nestjs/common';
 import { Types } from 'mongoose';
 
@@ -146,6 +146,25 @@ describe('AgentContextService', () => {
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('Client client-1 not found'),
     );
+  });
+
+  it('should not retain stale companyBrief from input when client document has none', async () => {
+    clientRepository.findById.mockResolvedValue({
+      _id: 'client-1',
+      name: 'Acme Corp',
+      type: 'organization',
+      status: 'active',
+    } as any);
+
+    const contextWithStale: AgentContext = {
+      ...baseContext,
+      companyBrief: 'Stale text that must be dropped.',
+    };
+
+    const result = await service.enrichContext(contextWithStale);
+
+    expect(result.clientName).toBe('Acme Corp');
+    expect(result.companyBrief).toBeUndefined();
   });
 
   it('should use passed-in client and not call findById when client is provided', async () => {

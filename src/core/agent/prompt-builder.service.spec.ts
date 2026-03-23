@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PromptBuilderService } from './prompt-builder.service';
 import { AgentContext } from './contracts/agent-context';
-import { LlmProvider } from './llm/provider.enum';
+import { LlmProvider } from '@domain/llm/provider.enum';
 
 describe('PromptBuilderService', () => {
   let service: PromptBuilderService;
