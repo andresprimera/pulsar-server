@@ -9,6 +9,7 @@ import {
   IsEnum,
   IsObject,
   IsOptional,
+  IsString,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ChannelProvider } from '@domain/channels/channel-provider.enum';
@@ -67,6 +68,10 @@ export class CreateClientAgentDto {
   @ValidateNested()
   @Type(() => PricingOverrideDto)
   pricingOverride?: PricingOverrideDto;
+
+  @IsOptional()
+  @IsString()
+  promptSupplement?: string;
 
   @IsArray()
   @ValidateNested({ each: true })

@@ -105,35 +105,34 @@ describe('AgentContextService', () => {
     expect(result.systemPrompt).toBe(contextWithAgent.systemPrompt);
   });
 
-  it('should enrich context with client brandVoice when set', async () => {
+  it('should enrich context with client companyBrief when set', async () => {
     clientRepository.findById.mockResolvedValue({
       _id: 'client-1',
       name: 'Acme Corp',
       type: 'organization',
       status: 'active',
-      brandVoice: 'Our brand voice is calm, trustworthy, and professional.',
+      companyBrief: 'We build widgets for enterprise teams.',
     } as any);
 
     const result = await service.enrichContext(baseContext);
 
     expect(result.clientName).toBe('Acme Corp');
-    expect(result.brandVoice).toBe(
-      'Our brand voice is calm, trustworthy, and professional.',
-    );
+    expect(result.companyBrief).toBe('We build widgets for enterprise teams.');
   });
 
-  it('should not add brandVoice to context when client has none', async () => {
+  it('should not add companyBrief to context when client has none or whitespace', async () => {
     clientRepository.findById.mockResolvedValue({
       _id: 'client-1',
       name: 'Acme Corp',
       type: 'organization',
       status: 'active',
+      companyBrief: '   ',
     } as any);
 
     const result = await service.enrichContext(baseContext);
 
     expect(result.clientName).toBe('Acme Corp');
-    expect(result.brandVoice).toBeUndefined();
+    expect(result.companyBrief).toBeUndefined();
   });
 
   it('should return context unchanged when client is not found', async () => {
@@ -155,13 +154,13 @@ describe('AgentContextService', () => {
       name: 'Passed Client',
       type: 'organization',
       status: 'active',
-      brandVoice: 'Custom voice',
+      companyBrief: 'Org facts from preload.',
     } as any;
 
     const result = await service.enrichContext(baseContext, passedClient);
 
     expect(result.clientName).toBe('Passed Client');
-    expect(result.brandVoice).toBe('Custom voice');
+    expect(result.companyBrief).toBe('Org facts from preload.');
     expect(clientRepository.findById).not.toHaveBeenCalled();
   });
 
@@ -320,6 +319,61 @@ describe('AgentContextService', () => {
       } finally {
         process.env.OPENAI_API_KEY = orig;
       }
+    });
+
+    it('should set promptSupplement on context from clientAgent when trim-non-empty', async () => {
+      const clientWithLlm = {
+        _id: 'client-1',
+        name: 'Acme',
+        type: 'organization',
+        status: 'active',
+        llmConfig: {
+          provider: LlmProvider.OpenAI,
+          apiKey: 'encrypted-client-key',
+          model: 'gpt-4o-mini',
+        },
+      } as any;
+      clientRepository.findByIdWithLlmCredentials.mockResolvedValue(
+        clientWithLlm,
+      );
+
+      const agentWithSupplement = {
+        ...mockClientAgent,
+        promptSupplement: '  Hire-specific FAQ line.  ',
+      };
+
+      const { context } = await service.buildContextFromRoute(
+        agentWithSupplement,
+        mockChannelConfig,
+      );
+
+      expect(context).not.toBeNull();
+      expect(context!.promptSupplement).toBe('Hire-specific FAQ line.');
+    });
+
+    it('should omit promptSupplement when clientAgent has none or whitespace', async () => {
+      const clientWithLlm = {
+        _id: 'client-1',
+        name: 'Acme',
+        type: 'organization',
+        status: 'active',
+        llmConfig: {
+          provider: LlmProvider.OpenAI,
+          apiKey: 'k',
+          model: 'gpt-4o-mini',
+        },
+      } as any;
+      clientRepository.findByIdWithLlmCredentials.mockResolvedValue(
+        clientWithLlm,
+      );
+
+      const { context } = await service.buildContextFromRoute(
+        { ...mockClientAgent, promptSupplement: '  \n  ' },
+        mockChannelConfig,
+      );
+
+      expect(context).not.toBeNull();
+      expect(context!.promptSupplement).toBeUndefined();
     });
 
     it('should never use channelConfig.llmConfig (resolution from client or env only)', async () => {

@@ -148,6 +148,7 @@ describe('Onboarding (e2e)', () => {
           },
           client: {
             type: 'individual',
+            companyBrief: 'E2E org-wide context line.',
             llmConfig: {
               provider: 'openai',
               apiKey: 'test-key',
@@ -158,6 +159,7 @@ describe('Onboarding (e2e)', () => {
             agentId: testAgentId,
             personalityId: testPersonalityId,
             pricingOverride: { agentAmount: 99.99 },
+            promptSupplement: 'E2E hire supplement line.',
           },
           channels: [
             {
@@ -188,12 +190,23 @@ describe('Onboarding (e2e)', () => {
       expect(response.body.client.type).toBe('individual');
       expect(response.body.client.name).toBe('E2E Onboarding Test User');
       expect(response.body.client.status).toBe('active');
+      expect(response.body.client.companyBrief).toBe(
+        'E2E org-wide context line.',
+      );
 
       // Verify clientAgent
       expect(response.body.clientAgent.clientId).toBe(response.body.client._id);
       expect(response.body.clientAgent.agentId).toBe(testAgentId);
       expect(response.body.clientAgent.agentPricing.amount).toBe(99.99);
       expect(response.body.clientAgent.agentPricing.currency).toBeDefined();
+      expect(response.body.clientAgent.promptSupplement).toBe(
+        'E2E hire supplement line.',
+      );
+
+      const savedClient = await connection
+        .collection('clients')
+        .findOne({ _id: new Types.ObjectId(response.body.client._id) });
+      expect(savedClient?.companyBrief).toBe('E2E org-wide context line.');
 
       // Verify agentChannels in DB
       const savedClientAgent = await connection
@@ -201,6 +214,9 @@ describe('Onboarding (e2e)', () => {
         .findOne({ _id: new Types.ObjectId(response.body.clientAgent._id) });
 
       expect(savedClientAgent).toBeDefined();
+      expect(savedClientAgent?.promptSupplement).toBe(
+        'E2E hire supplement line.',
+      );
 
       expect(savedClientAgent.channels).toHaveLength(1);
       expect(savedClientAgent.channels[0].channelId.toString()).toBe(channelId);

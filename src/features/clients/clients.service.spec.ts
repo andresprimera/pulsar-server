@@ -21,6 +21,7 @@ describe('ClientsService', () => {
       findById: jest.fn(),
       findByStatus: jest.fn(),
       update: jest.fn(),
+      updateWithQuery: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -103,17 +104,32 @@ describe('ClientsService', () => {
   describe('update', () => {
     it('should update client fields', async () => {
       mockClientRepository.findById.mockResolvedValue(mockClient);
-      mockClientRepository.update.mockResolvedValue({
+      mockClientRepository.updateWithQuery.mockResolvedValue({
         ...mockClient,
         name: 'Updated',
       });
 
       const result = await service.update('client-1', { name: 'Updated' });
 
-      expect(mockClientRepository.update).toHaveBeenCalledWith('client-1', {
-        name: 'Updated',
-      });
+      expect(mockClientRepository.updateWithQuery).toHaveBeenCalledWith(
+        'client-1',
+        { $set: { name: 'Updated' } },
+      );
       expect(result.name).toBe('Updated');
+    });
+
+    it('should unset companyBrief when cleared with empty string', async () => {
+      mockClientRepository.findById.mockResolvedValue(mockClient);
+      mockClientRepository.updateWithQuery.mockResolvedValue({
+        ...mockClient,
+      });
+
+      await service.update('client-1', { companyBrief: '   ' });
+
+      expect(mockClientRepository.updateWithQuery).toHaveBeenCalledWith(
+        'client-1',
+        { $unset: { companyBrief: '' } },
+      );
     });
 
     it('should throw NotFoundException for invalid ID', async () => {

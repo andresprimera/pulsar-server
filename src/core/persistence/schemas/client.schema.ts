@@ -59,11 +59,11 @@ export class Client extends Document {
   llmConfig?: LlmConfig;
 
   /**
-   * Optional client-specific brand voice instructions. Refines tone/style
-   * without replacing personality. Injected into the prompt alongside personality.
+   * Optional org-wide context: what the company does and stable facts shared
+   * by all agents for this tenant (injected as [Organization Context] in prompts).
    */
   @Prop({ required: false })
-  brandVoice?: string;
+  companyBrief?: string;
 }
 
 export const ClientSchema = SchemaFactory.createForClass(Client);

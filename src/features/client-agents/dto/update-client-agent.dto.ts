@@ -1,4 +1,4 @@
-import { IsMongoId, IsOptional } from 'class-validator';
+import { IsMongoId, IsOptional, IsString } from 'class-validator';
 
 /**
  * Pricing is snapshotted at hire time and is immutable.
@@ -9,4 +9,8 @@ export class UpdateClientAgentDto {
   @IsOptional()
   @IsMongoId()
   personalityId?: string;
+
+  @IsOptional()
+  @IsString()
+  promptSupplement?: string;
 }

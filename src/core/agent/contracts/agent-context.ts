@@ -14,8 +14,10 @@ export interface AgentContext {
     examplePhrases?: string[];
     guardrails?: string;
   };
-  /** Optional client brand voice instructions; refines tone alongside personality. */
-  brandVoice?: string;
+  /** Org-wide stable context from the client document (trim-non-empty). */
+  companyBrief?: string;
+  /** Per-hire grounding from the client_agent document (trim-non-empty). */
+  promptSupplement?: string;
   llmConfig: {
     provider: LlmProvider;
     apiKey: string;

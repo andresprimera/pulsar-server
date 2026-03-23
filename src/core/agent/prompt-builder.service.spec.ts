@@ -57,23 +57,38 @@ describe('PromptBuilderService', () => {
     expect(result).toContain('Always be warm and use casual language.');
   });
 
-  it('should include [Brand Voice] when context has brandVoice', () => {
-    const contextWithBrandVoice: AgentContext = {
+  it('should include [Organization Context] when context has companyBrief', () => {
+    const contextWithBrief: AgentContext = {
       ...baseContext,
-      brandVoice: 'Our brand voice is calm, trustworthy, and professional.',
+      companyBrief: 'We sell sustainable packaging to retailers.',
     };
 
-    const result = service.build(contextWithBrandVoice, {}, undefined);
+    const result = service.build(contextWithBrief, {}, undefined);
 
-    expect(result).toContain('[Brand Voice]');
-    expect(result).toContain(
-      'Our brand voice is calm, trustworthy, and professional.',
-    );
+    expect(result).toContain('[Organization Context]');
+    expect(result).toContain('We sell sustainable packaging to retailers.');
   });
 
-  it('should not include [Brand Voice] when brandVoice is empty or missing', () => {
+  it('should not include [Organization Context] when companyBrief is empty or missing', () => {
     const result = service.build(baseContext, {}, undefined);
-    expect(result).not.toContain('[Brand Voice]');
+    expect(result).not.toContain('[Organization Context]');
+  });
+
+  it('should include [Task Context] when context has promptSupplement', () => {
+    const contextWithTask: AgentContext = {
+      ...baseContext,
+      promptSupplement: 'Refund policy: 30 days.',
+    };
+
+    const result = service.build(contextWithTask, {}, undefined);
+
+    expect(result).toContain('[Task Context]');
+    expect(result).toContain('Refund policy: 30 days.');
+  });
+
+  it('should not include [Task Context] when promptSupplement is empty or missing', () => {
+    const result = service.build(baseContext, {}, undefined);
+    expect(result).not.toContain('[Task Context]');
   });
 
   it('should include [Client Context] when clientName and agentName are set', () => {
@@ -179,11 +194,12 @@ describe('PromptBuilderService', () => {
     expect(result2).not.toContain('[Personality Guardrails]');
   });
 
-  it('should order sections: Agent Instructions, Personality, Personality Examples, Personality Guardrails, Brand Voice, Client, Contact, Safety', () => {
+  it('should order sections: Agent, Organization, Personality, Examples, Guardrails, Task, Client, Contact, Safety', () => {
     const context: AgentContext = {
       ...baseContext,
       clientName: 'Co',
-      brandVoice: 'Be elegant.',
+      companyBrief: 'Org line.',
+      promptSupplement: 'Task line.',
       personality: {
         id: 'p-1',
         name: 'P',
@@ -196,27 +212,29 @@ describe('PromptBuilderService', () => {
     const result = service.build(context, { key: 'value' }, 'Summary');
 
     const agentIdx = result.indexOf('[Agent Instructions]');
+    const orgIdx = result.indexOf('[Organization Context]');
     const personalityIdx = result.indexOf('[Personality]');
     const examplesIdx = result.indexOf('[Personality Examples]');
     const guardrailsIdx = result.indexOf('[Personality Guardrails]');
-    const brandVoiceIdx = result.indexOf('[Brand Voice]');
+    const taskIdx = result.indexOf('[Task Context]');
     const clientIdx = result.indexOf('[Client Context]');
     const contactIdx = result.indexOf('[Contact Context]');
     const safetyIdx = result.indexOf('[Safety Rules]');
 
-    expect(agentIdx).toBeLessThan(personalityIdx);
+    expect(agentIdx).toBeLessThan(orgIdx);
+    expect(orgIdx).toBeLessThan(personalityIdx);
     expect(personalityIdx).toBeLessThan(examplesIdx);
     expect(examplesIdx).toBeLessThan(guardrailsIdx);
-    expect(guardrailsIdx).toBeLessThan(brandVoiceIdx);
-    expect(brandVoiceIdx).toBeLessThan(clientIdx);
+    expect(guardrailsIdx).toBeLessThan(taskIdx);
+    expect(taskIdx).toBeLessThan(clientIdx);
     expect(clientIdx).toBeLessThan(contactIdx);
     expect(contactIdx).toBeLessThan(safetyIdx);
   });
 
-  it('should place Personality Examples before Brand Voice when both exist', () => {
+  it('should place Organization Context before Personality when both exist', () => {
     const context: AgentContext = {
       ...baseContext,
-      brandVoice: 'Brand voice here.',
+      companyBrief: 'About the company.',
       personality: {
         id: 'p-1',
         name: 'P',
@@ -227,8 +245,27 @@ describe('PromptBuilderService', () => {
 
     const result = service.build(context, {}, undefined);
 
-    const examplesIdx = result.indexOf('[Personality Examples]');
-    const brandVoiceIdx = result.indexOf('[Brand Voice]');
-    expect(examplesIdx).toBeLessThan(brandVoiceIdx);
+    const orgIdx = result.indexOf('[Organization Context]');
+    const personalityIdx = result.indexOf('[Personality]');
+    expect(orgIdx).toBeLessThan(personalityIdx);
+  });
+
+  it('should place Task Context after Personality Guardrails when both exist', () => {
+    const context: AgentContext = {
+      ...baseContext,
+      promptSupplement: 'Per-hire notes.',
+      personality: {
+        id: 'p-1',
+        name: 'P',
+        promptTemplate: 'Be brief.',
+        guardrails: 'Stay safe.',
+      },
+    };
+
+    const result = service.build(context, {}, undefined);
+
+    const guardrailsIdx = result.indexOf('[Personality Guardrails]');
+    const taskIdx = result.indexOf('[Task Context]');
+    expect(guardrailsIdx).toBeLessThan(taskIdx);
   });
 });

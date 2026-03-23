@@ -14,5 +14,5 @@ export class UpdateClientDto {
 
   @IsOptional()
   @IsString()
-  brandVoice?: string;
+  companyBrief?: string;
 }

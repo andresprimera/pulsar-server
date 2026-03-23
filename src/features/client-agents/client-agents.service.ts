@@ -196,6 +196,8 @@ export class ClientAgentsService {
       );
     }
 
+    const supplementTrimmed = data.promptSupplement?.trim();
+
     try {
       return await this.clientAgentRepository.create({
         clientId: data.clientId,
@@ -205,6 +207,7 @@ export class ClientAgentsService {
         billingAnchor: new Date(),
         status: 'active',
         channels,
+        ...(supplementTrimmed ? { promptSupplement: supplementTrimmed } : {}),
       });
     } catch (error: any) {
       // Handle MongoDB duplicate key error (race condition fallback)
@@ -229,7 +232,9 @@ export class ClientAgentsService {
       throw new BadRequestException('Cannot update archived ClientAgent');
     }
 
-    const updatePayload: Partial<ClientAgent> = {};
+    const $set: Record<string, unknown> = {};
+    const $unset: Record<string, string> = {};
+
     if (data.personalityId !== undefined) {
       const personality = await this.personalityRepository.findActiveById(
         data.personalityId,
@@ -237,14 +242,37 @@ export class ClientAgentsService {
       if (!personality) {
         throw new BadRequestException('Personality not found or not active');
       }
-      updatePayload.personalityId = new Types.ObjectId(data.personalityId);
+      $set.personalityId = new Types.ObjectId(data.personalityId);
     }
 
-    if (Object.keys(updatePayload).length === 0) {
+    if (data.promptSupplement !== undefined) {
+      const t = data.promptSupplement.trim();
+      if (t) {
+        $set.promptSupplement = t;
+      } else {
+        $unset.promptSupplement = '';
+      }
+    }
+
+    if (Object.keys($set).length === 0 && Object.keys($unset).length === 0) {
       return clientAgent;
     }
 
-    const updated = await this.clientAgentRepository.update(id, updatePayload);
+    const updateQuery: {
+      $set?: Record<string, unknown>;
+      $unset?: Record<string, string>;
+    } = {};
+    if (Object.keys($set).length > 0) {
+      updateQuery.$set = $set;
+    }
+    if (Object.keys($unset).length > 0) {
+      updateQuery.$unset = $unset;
+    }
+
+    const updated = await this.clientAgentRepository.updateWithQuery(
+      id,
+      updateQuery,
+    );
     if (!updated)
       throw new NotFoundException('ClientAgent not found after update');
     return updated;

@@ -35,6 +35,7 @@ export interface RegisterAndHireResult {
     name: string;
     ownerUserId: string;
     status: string;
+    companyBrief?: string;
   };
   clientAgent: {
     _id: string;
@@ -42,6 +43,7 @@ export interface RegisterAndHireResult {
     agentId: string;
     agentPricing: { amount: number; currency: string };
     status: string;
+    promptSupplement?: string;
   };
 }
 
@@ -131,6 +133,10 @@ export class OnboardingService {
           apiKey: encrypt(dto.client.llmConfig.apiKey),
           model: dto.client.llmConfig.model,
         };
+      }
+      const briefTrimmed = dto.client.companyBrief?.trim();
+      if (briefTrimmed) {
+        clientPayload.companyBrief = briefTrimmed;
       }
       client = await this.clientRepository.create(clientPayload, session);
 
@@ -312,6 +318,8 @@ export class OnboardingService {
         );
       }
 
+      const hireSupplementTrimmed = dto.agentHiring.promptSupplement?.trim();
+
       // 9. Create ClientAgent (pricing snapshot + channels + personality)
       clientAgent = await this.clientAgentRepository.create(
         {
@@ -322,6 +330,9 @@ export class OnboardingService {
           billingAnchor: new Date(),
           status: 'active',
           channels: hireChannels,
+          ...(hireSupplementTrimmed
+            ? { promptSupplement: hireSupplementTrimmed }
+            : {}),
         },
         session,
       );
@@ -344,6 +355,9 @@ export class OnboardingService {
           name: client.name,
           ownerUserId: (user._id as Types.ObjectId).toString(),
           status: client.status,
+          ...(client.companyBrief?.trim()
+            ? { companyBrief: client.companyBrief.trim() }
+            : {}),
         },
         clientAgent: {
           _id: (clientAgent._id as Types.ObjectId).toString(),
@@ -351,6 +365,9 @@ export class OnboardingService {
           agentId: clientAgent.agentId,
           agentPricing: clientAgent.agentPricing,
           status: clientAgent.status,
+          ...(clientAgent.promptSupplement?.trim()
+            ? { promptSupplement: clientAgent.promptSupplement.trim() }
+            : {}),
         },
       };
     } catch (error) {

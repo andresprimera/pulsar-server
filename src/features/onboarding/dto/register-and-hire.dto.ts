@@ -58,6 +58,10 @@ class ClientDto {
   @ValidateNested()
   @Type(() => LlmConfigDto)
   llmConfig?: LlmConfigDto;
+
+  @IsOptional()
+  @IsString()
+  companyBrief?: string;
 }
 
 class PricingOverrideDto {
@@ -85,6 +89,10 @@ class AgentHiringDto {
   @ValidateNested()
   @Type(() => PricingOverrideDto)
   pricingOverride?: PricingOverrideDto;
+
+  @IsOptional()
+  @IsString()
+  promptSupplement?: string;
 }
 
 class HireChannelConfigDto {
