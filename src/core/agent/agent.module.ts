@@ -7,11 +7,13 @@ import { ConversationSummaryService } from './conversation-summary.service';
 import { MetadataExposureService } from './metadata-exposure.service';
 import { MessagePersistenceService } from '@persistence/message-persistence.service';
 import { DomainModule } from '@domain/domain.module';
+import { ClientContextSuggestionExecutor } from './client-context-suggestion.executor';
 
 @Module({
   imports: [ConfigModule, DomainModule],
   providers: [
     AgentService,
+    ClientContextSuggestionExecutor,
     AgentContextService,
     PromptBuilderService,
     ConversationSummaryService,

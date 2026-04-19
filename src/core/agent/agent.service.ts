@@ -10,6 +10,11 @@ import { ConversationSummaryService } from './conversation-summary.service';
 import { MetadataExposureService } from './metadata-exposure.service';
 import { LlmUsageLogRepository } from '@persistence/repositories/llm-usage-log.repository';
 import { PromptBuilderService } from './prompt-builder.service';
+import { ClientContextSuggestionExecutor } from './client-context-suggestion.executor';
+import type {
+  CompanyBriefSuggestionInput,
+  PromptSupplementSuggestionInput,
+} from './contracts/client-context-suggestion.input';
 
 @Injectable()
 export class AgentService {
@@ -21,6 +26,7 @@ export class AgentService {
     private readonly metadataExposureService: MetadataExposureService,
     private readonly llmUsageLogRepository: LlmUsageLogRepository,
     private readonly promptBuilder: PromptBuilderService,
+    private readonly clientContextSuggestionExecutor: ClientContextSuggestionExecutor,
   ) {}
 
   async run(input: AgentInput, context: AgentContext): Promise<AgentOutput> {
@@ -159,5 +165,27 @@ export class AgentService {
         },
       };
     }
+  }
+
+  /**
+   * Server-key LLM: organization / company context markdown (onboarding & admin UI).
+   */
+  suggestCompanyBriefMarkdown(
+    input: CompanyBriefSuggestionInput,
+  ): Promise<{ suggestedText: string }> {
+    return this.clientContextSuggestionExecutor.generateCompanyBriefMarkdown(
+      input,
+    );
+  }
+
+  /**
+   * Server-key LLM: per-hire prompt supplement markdown (onboarding & admin UI).
+   */
+  suggestPromptSupplementMarkdown(
+    input: PromptSupplementSuggestionInput,
+  ): Promise<{ suggestedText: string }> {
+    return this.clientContextSuggestionExecutor.generatePromptSupplementMarkdown(
+      input,
+    );
   }
 }

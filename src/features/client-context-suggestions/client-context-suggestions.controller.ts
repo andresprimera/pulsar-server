@@ -2,22 +2,17 @@ import {
   Controller,
   Post,
   Body,
-  HttpCode,
-  HttpStatus,
   UseInterceptors,
   UploadedFiles,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { OnboardingService } from './onboarding.service';
-import { RegisterAndHireDto } from './dto/register-and-hire.dto';
-import { ClientContextSuggestionService } from '@client-context-suggestions/client-context-suggestion.service';
-import { SuggestCompanyBriefDto } from '@client-context-suggestions/dto/suggest-company-brief.dto';
-import { SuggestPromptSupplementDto } from '@client-context-suggestions/dto/suggest-prompt-supplement.dto';
+import { ClientContextSuggestionService } from './client-context-suggestion.service';
+import { SuggestCompanyBriefDto } from './dto/suggest-company-brief.dto';
+import { SuggestPromptSupplementDto } from './dto/suggest-prompt-supplement.dto';
 
-@Controller('onboarding')
-export class OnboardingController {
+@Controller('clients/context-suggestions')
+export class ClientContextSuggestionsController {
   constructor(
-    private readonly onboardingService: OnboardingService,
     private readonly clientContextSuggestionService: ClientContextSuggestionService,
   ) {}
 
@@ -51,11 +46,5 @@ export class OnboardingController {
       dto,
       files ?? [],
     );
-  }
-
-  @Post('register-and-hire')
-  @HttpCode(HttpStatus.CREATED)
-  async registerAndHire(@Body() dto: RegisterAndHireDto) {
-    return this.onboardingService.registerAndHire(dto);
   }
 }
