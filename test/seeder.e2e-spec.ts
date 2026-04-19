@@ -4,6 +4,7 @@ import { AppModule } from '../src/app.module';
 import { Connection } from 'mongoose';
 import { getConnectionToken } from '@nestjs/mongoose';
 import * as SEED_DATA from '../src/core/persistence/data/seed-data.json';
+import { CHANNEL_CATALOG } from '../src/core/persistence/channel-catalog';
 
 describe('Seeder (e2e)', () => {
   let app: INestApplication;
@@ -93,7 +94,7 @@ describe('Seeder (e2e)', () => {
         createdBySeeder: true,
       });
 
-      const seedChannelNames = SEED_DATA.channels.map((c) => c.name);
+      const seedChannelNames = CHANNEL_CATALOG.map((c) => c.name);
       const seededChannels = await connection
         .collection('channels')
         .find({ name: { $in: seedChannelNames } })

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model, Types } from 'mongoose';
 import { Channel } from '@persistence/schemas/channel.schema';
+import type { ChannelCatalogEntry } from '@persistence/channel-catalog';
 
 @Injectable()
 export class ChannelRepository {
@@ -32,6 +33,37 @@ export class ChannelRepository {
         { name },
         { $setOnInsert: { ...data, name } },
         { upsert: true, new: true, ...(session && { session }) },
+      )
+      .exec();
+  }
+
+  /**
+   * Materializes code-owned fields; preserves DB-tuned fields after insert
+   * (monthlyMessageQuota is only set on insert).
+   */
+  async upsertCatalogEntry(entry: ChannelCatalogEntry): Promise<Channel> {
+    const supportedProviders = entry.supportedProviders.map((p) =>
+      p.toLowerCase(),
+    );
+    const monthlyMessageQuotaOnInsert =
+      entry.defaultMonthlyMessageQuota !== undefined
+        ? entry.defaultMonthlyMessageQuota
+        : null;
+
+    return this.model
+      .findOneAndUpdate(
+        { name: entry.name },
+        {
+          $set: {
+            type: entry.type,
+            supportedProviders,
+          },
+          $setOnInsert: {
+            name: entry.name,
+            monthlyMessageQuota: monthlyMessageQuotaOnInsert,
+          },
+        },
+        { upsert: true, new: true },
       )
       .exec();
   }

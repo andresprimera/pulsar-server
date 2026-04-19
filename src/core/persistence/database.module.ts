@@ -16,6 +16,7 @@ import { ClientAgentRepository } from './repositories/client-agent.repository';
 import { ClientPhoneRepository } from './repositories/client-phone.repository';
 import { ContactRepository } from './repositories/contact.repository';
 import { SeederService } from './seeder.service';
+import { ChannelCatalogSeederService } from './channel-catalog-seeder.service';
 import { User, UserSchema } from './schemas/user.schema';
 import { UserRepository } from './repositories/user.repository';
 import { Message, MessageSchema } from './schemas/message.schema';
@@ -99,7 +100,12 @@ const repositories = [
     ]),
     forwardRef(() => OnboardingModule),
   ],
-  providers: [...repositories, SeederService, EventIdempotencyService],
+  providers: [
+    ...repositories,
+    ChannelCatalogSeederService,
+    SeederService,
+    EventIdempotencyService,
+  ],
   exports: [...repositories, EventIdempotencyService],
 })
 export class DatabaseModule {}

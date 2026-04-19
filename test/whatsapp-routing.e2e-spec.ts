@@ -5,6 +5,7 @@ import { AppModule } from '../src/app.module';
 import { Connection } from 'mongoose';
 import { getConnectionToken } from '@nestjs/mongoose';
 import * as SEED_DATA from '../src/core/persistence/data/seed-data.json';
+import { CHANNEL_CATALOG } from '../src/core/persistence/channel-catalog';
 import { AgentService } from '../src/core/agent/agent.service';
 
 describe('WhatsApp Message Routing (e2e)', () => {
@@ -63,7 +64,7 @@ describe('WhatsApp Message Routing (e2e)', () => {
       email: { $in: seedEmails },
     });
 
-    const seedChannelNames = SEED_DATA.channels.map((c) => c.name);
+    const seedChannelNames = CHANNEL_CATALOG.map((c) => c.name);
     await connection.collection('channels').deleteMany({
       name: { $in: seedChannelNames },
     });

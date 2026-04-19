@@ -16,6 +16,7 @@ import { ChannelPriceRepository } from './repositories/channel-price.repository'
 import { OnboardingService } from '@onboarding/onboarding.service';
 import { BadRequestException, Logger } from '@nestjs/common';
 import * as SEED_DATA from './data/seed-data.json';
+import { CHANNEL_CATALOG } from './channel-catalog';
 
 describe('SeederService', () => {
   let service: SeederService;
@@ -94,7 +95,7 @@ describe('SeederService', () => {
     };
 
     mockChannelRepository = {
-      findOrCreateByName: jest.fn(),
+      upsertCatalogEntry: jest.fn(),
       findByNameOrFail: jest.fn(),
     };
 
@@ -199,7 +200,7 @@ describe('SeederService', () => {
   });
 
   it('should seed only WhatsApp, TikTok, and Instagram with multichannel coverage', () => {
-    const channelNames = SEED_DATA.channels.map((channel) => channel.name);
+    const channelNames = CHANNEL_CATALOG.map((channel) => channel.name);
     expect(channelNames).toEqual(
       expect.arrayContaining(['WhatsApp', 'TikTok', 'Instagram']),
     );
@@ -251,7 +252,7 @@ describe('SeederService', () => {
       });
 
       // Mock Channel resolutions
-      mockChannelRepository.findOrCreateByName.mockResolvedValue({
+      mockChannelRepository.upsertCatalogEntry.mockResolvedValue({
         _id: 'channel-id',
         name: 'WhatsApp',
         supportedProviders: ['meta', 'twilio'],
@@ -278,7 +279,7 @@ describe('SeederService', () => {
       });
 
       // Mock Channel resolutions
-      mockChannelRepository.findOrCreateByName.mockResolvedValue({
+      mockChannelRepository.upsertCatalogEntry.mockResolvedValue({
         _id: 'channel-id',
         name: 'WhatsApp',
         supportedProviders: ['meta', 'twilio'],
@@ -291,7 +292,7 @@ describe('SeederService', () => {
         SEED_DATA.agents.length,
       );
       expect(mockChannelPriceRepository.upsert).toHaveBeenCalledTimes(
-        SEED_DATA.channels.length,
+        CHANNEL_CATALOG.length,
       );
 
       // Verify agents creation (both agents should be created)
@@ -332,8 +333,8 @@ describe('SeederService', () => {
       );
 
       // Verify channel provisioning
-      expect(mockChannelRepository.findOrCreateByName).toHaveBeenCalledTimes(
-        SEED_DATA.channels.length,
+      expect(mockChannelRepository.upsertCatalogEntry).toHaveBeenCalledTimes(
+        CHANNEL_CATALOG.length,
       );
     });
 
@@ -390,7 +391,7 @@ describe('SeederService', () => {
       });
 
       // Mock Channel resolutions
-      mockChannelRepository.findOrCreateByName.mockResolvedValue({
+      mockChannelRepository.upsertCatalogEntry.mockResolvedValue({
         _id: 'channel-id',
         name: 'WhatsApp',
         supportedProviders: ['meta', 'twilio'],
@@ -422,7 +423,7 @@ describe('SeederService', () => {
         name: SEED_DATA.agents[0].name,
       });
 
-      mockChannelRepository.findOrCreateByName
+      mockChannelRepository.upsertCatalogEntry
         .mockResolvedValueOnce({
           _id: 'wa-channel-id',
           name: 'WhatsApp',
@@ -484,7 +485,7 @@ describe('SeederService', () => {
           _id: mockAgentId,
           name: SEED_DATA.agents[0].name,
         });
-        mockChannelRepository.findOrCreateByName.mockResolvedValue({
+        mockChannelRepository.upsertCatalogEntry.mockResolvedValue({
           _id: 'channel-id',
           name: 'WhatsApp',
           supportedProviders: ['meta', 'twilio'],
@@ -548,7 +549,7 @@ describe('SeederService', () => {
           }),
         });
 
-      mockChannelRepository.findOrCreateByName
+      mockChannelRepository.upsertCatalogEntry
         .mockResolvedValueOnce({
           _id: 'wa-channel-id',
           name: 'WhatsApp',
@@ -617,7 +618,7 @@ describe('SeederService', () => {
         name: SEED_DATA.agents[0].name,
       });
 
-      mockChannelRepository.findOrCreateByName
+      mockChannelRepository.upsertCatalogEntry
         .mockResolvedValueOnce({
           _id: 'wa-channel-id',
           name: 'WhatsApp',
@@ -667,7 +668,7 @@ describe('SeederService', () => {
         name: SEED_DATA.agents[0].name,
       });
 
-      mockChannelRepository.findOrCreateByName
+      mockChannelRepository.upsertCatalogEntry
         .mockResolvedValueOnce({
           _id: 'wa-channel-id',
           name: 'WhatsApp',
@@ -712,7 +713,7 @@ describe('SeederService', () => {
         name: SEED_DATA.agents[1].name,
       });
 
-      mockChannelRepository.findOrCreateByName
+      mockChannelRepository.upsertCatalogEntry
         .mockResolvedValueOnce({
           _id: 'wa-channel-id',
           name: 'WhatsApp',

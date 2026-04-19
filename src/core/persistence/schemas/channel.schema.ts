@@ -1,5 +1,9 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
+import {
+  CHANNEL_TYPES,
+  type ChannelType,
+} from '@shared/channel-type.constants';
 
 @Schema({ collection: 'channels' })
 export class Channel extends Document {
@@ -8,9 +12,9 @@ export class Channel extends Document {
 
   @Prop({
     required: true,
-    enum: ['whatsapp', 'telegram', 'web', 'api', 'tiktok', 'instagram'],
+    enum: CHANNEL_TYPES,
   })
-  type: 'whatsapp' | 'telegram' | 'web' | 'api' | 'tiktok' | 'instagram';
+  type: ChannelType;
 
   @Prop({ required: true, type: [String] })
   supportedProviders: string[];

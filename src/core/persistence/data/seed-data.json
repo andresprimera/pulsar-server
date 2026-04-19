@@ -118,23 +118,6 @@
       "status": "active"
     }
   ],
-  "channels": [
-    {
-      "name": "WhatsApp",
-      "type": "whatsapp",
-      "supportedProviders": ["meta", "twilio", "dialog360"]
-    },
-    {
-      "name": "TikTok",
-      "type": "tiktok",
-      "supportedProviders": ["tiktok"]
-    },
-    {
-      "name": "Instagram",
-      "type": "instagram",
-      "supportedProviders": ["instagram"]
-    }
-  ],
   "users": [
     {
       "email": "admin@homegroupd.com",

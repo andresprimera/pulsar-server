@@ -23,6 +23,7 @@ import { Personality } from './schemas/personality.schema';
 import { encryptRecord, encrypt } from '@shared/crypto.util';
 import * as SEED_DATA from './data/seed-data.json';
 import { ClientRepository } from './repositories/client.repository';
+import { CHANNEL_CATALOG } from './channel-catalog';
 
 @Injectable()
 export class SeederService implements OnApplicationBootstrap {
@@ -136,25 +137,14 @@ export class SeederService implements OnApplicationBootstrap {
         agentsMap.set(agentSeed.name, agent);
       }
 
-      // 3. Ensure Channels exist (Infrastructure provisioning)
-      this.logger.log('Provisioning channels...');
+      // 3. Ensure Channels exist (canonical definitions in CHANNEL_CATALOG)
+      this.logger.log('Provisioning channels from CHANNEL_CATALOG...');
       const channelsMap = new Map();
-      for (const channelSeed of SEED_DATA.channels) {
-        const channel = await this.channelRepository.findOrCreateByName(
-          channelSeed.name,
-          {
-            type: channelSeed.type as any,
-            supportedProviders: channelSeed.supportedProviders.map((p) =>
-              p.toLowerCase(),
-            ),
-            ...((channelSeed as any).monthlyMessageQuota != null
-              ? {
-                  monthlyMessageQuota: (channelSeed as any).monthlyMessageQuota,
-                }
-              : {}),
-          },
+      for (const catalogEntry of CHANNEL_CATALOG) {
+        const channel = await this.channelRepository.upsertCatalogEntry(
+          catalogEntry,
         );
-        channelsMap.set(channelSeed.name, { channel });
+        channelsMap.set(catalogEntry.name, { channel });
       }
 
       // 4. Pre-seed full catalog (AgentPrice + ChannelPrice) in default currency before any user
@@ -176,8 +166,8 @@ export class SeederService implements OnApplicationBootstrap {
           amount,
         );
       }
-      for (const channelSeed of SEED_DATA.channels) {
-        const channelInfo = channelsMap.get(channelSeed.name);
+      for (const catalogEntry of CHANNEL_CATALOG) {
+        const channelInfo = channelsMap.get(catalogEntry.name);
         if (!channelInfo?.channel?._id) continue;
         const channelId = channelInfo.channel._id as Types.ObjectId;
         const existing =
@@ -186,7 +176,7 @@ export class SeederService implements OnApplicationBootstrap {
             defaultCurrency,
           );
         if (existing) continue; // avoid creating history on re-seed
-        const amount = (channelSeed as any).amount ?? 0;
+        const amount = 0;
         await this.channelPriceRepository.upsert(
           channelId,
           defaultCurrency,
