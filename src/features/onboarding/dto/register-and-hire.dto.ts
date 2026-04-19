@@ -12,6 +12,8 @@ import {
   ArrayMinSize,
   Matches,
   IsInt,
+  ValidateIf,
+  IsBoolean,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { LlmProvider } from '@domain/llm/provider.enum';
@@ -99,9 +101,17 @@ class HireChannelConfigDto {
   @IsMongoId()
   channelId: string;
 
-  @Transform(({ value }) => value?.toLowerCase().trim())
+  /** When true, the server picks a default supported provider and does not require routing or credentials yet. */
+  @IsOptional()
+  @IsBoolean()
+  platformHosted?: boolean;
+
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.toLowerCase().trim() : value,
+  )
+  @ValidateIf((o) => !o.platformHosted)
   @IsEnum(ChannelProvider)
-  provider: ChannelProvider;
+  provider?: ChannelProvider;
 
   @IsOptional()
   @IsObject()
