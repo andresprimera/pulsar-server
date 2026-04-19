@@ -62,6 +62,7 @@ describe('ClientAgentsService', () => {
       findByClientAndStatus: jest.fn(),
       findById: jest.fn(),
       update: jest.fn(),
+      updateWithQuery: jest.fn(),
     };
 
     mockClientsService = {
@@ -431,7 +432,7 @@ describe('ClientAgentsService', () => {
       mockClientAgentRepository.findById.mockResolvedValue(mockClientAgent);
 
       const result = await service.update('ca-1', {} as any);
-      expect(mockClientAgentRepository.update).not.toHaveBeenCalled();
+      expect(mockClientAgentRepository.updateWithQuery).not.toHaveBeenCalled();
       expect(result).toEqual(mockClientAgent);
     });
 
@@ -440,7 +441,7 @@ describe('ClientAgentsService', () => {
       mockPersonalityRepository.findActiveById.mockResolvedValue(
         mockPersonality,
       );
-      mockClientAgentRepository.update.mockResolvedValue({
+      mockClientAgentRepository.updateWithQuery.mockResolvedValue({
         ...mockClientAgent,
         personalityId: 'personality-1',
       });
@@ -451,14 +452,28 @@ describe('ClientAgentsService', () => {
       expect(mockPersonalityRepository.findActiveById).toHaveBeenCalledWith(
         '507f1f77bcf86cd799439099',
       );
-      expect(mockClientAgentRepository.update).toHaveBeenCalledWith(
+      expect(mockClientAgentRepository.updateWithQuery).toHaveBeenCalledWith(
         'ca-1',
-        expect.objectContaining({ personalityId: expect.anything() }),
+        expect.objectContaining({ $set: expect.any(Object) }),
       );
       expect(result).toEqual({
         ...mockClientAgent,
         personalityId: 'personality-1',
       });
+    });
+
+    it('should unset promptSupplement when cleared with whitespace-only string', async () => {
+      mockClientAgentRepository.findById.mockResolvedValue(mockClientAgent);
+      mockClientAgentRepository.updateWithQuery.mockResolvedValue({
+        ...mockClientAgent,
+      });
+
+      await service.update('ca-1', { promptSupplement: '   \n  ' } as any);
+
+      expect(mockClientAgentRepository.updateWithQuery).toHaveBeenCalledWith(
+        'ca-1',
+        { $unset: { promptSupplement: '' } },
+      );
     });
 
     it('should throw NotFoundException if not found', async () => {

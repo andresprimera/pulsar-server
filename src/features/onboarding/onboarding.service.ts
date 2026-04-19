@@ -2,6 +2,7 @@ import {
   Injectable,
   ConflictException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { InjectConnection } from '@nestjs/mongoose';
 import { Connection, Types } from 'mongoose';
@@ -35,6 +36,7 @@ export interface RegisterAndHireResult {
     name: string;
     ownerUserId: string;
     status: string;
+    companyBrief?: string;
   };
   clientAgent: {
     _id: string;
@@ -42,11 +44,14 @@ export interface RegisterAndHireResult {
     agentId: string;
     agentPricing: { amount: number; currency: string };
     status: string;
+    promptSupplement?: string;
   };
 }
 
 @Injectable()
 export class OnboardingService {
+  private readonly logger = new Logger(OnboardingService.name);
+
   constructor(
     @InjectConnection() private readonly connection: Connection,
     private readonly clientRepository: ClientRepository,
@@ -132,6 +137,10 @@ export class OnboardingService {
           model: dto.client.llmConfig.model,
         };
       }
+      const briefTrimmed = dto.client.companyBrief?.trim();
+      if (briefTrimmed) {
+        clientPayload.companyBrief = briefTrimmed;
+      }
       client = await this.clientRepository.create(clientPayload, session);
 
       // 7. Create User
@@ -180,6 +189,8 @@ export class OnboardingService {
       const processedChannelIds = new Set<string>();
 
       for (const channelConfig of dto.channels) {
+        const platformHosted = Boolean(channelConfig.platformHosted);
+
         // Validation: Unique channelId in request
         if (processedChannelIds.has(channelConfig.channelId)) {
           throw new BadRequestException(
@@ -193,13 +204,30 @@ export class OnboardingService {
           channelConfig.channelId,
         );
 
-        // Validation: Provider supported
-        const normalizedProvider = channelConfig.provider.toLowerCase().trim();
+        const normalizedProvider = (() => {
+          if (platformHosted && !channelConfig.provider) {
+            const first = channel.supportedProviders?.[0]
+              ?.toLowerCase()
+              ?.trim();
+            if (!first) {
+              throw new BadRequestException(
+                `Channel "${channel.name}" has no supported providers; platform-hosted onboarding is unavailable.`,
+              );
+            }
+            return first;
+          }
+          const fromDto = channelConfig.provider?.toLowerCase()?.trim();
+          if (!fromDto) {
+            throw new BadRequestException(
+              'Provider is required unless platformHosted is true.',
+            );
+          }
+          return fromDto;
+        })();
+
         if (!channel.supportedProviders.includes(normalizedProvider)) {
           throw new BadRequestException(
-            `Provider "${
-              channelConfig.provider
-            }" is not supported by channel "${
+            `Provider "${normalizedProvider}" is not supported by channel "${
               channel.name
             }". Supported: ${channel.supportedProviders.join(', ')}`,
           );
@@ -259,7 +287,7 @@ export class OnboardingService {
           channel.type === 'tiktok';
         const hasRoutingId =
           phoneNumberId || tiktokUserId || instagramAccountId;
-        if (needsRoutingId && !hasRoutingId) {
+        if (needsRoutingId && !hasRoutingId && !platformHosted) {
           throw new BadRequestException(
             `Channel "${channel.name}" requires either credentials (with the appropriate routing field) or routingIdentifier.`,
           );
@@ -312,6 +340,8 @@ export class OnboardingService {
         );
       }
 
+      const hireSupplementTrimmed = dto.agentHiring.promptSupplement?.trim();
+
       // 9. Create ClientAgent (pricing snapshot + channels + personality)
       clientAgent = await this.clientAgentRepository.create(
         {
@@ -322,6 +352,9 @@ export class OnboardingService {
           billingAnchor: new Date(),
           status: 'active',
           channels: hireChannels,
+          ...(hireSupplementTrimmed
+            ? { promptSupplement: hireSupplementTrimmed }
+            : {}),
         },
         session,
       );
@@ -344,6 +377,9 @@ export class OnboardingService {
           name: client.name,
           ownerUserId: (user._id as Types.ObjectId).toString(),
           status: client.status,
+          ...(client.companyBrief?.trim()
+            ? { companyBrief: client.companyBrief.trim() }
+            : {}),
         },
         clientAgent: {
           _id: (clientAgent._id as Types.ObjectId).toString(),
@@ -351,6 +387,9 @@ export class OnboardingService {
           agentId: clientAgent.agentId,
           agentPricing: clientAgent.agentPricing,
           status: clientAgent.status,
+          ...(clientAgent.promptSupplement?.trim()
+            ? { promptSupplement: clientAgent.promptSupplement.trim() }
+            : {}),
         },
       };
     } catch (error) {

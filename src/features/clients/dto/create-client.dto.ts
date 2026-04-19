@@ -13,5 +13,5 @@ export class CreateClientDto {
 
   @IsOptional()
   @IsString()
-  brandVoice?: string;
+  companyBrief?: string;
 }

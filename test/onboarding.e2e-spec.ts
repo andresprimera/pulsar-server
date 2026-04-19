@@ -131,6 +131,62 @@ describe('Onboarding (e2e)', () => {
     return channelId;
   }
 
+  describe('POST /onboarding/company-brief/suggest', () => {
+    it('should return 400 when OPENAI_API_KEY is unset', async () => {
+      const prev = process.env.OPENAI_API_KEY;
+      delete process.env.OPENAI_API_KEY;
+
+      await request(app.getHttpServer())
+        .post('/onboarding/company-brief/suggest')
+        .field('instructions', 'Hello')
+        .expect(400);
+
+      process.env.OPENAI_API_KEY = prev;
+    });
+  });
+
+  describe('POST /onboarding/prompt-supplement/suggest', () => {
+    it('should return 400 when OPENAI_API_KEY is unset', async () => {
+      const prev = process.env.OPENAI_API_KEY;
+      delete process.env.OPENAI_API_KEY;
+
+      await request(app.getHttpServer())
+        .post('/onboarding/prompt-supplement/suggest')
+        .field('instructions', 'Hello')
+        .expect(400);
+
+      process.env.OPENAI_API_KEY = prev;
+    });
+  });
+
+  describe('POST /clients/context-suggestions/company-brief/suggest', () => {
+    it('should return 400 when OPENAI_API_KEY is unset', async () => {
+      const prev = process.env.OPENAI_API_KEY;
+      delete process.env.OPENAI_API_KEY;
+
+      await request(app.getHttpServer())
+        .post('/clients/context-suggestions/company-brief/suggest')
+        .field('instructions', 'Hello')
+        .expect(400);
+
+      process.env.OPENAI_API_KEY = prev;
+    });
+  });
+
+  describe('POST /clients/context-suggestions/prompt-supplement/suggest', () => {
+    it('should return 400 when OPENAI_API_KEY is unset', async () => {
+      const prev = process.env.OPENAI_API_KEY;
+      delete process.env.OPENAI_API_KEY;
+
+      await request(app.getHttpServer())
+        .post('/clients/context-suggestions/prompt-supplement/suggest')
+        .field('instructions', 'Hello')
+        .expect(400);
+
+      process.env.OPENAI_API_KEY = prev;
+    });
+  });
+
   describe('POST /onboarding/register-and-hire', () => {
     it('should complete full registration flow for individual client', async () => {
       const suffix = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -148,6 +204,7 @@ describe('Onboarding (e2e)', () => {
           },
           client: {
             type: 'individual',
+            companyBrief: 'E2E org-wide context line.',
             llmConfig: {
               provider: 'openai',
               apiKey: 'test-key',
@@ -158,6 +215,7 @@ describe('Onboarding (e2e)', () => {
             agentId: testAgentId,
             personalityId: testPersonalityId,
             pricingOverride: { agentAmount: 99.99 },
+            promptSupplement: 'E2E hire supplement line.',
           },
           channels: [
             {
@@ -188,12 +246,23 @@ describe('Onboarding (e2e)', () => {
       expect(response.body.client.type).toBe('individual');
       expect(response.body.client.name).toBe('E2E Onboarding Test User');
       expect(response.body.client.status).toBe('active');
+      expect(response.body.client.companyBrief).toBe(
+        'E2E org-wide context line.',
+      );
 
       // Verify clientAgent
       expect(response.body.clientAgent.clientId).toBe(response.body.client._id);
       expect(response.body.clientAgent.agentId).toBe(testAgentId);
       expect(response.body.clientAgent.agentPricing.amount).toBe(99.99);
       expect(response.body.clientAgent.agentPricing.currency).toBeDefined();
+      expect(response.body.clientAgent.promptSupplement).toBe(
+        'E2E hire supplement line.',
+      );
+
+      const savedClient = await connection
+        .collection('clients')
+        .findOne({ _id: new Types.ObjectId(response.body.client._id) });
+      expect(savedClient?.companyBrief).toBe('E2E org-wide context line.');
 
       // Verify agentChannels in DB
       const savedClientAgent = await connection
@@ -201,6 +270,9 @@ describe('Onboarding (e2e)', () => {
         .findOne({ _id: new Types.ObjectId(response.body.clientAgent._id) });
 
       expect(savedClientAgent).toBeDefined();
+      expect(savedClientAgent?.promptSupplement).toBe(
+        'E2E hire supplement line.',
+      );
 
       expect(savedClientAgent.channels).toHaveLength(1);
       expect(savedClientAgent.channels[0].channelId.toString()).toBe(channelId);
@@ -228,6 +300,37 @@ describe('Onboarding (e2e)', () => {
           });
         },
       );
+    });
+
+    it('should complete registration with platform-hosted WhatsApp (no provider or routing)', async () => {
+      const suffix = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+      const uniqueEmail = `e2e-onboarding-platform-${suffix}@example.com`;
+      const channelName = `e2e-test-channel-platform-${suffix}`;
+      const channelId = await provisionChannel(channelName, 'whatsapp');
+
+      const response = await request(app.getHttpServer())
+        .post('/onboarding/register-and-hire')
+        .send({
+          user: { email: uniqueEmail, name: 'E2E Platform Hosted User' },
+          client: { type: 'individual' },
+          agentHiring: {
+            agentId: testAgentId,
+            personalityId: testPersonalityId,
+            pricingOverride: { agentAmount: 0 },
+          },
+          channels: [{ channelId, platformHosted: true }],
+        })
+        .expect(201);
+
+      const savedClientAgent = await connection
+        .collection('client_agents')
+        .findOne({ _id: new Types.ObjectId(response.body.clientAgent._id) });
+      expect(savedClientAgent?.channels).toHaveLength(1);
+      expect(savedClientAgent?.channels[0].channelId.toString()).toBe(
+        channelId,
+      );
+      expect(savedClientAgent?.channels[0].provider).toBe('meta');
+      expect(savedClientAgent?.channels[0].phoneNumberId).toBeUndefined();
     });
 
     it('should use explicit client name when provided', async () => {

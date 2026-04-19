@@ -5,8 +5,9 @@ const SECTION_SEP = '\n\n';
 
 /**
  * Centralized prompt construction. Builds the final system prompt in deterministic
- * section order: [Agent Instructions] → [Personality] → [Personality Examples] →
- * [Personality Guardrails] → [Brand Voice] → [Client Context] → [Contact Context] → [Safety Rules].
+ * section order:
+ * [Agent Instructions] → [Organization Context] → [Personality] → [Personality Examples] →
+ * [Personality Guardrails] → [Task Context] → [Client Context] → [Contact Context] → [Safety Rules].
  */
 @Injectable()
 export class PromptBuilderService {
@@ -20,6 +21,11 @@ export class PromptBuilderService {
     // [Agent Instructions]
     if (context.systemPrompt?.trim()) {
       sections.push(`[Agent Instructions]\n${context.systemPrompt.trim()}`);
+    }
+
+    // [Organization Context]
+    if (context.companyBrief?.trim()) {
+      sections.push(`[Organization Context]\n${context.companyBrief.trim()}`);
     }
 
     // [Personality]
@@ -52,9 +58,9 @@ export class PromptBuilderService {
       );
     }
 
-    // [Brand Voice] — client-specific tone/style; does not replace personality
-    if (context.brandVoice?.trim()) {
-      sections.push(`[Brand Voice]\n${context.brandVoice.trim()}`);
+    // [Task Context]
+    if (context.promptSupplement?.trim()) {
+      sections.push(`[Task Context]\n${context.promptSupplement.trim()}`);
     }
 
     // [Client Context]

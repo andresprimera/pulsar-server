@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { ClientSession, Model } from 'mongoose';
+import { ClientSession, Model, UpdateQuery } from 'mongoose';
 import { Client } from '@persistence/schemas/client.schema';
 
 @Injectable()
@@ -47,6 +47,15 @@ export class ClientRepository {
     session?: ClientSession,
   ): Promise<Client | null> {
     const query = this.model.findByIdAndUpdate(id, data, { new: true });
+    return (session ? query.session(session) : query).exec();
+  }
+
+  async updateWithQuery(
+    id: string,
+    update: UpdateQuery<Client>,
+    session?: ClientSession,
+  ): Promise<Client | null> {
+    const query = this.model.findByIdAndUpdate(id, update, { new: true });
     return (session ? query.session(session) : query).exec();
   }
 }

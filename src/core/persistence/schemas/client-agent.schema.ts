@@ -70,6 +70,13 @@ export class ClientAgent extends Document {
   })
   personalityId: Types.ObjectId;
 
+  /**
+   * Optional hire-specific grounding (products, process, FAQs) for this agent
+   * on this client ([Task Context] in prompts).
+   */
+  @Prop({ required: false })
+  promptSupplement?: string;
+
   @Prop({
     required: true,
     enum: ['active', 'inactive', 'archived'],

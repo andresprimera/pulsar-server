@@ -23,6 +23,9 @@
       "@client-agents/*": ["src/features/client-agents/*"],
       "@users/*": ["src/features/users/*"],
       "@onboarding/*": ["src/features/onboarding/*"],
+      "@client-context-suggestions/*": [
+        "src/features/client-context-suggestions/*"
+      ],
       "@personalities/*": ["src/features/personalities/*"]
     },
     "incremental": true,

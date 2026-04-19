@@ -15,6 +15,7 @@ import { ClientsModule } from './features/clients/clients.module';
 import { ClientAgentsModule } from './features/client-agents/client-agents.module';
 import { OnboardingModule } from './features/onboarding/onboarding.module';
 import { PersonalitiesModule } from './features/personalities/personalities.module';
+import { ClientContextSuggestionsModule } from './features/client-context-suggestions/client-context-suggestions.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { PersonalitiesModule } from './features/personalities/personalities.modu
     ClientsModule,
     ClientAgentsModule,
     PersonalitiesModule,
+    ClientContextSuggestionsModule,
     OnboardingModule,
   ],
 

@@ -8,6 +8,7 @@ import { ConversationSummaryService } from './conversation-summary.service';
 import { MetadataExposureService } from './metadata-exposure.service';
 import { LlmUsageLogRepository } from '@persistence/repositories/llm-usage-log.repository';
 import { PromptBuilderService } from './prompt-builder.service';
+import { ClientContextSuggestionExecutor } from './client-context-suggestion.executor';
 import * as llmFactory from './llm/llm.factory';
 import * as ai from 'ai';
 import { Logger } from '@nestjs/common';
@@ -76,6 +77,13 @@ describe('AgentService', () => {
           provide: LlmUsageLogRepository,
           useValue: {
             create: jest.fn().mockResolvedValue({}),
+          },
+        },
+        {
+          provide: ClientContextSuggestionExecutor,
+          useValue: {
+            generateCompanyBriefMarkdown: jest.fn(),
+            generatePromptSupplementMarkdown: jest.fn(),
           },
         },
         {

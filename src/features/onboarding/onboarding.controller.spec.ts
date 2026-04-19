@@ -1,10 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { OnboardingController } from './onboarding.controller';
 import { OnboardingService } from './onboarding.service';
+import { ClientContextSuggestionService } from '@client-context-suggestions/client-context-suggestion.service';
 
 describe('OnboardingController', () => {
   let controller: OnboardingController;
   let mockOnboardingService: any;
+  let mockClientContextSuggestionService: any;
 
   const mockResult = {
     user: {
@@ -34,11 +36,19 @@ describe('OnboardingController', () => {
     mockOnboardingService = {
       registerAndHire: jest.fn().mockResolvedValue(mockResult),
     };
+    mockClientContextSuggestionService = {
+      suggestCompanyBrief: jest.fn(),
+      suggestPromptSupplement: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [OnboardingController],
       providers: [
         { provide: OnboardingService, useValue: mockOnboardingService },
+        {
+          provide: ClientContextSuggestionService,
+          useValue: mockClientContextSuggestionService,
+        },
       ],
     }).compile();
 

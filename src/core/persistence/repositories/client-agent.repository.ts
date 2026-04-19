@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { ClientSession, Model } from 'mongoose';
+import { ClientSession, Model, UpdateQuery } from 'mongoose';
 import { ClientAgent } from '@persistence/schemas/client-agent.schema';
 import { normalizeToE164 } from '@shared/e164.util';
 
@@ -59,6 +59,13 @@ export class ClientAgentRepository {
   ): Promise<ClientAgent | null> {
     const normalized = this.normalizeChannelPhoneNumbers(data);
     return this.model.findByIdAndUpdate(id, normalized, { new: true }).exec();
+  }
+
+  async updateWithQuery(
+    id: string,
+    update: UpdateQuery<ClientAgent>,
+  ): Promise<ClientAgent | null> {
+    return this.model.findByIdAndUpdate(id, update, { new: true }).exec();
   }
 
   /** Ensures channel.phoneNumberId is stored as E.164 (single place for persistence format). */

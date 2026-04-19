@@ -68,6 +68,8 @@ export class AgentContextService {
         ? decryptRecord(channelConfig.credentials)
         : {};
 
+    const promptSupplementTrimmed = clientAgent.promptSupplement?.trim();
+
     let personality: AgentContext['personality'] | undefined;
     const personalityId = clientAgent.personalityId;
     if (personalityId) {
@@ -102,6 +104,9 @@ export class AgentContextService {
         model,
       },
       channelConfig: channelConfigDecrypted,
+      ...(promptSupplementTrimmed
+        ? { promptSupplement: promptSupplementTrimmed }
+        : {}),
     };
 
     return { context: rawContext, client };
@@ -143,7 +148,7 @@ export class AgentContextService {
   }
 
   /**
-   * Enriches context with clientName and brandVoice for PromptBuilder.
+   * Enriches context with clientName and companyBrief for PromptBuilder.
    * When client is provided (e.g. from buildContextFromRoute), skips a second client load.
    */
   async enrichContext(
@@ -160,12 +165,14 @@ export class AgentContextService {
       return context;
     }
 
+    const companyBriefTrimmed = resolvedClient.companyBrief?.trim();
+    const contextBase: AgentContext = { ...context };
+    delete contextBase.companyBrief;
+
     return {
-      ...context,
+      ...contextBase,
       clientName: resolvedClient.name,
-      ...(resolvedClient.brandVoice != null && resolvedClient.brandVoice !== ''
-        ? { brandVoice: resolvedClient.brandVoice }
-        : {}),
+      ...(companyBriefTrimmed ? { companyBrief: companyBriefTrimmed } : {}),
     };
   }
 }
