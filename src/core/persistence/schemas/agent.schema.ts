@@ -1,5 +1,9 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
+import {
+  AGENT_TOOLING_PROFILE_IDS,
+  type AgentToolingProfileId,
+} from '@shared/agent-tooling-profile.constants';
 
 @Schema({ collection: 'agents', timestamps: true })
 export class Agent extends Document {
@@ -22,6 +26,14 @@ export class Agent extends Document {
 
   @Prop({ type: Number, default: null })
   monthlyTokenQuota: number | null; // null = unlimited
+
+  /** Optional default tooling profile when hire does not override. */
+  @Prop({
+    type: String,
+    required: false,
+    enum: [...AGENT_TOOLING_PROFILE_IDS],
+  })
+  toolingProfileId?: AgentToolingProfileId;
 }
 
 export const AgentSchema = SchemaFactory.createForClass(Agent);

@@ -214,6 +214,7 @@ describe('IncomingMessageOrchestrator', () => {
         clientId: mockClientAgent.clientId,
         channelId: mockClientAgent.channels[0].channelId,
         systemPrompt: mockAgent.systemPrompt,
+        toolingProfileId: 'standard' as const,
         llmConfig: {
           provider: LlmProvider.OpenAI,
           apiKey: 'sk-mock',
@@ -285,6 +286,7 @@ describe('IncomingMessageOrchestrator', () => {
         clientId: mockClientAgent.clientId,
         channelId: mockClientAgent.channels[0].channelId,
         systemPrompt: mockAgent.systemPrompt,
+        toolingProfileId: 'standard' as const,
         llmConfig: {
           provider: LlmProvider.OpenAI,
           apiKey: 'sk-mock',

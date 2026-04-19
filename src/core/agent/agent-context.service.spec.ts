@@ -24,6 +24,7 @@ describe('AgentContextService', () => {
     clientId: 'client-1',
     channelId: 'channel-1',
     systemPrompt: 'You are a helpful assistant.',
+    toolingProfileId: 'standard',
     llmConfig: {
       provider: LlmProvider.OpenAI,
       apiKey: 'sk-mock',
@@ -194,6 +195,7 @@ describe('AgentContextService', () => {
     const contextWithConfig: AgentContext = {
       ...baseContext,
       channelConfig: { phoneNumberId: '123' },
+      toolingProfileId: 'internal-debug',
     };
 
     const result = await service.enrichContext(contextWithConfig);
@@ -204,9 +206,18 @@ describe('AgentContextService', () => {
     expect(result.systemPrompt).toBe(baseContext.systemPrompt);
     expect(result.llmConfig).toEqual(baseContext.llmConfig);
     expect(result.channelConfig).toEqual({ phoneNumberId: '123' });
+    expect(result.toolingProfileId).toBe('internal-debug');
   });
 
   describe('buildContextFromRoute', () => {
+    const unwrapContext = (c: AgentContext | null): AgentContext => {
+      expect(c).not.toBeNull();
+      if (c === null) {
+        throw new Error('Expected context');
+      }
+      return c;
+    };
+
     const mockClientAgent = {
       clientId: 'client-1',
       agentId: 'agent-1',
@@ -272,10 +283,11 @@ describe('AgentContextService', () => {
         mockChannelConfig,
       );
 
-      expect(context).not.toBeNull();
-      expect(context!.llmConfig.provider).toBe(LlmProvider.OpenAI);
-      expect(context!.llmConfig.model).toBe('gpt-4o-mini');
-      expect(context!.llmConfig.apiKey).toBe('encrypted-client-key');
+      const ctx = unwrapContext(context);
+      expect(ctx.llmConfig.provider).toBe(LlmProvider.OpenAI);
+      expect(ctx.llmConfig.model).toBe('gpt-4o-mini');
+      expect(ctx.llmConfig.apiKey).toBe('encrypted-client-key');
+      expect(ctx.toolingProfileId).toBe('standard');
       expect(client).toBe(clientWithLlm);
     });
 
@@ -298,10 +310,10 @@ describe('AgentContextService', () => {
           mockClientAgent,
           mockChannelConfig,
         );
-        expect(context).not.toBeNull();
-        expect(context!.llmConfig.apiKey).toBe(envKey);
-        expect(context!.llmConfig.provider).toBe(LlmProvider.OpenAI);
-        expect(context!.llmConfig.model).toBe('gpt-4o');
+        const ctx = unwrapContext(context);
+        expect(ctx.llmConfig.apiKey).toBe(envKey);
+        expect(ctx.llmConfig.provider).toBe(LlmProvider.OpenAI);
+        expect(ctx.llmConfig.model).toBe('gpt-4o');
       } finally {
         process.env.OPENAI_API_KEY = orig;
       }
@@ -331,10 +343,10 @@ describe('AgentContextService', () => {
           mockClientAgent,
           mockChannelConfig,
         );
-        expect(context).not.toBeNull();
-        expect(context!.llmConfig.apiKey).toBe(envKey);
-        expect(context!.llmConfig.provider).toBe(LlmProvider.OpenAI);
-        expect(context!.llmConfig.model).toBe('gpt-4o');
+        const ctx = unwrapContext(context);
+        expect(ctx.llmConfig.apiKey).toBe(envKey);
+        expect(ctx.llmConfig.provider).toBe(LlmProvider.OpenAI);
+        expect(ctx.llmConfig.model).toBe('gpt-4o');
       } finally {
         process.env.OPENAI_API_KEY = orig;
       }
@@ -366,8 +378,8 @@ describe('AgentContextService', () => {
         mockChannelConfig,
       );
 
-      expect(context).not.toBeNull();
-      expect(context!.promptSupplement).toBe('Hire-specific FAQ line.');
+      const ctx = unwrapContext(context);
+      expect(ctx.promptSupplement).toBe('Hire-specific FAQ line.');
     });
 
     it('should omit promptSupplement when clientAgent has none or whitespace', async () => {
@@ -391,8 +403,8 @@ describe('AgentContextService', () => {
         mockChannelConfig,
       );
 
-      expect(context).not.toBeNull();
-      expect(context!.promptSupplement).toBeUndefined();
+      const ctx = unwrapContext(context);
+      expect(ctx.promptSupplement).toBeUndefined();
     });
 
     it('should never use channelConfig.llmConfig (resolution from client or env only)', async () => {
@@ -424,14 +436,71 @@ describe('AgentContextService', () => {
         channelConfigWithFakeLlm,
       );
 
-      expect(context).not.toBeNull();
-      const ctx = context as NonNullable<typeof context>;
+      const ctx = unwrapContext(context);
       expect(ctx.llmConfig.apiKey).toBe('encrypted-client-key');
       expect(ctx.llmConfig.model).toBe('gpt-4o-mini');
       expect(ctx.llmConfig.apiKey).not.toBe(
         'channel-api-key-should-be-ignored',
       );
       expect(ctx.llmConfig.model).not.toBe('channel-model-should-be-ignored');
+    });
+
+    it('prefers hire toolingProfileId over catalog Agent', async () => {
+      const clientWithLlm = {
+        _id: 'client-1',
+        name: 'Acme',
+        type: 'organization',
+        status: 'active',
+        llmConfig: {
+          provider: LlmProvider.OpenAI,
+          apiKey: 'encrypted-client-key',
+          model: 'gpt-4o-mini',
+        },
+      } as any;
+      clientRepository.findByIdWithLlmCredentials.mockResolvedValue(
+        clientWithLlm,
+      );
+      const agentRepo = moduleRef.get(
+        AgentRepository,
+      ) as jest.Mocked<AgentRepository>;
+      agentRepo.findActiveById.mockResolvedValue({
+        ...mockAgent,
+        toolingProfileId: 'standard',
+      } as any);
+
+      const { context } = await service.buildContextFromRoute(
+        { ...mockClientAgent, toolingProfileId: 'internal-debug' },
+        mockChannelConfig,
+      );
+
+      expect(unwrapContext(context).toolingProfileId).toBe('internal-debug');
+    });
+
+    it('warns and defaults when hire toolingProfileId is invalid', async () => {
+      const clientWithLlm = {
+        _id: 'client-1',
+        name: 'Acme',
+        type: 'organization',
+        status: 'active',
+        llmConfig: {
+          provider: LlmProvider.OpenAI,
+          apiKey: 'encrypted-client-key',
+          model: 'gpt-4o-mini',
+        },
+      } as any;
+      clientRepository.findByIdWithLlmCredentials.mockResolvedValue(
+        clientWithLlm,
+      );
+
+      const { context } = await service.buildContextFromRoute(
+        { ...mockClientAgent, toolingProfileId: 'bogus' },
+        mockChannelConfig,
+      );
+
+      expect(unwrapContext(context).toolingProfileId).toBe('standard');
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Invalid toolingProfileId'),
+      );
     });
   });
 });

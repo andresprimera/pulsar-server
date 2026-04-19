@@ -33,6 +33,7 @@ describe('ConversationSummaryService', () => {
     clientId: mockClientId.toString(),
     channelId: mockChannelId.toString(),
     systemPrompt: 'You are a helpful assistant',
+    toolingProfileId: 'standard' as const,
     llmConfig: {
       provider: 'openai' as any,
       apiKey: 'test-key',

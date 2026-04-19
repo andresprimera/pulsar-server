@@ -1,4 +1,7 @@
 import { LlmProvider } from '@domain/llm/provider.enum';
+import type { AgentToolingProfileId } from '@shared/agent-tooling-profile.constants';
+
+export type { AgentToolingProfileId } from '@shared/agent-tooling-profile.constants';
 
 export interface AgentContext {
   agentId: string;
@@ -24,4 +27,9 @@ export interface AgentContext {
     model: string;
   };
   channelConfig?: Record<string, unknown>;
+  /**
+   * Resolved in {@link AgentContextService.buildContextFromRoute} only.
+   * Preserved through {@link AgentContextService.enrichContext} without recomputation.
+   */
+  toolingProfileId: AgentToolingProfileId;
 }

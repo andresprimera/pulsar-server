@@ -9,12 +9,14 @@ import { MetadataExposureService } from './metadata-exposure.service';
 import { LlmUsageLogRepository } from '@persistence/repositories/llm-usage-log.repository';
 import { PromptBuilderService } from './prompt-builder.service';
 import { ClientContextSuggestionExecutor } from './client-context-suggestion.executor';
+import { AgentToolSetBuilderService } from './tooling/agent-tool-set-builder.service';
 import * as llmFactory from './llm/llm.factory';
 import * as ai from 'ai';
 import { Logger } from '@nestjs/common';
 import { Types } from 'mongoose';
 
 jest.mock('ai', () => ({
+  ...jest.requireActual<typeof import('ai')>('ai'),
   generateText: jest.fn(),
 }));
 
@@ -47,6 +49,7 @@ describe('AgentService', () => {
     clientId: '507f1f77bcf86cd799439011',
     channelId: '507f1f77bcf86cd799439014',
     systemPrompt: 'You are a helpful assistant.',
+    toolingProfileId: 'standard',
     llmConfig: {
       provider: LlmProvider.OpenAI,
       apiKey: 'sk-mock',
@@ -86,6 +89,7 @@ describe('AgentService', () => {
             generatePromptSupplementMarkdown: jest.fn(),
           },
         },
+        AgentToolSetBuilderService,
         {
           provide: PromptBuilderService,
           useValue: {
@@ -183,17 +187,22 @@ describe('AgentService', () => {
         { firstName: 'Ana', language: 'es' },
         undefined,
       );
-      expect(ai.generateText).toHaveBeenCalledWith({
-        model: mockModel,
-        system: expectedSystem,
-        messages: [
-          { role: 'user', content: 'Previous message' },
-          {
-            role: 'user',
-            content: mockInput.message.text,
-          },
-        ],
-      });
+      expect(ai.generateText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: mockModel,
+          system: expectedSystem,
+          messages: [
+            { role: 'user', content: 'Previous message' },
+            {
+              role: 'user',
+              content: mockInput.message.text,
+            },
+          ],
+        }),
+      );
+      const genCall = (ai.generateText as jest.Mock).mock.calls[0][0];
+      expect(genCall.tools).toBeUndefined();
+      expect(genCall.stopWhen).toBeUndefined();
 
       expect(
         messagePersistenceService.handleOutgoingMessage,
@@ -447,6 +456,27 @@ describe('AgentService', () => {
       expect(generateTextCall.messages).toEqual([
         { role: 'user', content: mockInput.message.text },
       ]);
+    });
+
+    it('passes tools and stopWhen for internal-debug tooling profile', async () => {
+      const mockModel = {};
+      (llmFactory.createLLMModel as jest.Mock).mockReturnValue(mockModel);
+      (ai.generateText as jest.Mock).mockResolvedValue({ text: 'ok' });
+      messagePersistenceService.createUserMessage.mockResolvedValue();
+      messagePersistenceService.getConversationContextByConversationId.mockResolvedValue(
+        [],
+      );
+      messagePersistenceService.handleOutgoingMessage.mockResolvedValue();
+
+      await service.run(mockInput, {
+        ...mockContext,
+        toolingProfileId: 'internal-debug',
+      });
+
+      const genCall = (ai.generateText as jest.Mock).mock.calls[0][0];
+      expect(genCall.tools).toBeDefined();
+      expect(Object.keys(genCall.tools)).toContain('agent_debug_log');
+      expect(genCall.stopWhen).toBeDefined();
     });
   });
 });

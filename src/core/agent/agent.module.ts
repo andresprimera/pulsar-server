@@ -8,11 +8,13 @@ import { MetadataExposureService } from './metadata-exposure.service';
 import { MessagePersistenceService } from '@persistence/message-persistence.service';
 import { DomainModule } from '@domain/domain.module';
 import { ClientContextSuggestionExecutor } from './client-context-suggestion.executor';
+import { AgentToolSetBuilderService } from './tooling/agent-tool-set-builder.service';
 
 @Module({
   imports: [ConfigModule, DomainModule],
   providers: [
     AgentService,
+    AgentToolSetBuilderService,
     ClientContextSuggestionExecutor,
     AgentContextService,
     PromptBuilderService,
