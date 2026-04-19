@@ -77,15 +77,17 @@ export class AgentContextService {
       String(clientLlm.apiKey) !== '' &&
       !String(clientLlm.apiKey).includes('REPLACE_ME');
 
-    const rawApiKey = useClientLlm && clientLlm
-      ? clientLlm.apiKey
-      : process.env.OPENAI_API_KEY ?? '';
+    const rawApiKey =
+      useClientLlm && clientLlm
+        ? clientLlm.apiKey
+        : process.env.OPENAI_API_KEY ?? '';
     const apiKey = decrypt(rawApiKey);
 
     const provider: LlmProvider =
       useClientLlm && clientLlm
         ? (clientLlm.provider as LlmProvider)
-        : (client?.llmPreferences?.provider as LlmProvider) ?? LlmProvider.OpenAI;
+        : (client?.llmPreferences?.provider as LlmProvider) ??
+          LlmProvider.OpenAI;
     const model =
       useClientLlm && clientLlm
         ? clientLlm.model
