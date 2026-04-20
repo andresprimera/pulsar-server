@@ -137,19 +137,14 @@ export class SeederService implements OnApplicationBootstrap {
           );
         }
         const toolingFromSeed = (agentSeed as any).toolingProfileId;
-        if (
-          toolingFromSeed != null &&
-          agent.createdBySeeder === true
-        ) {
+        if (toolingFromSeed != null && agent.createdBySeeder === true) {
           await this.agentModel
             .updateOne(
               { _id: agent._id },
               { $set: { toolingProfileId: toolingFromSeed } },
             )
             .exec();
-          const refreshed = await this.agentModel
-            .findById(agent._id)
-            .exec();
+          const refreshed = await this.agentModel.findById(agent._id).exec();
           if (refreshed) agent = refreshed;
         }
         agentsMap.set(agentSeed.name, agent);
