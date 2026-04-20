@@ -72,6 +72,13 @@ describe('Seeder (e2e)', () => {
         clientId: { $in: clientIds.map((id) => id.toString()) },
       });
 
+      await connection.collection('client_sales').deleteMany({
+        clientId: { $in: clientIds },
+      });
+      await connection.collection('client_catalog_items').deleteMany({
+        clientId: { $in: clientIds },
+      });
+
       // Clean up seeded clients and their billing records
       await connection.collection('billing_records').deleteMany({
         clientId: { $in: clientIds },

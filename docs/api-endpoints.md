@@ -49,6 +49,41 @@ Response: client document (`_id`, `name`, `type`, `status`, `billingCurrency`, `
 
 ---
 
+## Client catalog items (products / services)
+
+**Base path:** `/clients/:clientId/catalog-items` (`:clientId` must be an active client).
+
+**Money fields:** `unitAmountMinor` is a **JSON integer** (minor units). When set, `currency` is required and must equal the client’s `billingCurrency`. Omit both for “no list price”.
+
+| Method | Path | Query | Body / Notes |
+|--------|------|--------|--------------|
+| POST | `/clients/:clientId/catalog-items` | - | `sku`, `name`, `type` (`product` \| `service`); optional `description`; optional `unitAmountMinor` + `currency` (pair) |
+| POST | `/clients/:clientId/catalog-items/bulk-upsert` | - | `{ "items": [ ... ] }` — same shape as create per row; max **500** items; **all-or-nothing** transaction; duplicate `sku` in the array: **last index wins** |
+| GET | `/clients/:clientId/catalog-items` | `page?`, `limit?`, `activeOnly?` | Paginated list (`activeOnly` defaults **false** for this HTTP list) |
+| GET | `/clients/:clientId/catalog-items/:catalogItemId` | - | One item; wrong `clientId` → **404** |
+| PATCH | `/clients/:clientId/catalog-items/:catalogItemId` | - | Whitelisted fields only: `name`, `description`, `type`, `unitAmountMinor` + `currency` (pair), `active` |
+| DELETE | `/clients/:clientId/catalog-items/:catalogItemId` | - | **Soft delete:** sets `active=false` and `deactivatedAt` |
+
+---
+
+## Client sales
+
+**Base path:** `/clients/:clientId/sales`
+
+**Money:** `amountMinor` is a **JSON integer** (minor units). `currency` must equal the client’s `billingCurrency`. `currency` is **immutable** after create.
+
+**Idempotency:** Optional header `Idempotency-Key` (trimmed; empty/whitespace-only → **400**). Replays with the same key return **200** when the body matches the original sale; mismatch → **409**.
+
+| Method | Path | Query | Body / Notes |
+|--------|------|--------|--------------|
+| POST | `/clients/:clientId/sales` | - | `title`, `status` (`lead` \| `quoted` \| `won` \| `lost` \| `cancelled`), `amountMinor` (int), `currency`, `occurredAt` (ISO-8601 string or epoch **ms** integer); optional `notes`; optional `catalogItemId` (must belong to client) |
+| GET | `/clients/:clientId/sales` | `page?`, `limit?` | Paginated list |
+| GET | `/clients/:clientId/sales/:saleId` | - | One sale |
+| PATCH | `/clients/:clientId/sales/:saleId` | - | Allowlist only: `title`, `notes`, `status`, `occurredAt`, `amountMinor`, `catalogItemId` (set to `null` to clear) |
+| DELETE | `/clients/:clientId/sales/:saleId` | - | Hard delete → **204** |
+
+---
+
 ## Users
 
 **Base path:** `/users`

@@ -5,6 +5,7 @@
 export const AGENT_TOOLING_PROFILE_IDS = [
   'standard',
   'internal-debug',
+  'sales-catalog',
 ] as const;
 
 export type AgentToolingProfileId = (typeof AGENT_TOOLING_PROFILE_IDS)[number];

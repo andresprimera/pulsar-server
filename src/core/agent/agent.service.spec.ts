@@ -10,6 +10,8 @@ import { LlmUsageLogRepository } from '@persistence/repositories/llm-usage-log.r
 import { PromptBuilderService } from './prompt-builder.service';
 import { ClientContextSuggestionExecutor } from './client-context-suggestion.executor';
 import { AgentToolSetBuilderService } from './tooling/agent-tool-set-builder.service';
+import { ClientCatalogItemRepository } from '@persistence/repositories/client-catalog-item.repository';
+import { ClientRepository } from '@persistence/repositories/client.repository';
 import * as llmFactory from './llm/llm.factory';
 import * as ai from 'ai';
 import { Logger } from '@nestjs/common';
@@ -90,6 +92,23 @@ describe('AgentService', () => {
           },
         },
         AgentToolSetBuilderService,
+        {
+          provide: ClientCatalogItemRepository,
+          useValue: {
+            findByClientPaged: jest
+              .fn()
+              .mockResolvedValue({ items: [], total: 0 }),
+          },
+        },
+        {
+          provide: ClientRepository,
+          useValue: {
+            findById: jest.fn().mockResolvedValue({
+              status: 'active',
+              billingCurrency: 'USD',
+            }),
+          },
+        },
         {
           provide: PromptBuilderService,
           useValue: {

@@ -1,5 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AgentToolSetBuilderService } from './agent-tool-set-builder.service';
+import { ClientCatalogItemRepository } from '@persistence/repositories/client-catalog-item.repository';
+import { ClientRepository } from '@persistence/repositories/client.repository';
 
 describe('AgentToolSetBuilderService', () => {
   let service: AgentToolSetBuilderService;
@@ -15,7 +17,26 @@ describe('AgentToolSetBuilderService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [AgentToolSetBuilderService],
+      providers: [
+        AgentToolSetBuilderService,
+        {
+          provide: ClientCatalogItemRepository,
+          useValue: {
+            findByClientPaged: jest
+              .fn()
+              .mockResolvedValue({ items: [], total: 0 }),
+          },
+        },
+        {
+          provide: ClientRepository,
+          useValue: {
+            findById: jest.fn().mockResolvedValue({
+              status: 'active',
+              billingCurrency: 'USD',
+            }),
+          },
+        },
+      ],
     }).compile();
     service = module.get(AgentToolSetBuilderService);
   });
@@ -31,5 +52,13 @@ describe('AgentToolSetBuilderService', () => {
       toolingProfileId: 'internal-debug',
     });
     expect(Object.keys(tools)).toEqual(['agent_debug_log']);
+  });
+
+  it('sales-catalog profile exposes list_client_catalog', () => {
+    const tools = service.buildToolSet('sales-catalog', {
+      ...correlation,
+      toolingProfileId: 'sales-catalog',
+    });
+    expect(Object.keys(tools)).toEqual(['list_client_catalog']);
   });
 });

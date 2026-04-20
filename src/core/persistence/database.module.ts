@@ -44,6 +44,13 @@ import {
   BillingRecordSchema,
 } from './schemas/billing-record.schema';
 import { BillingRecordRepository } from './repositories/billing-record.repository';
+import {
+  ClientCatalogItem,
+  ClientCatalogItemSchema,
+} from './schemas/client-catalog-item.schema';
+import { ClientSale, ClientSaleSchema } from './schemas/client-sale.schema';
+import { ClientCatalogItemRepository } from './repositories/client-catalog-item.repository';
+import { ClientSaleRepository } from './repositories/client-sale.repository';
 import { Personality, PersonalitySchema } from './schemas/personality.schema';
 import { PersonalityRepository } from './repositories/personality.repository';
 import { EventIdempotencyService } from './event-idempotency.service';
@@ -58,6 +65,8 @@ const repositories = [
   AgentPriceRepository,
   ChannelPriceRepository,
   BillingRecordRepository,
+  ClientCatalogItemRepository,
+  ClientSaleRepository,
   ClientPhoneRepository,
   ContactRepository,
   UserRepository,
@@ -96,6 +105,8 @@ const repositories = [
       { name: AgentPrice.name, schema: AgentPriceSchema },
       { name: ChannelPrice.name, schema: ChannelPriceSchema },
       { name: BillingRecord.name, schema: BillingRecordSchema },
+      { name: ClientCatalogItem.name, schema: ClientCatalogItemSchema },
+      { name: ClientSale.name, schema: ClientSaleSchema },
     ]),
     forwardRef(() => OnboardingModule),
   ],
