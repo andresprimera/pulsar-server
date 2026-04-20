@@ -121,17 +121,18 @@ describe('Seeder (e2e)', () => {
   const seedUser3 = SEED_DATA.users[2];
 
   describe('Agent Creation Tests', () => {
-    it('should create both Customer Service Agent and Lead Qualifier & Sales Agent', async () => {
+    it('should create all seeded catalog agents', async () => {
       const agents = await connection
         .collection('agents')
         .find({ createdBySeeder: true })
         .toArray();
 
-      expect(agents).toHaveLength(2);
+      expect(agents).toHaveLength(SEED_DATA.agents.length);
 
       const agentNames = agents.map((a) => a.name);
       expect(agentNames).toContain('Customer Service Agent');
       expect(agentNames).toContain('Lead Qualifier & Sales Agent');
+      expect(agentNames).toContain('Order & Sales Agent');
     });
 
     it('should create agents with correct properties', async () => {
@@ -157,6 +158,17 @@ describe('Seeder (e2e)', () => {
       expect(salesAgent.status).toBe('active');
       expect(salesAgent.createdBySeeder).toBe(true);
       expect(salesAgent.toolingProfileId).toBeUndefined();
+
+      const orderSalesAgent = await connection.collection('agents').findOne({
+        name: 'Order & Sales Agent',
+        createdBySeeder: true,
+      });
+
+      expect(orderSalesAgent).toBeDefined();
+      expect(orderSalesAgent.systemPrompt).toContain('order-taking');
+      expect(orderSalesAgent.status).toBe('active');
+      expect(orderSalesAgent.createdBySeeder).toBe(true);
+      expect(orderSalesAgent.toolingProfileId).toBeUndefined();
     });
   });
 
@@ -539,12 +551,12 @@ describe('Seeder (e2e)', () => {
         .find({ createdBySeeder: true })
         .toArray();
 
-      expect(agentsBefore).toHaveLength(2);
+      expect(agentsBefore).toHaveLength(SEED_DATA.agents.length);
 
       // Verify no duplicates by name
       const names = agentsBefore.map((a) => a.name);
       const uniqueNames = [...new Set(names)];
-      expect(uniqueNames).toHaveLength(2);
+      expect(uniqueNames).toHaveLength(SEED_DATA.agents.length);
     });
 
     it('should not duplicate users on re-run', async () => {

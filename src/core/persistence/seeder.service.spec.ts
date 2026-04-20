@@ -294,7 +294,7 @@ describe('SeederService', () => {
         SEED_DATA.channels.length,
       );
 
-      // Verify agents creation (both agents should be created)
+      // Verify agents creation (all seed agents should be created)
       expect(mockAgentModel.create).toHaveBeenCalledTimes(
         SEED_DATA.agents.length,
       );
@@ -311,6 +311,14 @@ describe('SeederService', () => {
         expect.objectContaining({
           name: SEED_DATA.agents[1].name,
           systemPrompt: SEED_DATA.agents[1].systemPrompt,
+          status: 'active',
+          createdBySeeder: true,
+        }),
+      );
+      expect(mockAgentModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: SEED_DATA.agents[2].name,
+          systemPrompt: SEED_DATA.agents[2].systemPrompt,
           status: 'active',
           createdBySeeder: true,
         }),
@@ -533,6 +541,7 @@ describe('SeederService', () => {
         'bbbbbbbbbbbbbbbbbbbbbbbb',
       );
       const salesAgentId = new Types.ObjectId('cccccccccccccccccccccccc');
+      const orderSalesAgentId = new Types.ObjectId('dddddddddddddddddddddddd');
 
       mockUserRepository.findByEmail.mockResolvedValue(null);
       mockAgentModel.findOne
@@ -546,6 +555,12 @@ describe('SeederService', () => {
           exec: jest.fn().mockResolvedValue({
             _id: salesAgentId,
             name: SEED_DATA.agents[1].name,
+          }),
+        })
+        .mockReturnValueOnce({
+          exec: jest.fn().mockResolvedValue({
+            _id: orderSalesAgentId,
+            name: SEED_DATA.agents[2].name,
           }),
         });
 
