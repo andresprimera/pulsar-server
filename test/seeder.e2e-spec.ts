@@ -145,6 +145,7 @@ describe('Seeder (e2e)', () => {
       );
       expect(customerServiceAgent.status).toBe('active');
       expect(customerServiceAgent.createdBySeeder).toBe(true);
+      expect(customerServiceAgent.toolingProfileId).toBe('internal-debug');
 
       const salesAgent = await connection.collection('agents').findOne({
         name: 'Lead Qualifier & Sales Agent',
@@ -155,6 +156,7 @@ describe('Seeder (e2e)', () => {
       expect(salesAgent.systemPrompt).toContain('sales and lead qualification');
       expect(salesAgent.status).toBe('active');
       expect(salesAgent.createdBySeeder).toBe(true);
+      expect(salesAgent.toolingProfileId).toBeUndefined();
     });
   });
 

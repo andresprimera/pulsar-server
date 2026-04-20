@@ -10,6 +10,11 @@ import {
   HireChannelConfig,
 } from '@persistence/schemas/client-agent.schema';
 import { decrypt, decryptRecord } from '@shared/crypto.util';
+import {
+  CHAT_STANDARD_TOOLING_PROFILE_ID,
+  isAgentToolingProfileId,
+  type AgentToolingProfileId,
+} from '@shared/agent-tooling-profile.constants';
 import { RouteCandidate } from '@domain/routing/agent-routing.service';
 import { LlmProvider } from '@domain/llm/provider.enum';
 
@@ -22,6 +27,28 @@ export class AgentContextService {
     private readonly clientRepository: ClientRepository,
     private readonly personalityRepository: PersonalityRepository,
   ) {}
+
+  private resolveToolingProfileId(
+    hireRaw: string | undefined,
+    catalogRaw: string | undefined,
+  ): AgentToolingProfileId {
+    const raw =
+      hireRaw != null && hireRaw !== ''
+        ? hireRaw
+        : catalogRaw != null && catalogRaw !== ''
+        ? catalogRaw
+        : undefined;
+    if (raw === undefined || raw === '') {
+      return CHAT_STANDARD_TOOLING_PROFILE_ID;
+    }
+    if (isAgentToolingProfileId(raw)) {
+      return raw;
+    }
+    this.logger.warn(
+      `Invalid toolingProfileId="${raw}"; defaulting to ${CHAT_STANDARD_TOOLING_PROFILE_ID}`,
+    );
+    return CHAT_STANDARD_TOOLING_PROFILE_ID;
+  }
 
   /**
    * Builds full AgentContext from route candidate, loading agent and decrypting
@@ -44,22 +71,27 @@ export class AgentContextService {
       clientAgent.clientId,
     );
 
+    const clientLlm = client?.llmConfig;
     const useClientLlm =
-      client?.llmConfig?.apiKey != null &&
-      String(client.llmConfig.apiKey) !== '' &&
-      !String(client.llmConfig.apiKey).includes('REPLACE_ME');
+      clientLlm?.apiKey != null &&
+      String(clientLlm.apiKey) !== '' &&
+      !String(clientLlm.apiKey).includes('REPLACE_ME');
 
-    const rawApiKey = useClientLlm
-      ? client!.llmConfig!.apiKey
-      : process.env.OPENAI_API_KEY ?? '';
+    const rawApiKey =
+      useClientLlm && clientLlm
+        ? clientLlm.apiKey
+        : process.env.OPENAI_API_KEY ?? '';
     const apiKey = decrypt(rawApiKey);
 
-    const provider: LlmProvider = useClientLlm
-      ? (client!.llmConfig!.provider as LlmProvider)
-      : (client?.llmPreferences?.provider as LlmProvider) ?? LlmProvider.OpenAI;
-    const model = useClientLlm
-      ? client!.llmConfig!.model
-      : client?.llmPreferences?.defaultModel ?? 'gpt-4o';
+    const provider: LlmProvider =
+      useClientLlm && clientLlm
+        ? (clientLlm.provider as LlmProvider)
+        : (client?.llmPreferences?.provider as LlmProvider) ??
+          LlmProvider.OpenAI;
+    const model =
+      useClientLlm && clientLlm
+        ? clientLlm.model
+        : client?.llmPreferences?.defaultModel ?? 'gpt-4o';
 
     const channelConfigDecrypted =
       channelConfig.credentials &&
@@ -91,6 +123,11 @@ export class AgentContextService {
       }
     }
 
+    const toolingProfileId = this.resolveToolingProfileId(
+      clientAgent.toolingProfileId,
+      agent.toolingProfileId,
+    );
+
     const rawContext: AgentContext = {
       agentId: clientAgent.agentId,
       agentName: agent.name,
@@ -104,6 +141,7 @@ export class AgentContextService {
         model,
       },
       channelConfig: channelConfigDecrypted,
+      toolingProfileId,
       ...(promptSupplementTrimmed
         ? { promptSupplement: promptSupplementTrimmed }
         : {}),

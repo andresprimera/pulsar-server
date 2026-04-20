@@ -127,11 +127,30 @@ export class SeederService implements OnApplicationBootstrap {
             ...((agentSeed as any).monthlyTokenQuota != null
               ? { monthlyTokenQuota: (agentSeed as any).monthlyTokenQuota }
               : {}),
+            ...((agentSeed as any).toolingProfileId != null
+              ? { toolingProfileId: (agentSeed as any).toolingProfileId }
+              : {}),
           });
         } else {
           this.logger.log(
             `Agent "${agentSeed.name}" already exists (${agent._id})`,
           );
+        }
+        const toolingFromSeed = (agentSeed as any).toolingProfileId;
+        if (
+          toolingFromSeed != null &&
+          agent.createdBySeeder === true
+        ) {
+          await this.agentModel
+            .updateOne(
+              { _id: agent._id },
+              { $set: { toolingProfileId: toolingFromSeed } },
+            )
+            .exec();
+          const refreshed = await this.agentModel
+            .findById(agent._id)
+            .exec();
+          if (refreshed) agent = refreshed;
         }
         agentsMap.set(agentSeed.name, agent);
       }

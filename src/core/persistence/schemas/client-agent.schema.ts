@@ -1,6 +1,10 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 import { CHANNEL_PROVIDER_VALUES } from '@shared/channel-provider.constants';
+import {
+  AGENT_TOOLING_PROFILE_IDS,
+  type AgentToolingProfileId,
+} from '@shared/agent-tooling-profile.constants';
 
 @Schema({ _id: false })
 export class AgentPricingSnapshot {
@@ -92,6 +96,14 @@ export class ClientAgent extends Document {
 
   @Prop({ type: [HireChannelConfigSchema], required: true })
   channels: HireChannelConfig[];
+
+  /** Optional hire-level tooling profile override. */
+  @Prop({
+    type: String,
+    required: false,
+    enum: [...AGENT_TOOLING_PROFILE_IDS],
+  })
+  toolingProfileId?: AgentToolingProfileId;
 
   createdAt: Date;
   updatedAt: Date;

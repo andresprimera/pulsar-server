@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { generateText } from 'ai';
+import { generateText, stepCountIs } from 'ai';
 import { Types } from 'mongoose';
 import { AgentInput } from './contracts/agent-input';
 import { AgentOutput } from './contracts/agent-output';
@@ -15,6 +15,9 @@ import type {
   CompanyBriefSuggestionInput,
   PromptSupplementSuggestionInput,
 } from './contracts/client-context-suggestion.input';
+import { AgentToolSetBuilderService } from './tooling/agent-tool-set-builder.service';
+import { extractLlmUsageFromGenerateTextResult } from './tooling/extract-llm-usage-from-generate-text-result';
+import type { AgentToolRunCorrelation } from './tooling/agent-tool-run-correlation';
 
 @Injectable()
 export class AgentService {
@@ -27,6 +30,7 @@ export class AgentService {
     private readonly llmUsageLogRepository: LlmUsageLogRepository,
     private readonly promptBuilder: PromptBuilderService,
     private readonly clientContextSuggestionExecutor: ClientContextSuggestionExecutor,
+    private readonly agentToolSetBuilderService: AgentToolSetBuilderService,
   ) {}
 
   async run(input: AgentInput, context: AgentContext): Promise<AgentOutput> {
@@ -95,11 +99,36 @@ export class AgentService {
         input.contactSummary,
       );
 
-      const { text, usage } = await generateText({
-        model,
-        system: finalPrompt,
-        messages,
-      });
+      const toolCorrelation: AgentToolRunCorrelation = {
+        clientId: context.clientId,
+        conversationId: input.conversationId,
+        agentId: context.agentId,
+        channelId: context.channelId,
+        contactId: input.contactId,
+        toolingProfileId: context.toolingProfileId,
+      };
+
+      const tools = this.agentToolSetBuilderService.buildToolSet(
+        context.toolingProfileId,
+        toolCorrelation,
+      );
+      const hasTools = Object.keys(tools).length > 0;
+
+      const result = hasTools
+        ? await generateText({
+            model,
+            system: finalPrompt,
+            messages,
+            tools,
+            stopWhen: stepCountIs(5),
+          })
+        : await generateText({
+            model,
+            system: finalPrompt,
+            messages,
+          });
+      const { text } = result;
+      const usage = extractLlmUsageFromGenerateTextResult(result);
 
       const safeText =
         text?.trim() || "I'm having trouble responding right now.";

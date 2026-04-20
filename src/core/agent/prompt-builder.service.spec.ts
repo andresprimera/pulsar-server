@@ -11,6 +11,7 @@ describe('PromptBuilderService', () => {
     clientId: 'client-1',
     channelId: 'channel-1',
     systemPrompt: 'You are a helpful assistant.',
+    toolingProfileId: 'standard',
     llmConfig: {
       provider: LlmProvider.OpenAI,
       apiKey: 'sk-mock',

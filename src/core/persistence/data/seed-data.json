@@ -110,7 +110,8 @@
     {
       "name": "Customer Service Agent",
       "systemPrompt": "You are a professional customer service representative. Your role is to assist customers with their inquiries, resolve issues, and provide excellent support. Be polite, empathetic, and efficient in your responses. Always maintain a helpful and friendly tone while addressing customer concerns.",
-      "status": "active"
+      "status": "active",
+      "toolingProfileId": "internal-debug"
     },
     {
       "name": "Lead Qualifier & Sales Agent",
