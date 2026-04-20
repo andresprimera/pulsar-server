@@ -304,6 +304,7 @@ describe('SeederService', () => {
           systemPrompt: SEED_DATA.agents[0].systemPrompt,
           status: 'active',
           createdBySeeder: true,
+          toolingProfileId: 'internal-debug',
         }),
       );
       expect(mockAgentModel.create).toHaveBeenCalledWith(
