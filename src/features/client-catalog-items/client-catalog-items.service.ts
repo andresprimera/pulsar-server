@@ -13,13 +13,18 @@ import { ClientsService } from '@clients/clients.service';
 import { CreateClientCatalogItemDto } from './dto/create-client-catalog-item.dto';
 import { UpdateClientCatalogItemDto } from './dto/update-client-catalog-item.dto';
 import type { ClientCatalogItemUpsertRowDto } from './dto/create-client-catalog-item.dto';
+import { isMongoDuplicateKeyError } from '@shared/mongo-duplicate-key.util';
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-function isMongoDuplicateKeyError(error: unknown): boolean {
-  return isRecord(error) && error.code === 11000;
-}
+/** Matches {@link ClientCatalogItemRepository.updateByIdForClient} $set shape. */
+type ClientCatalogItemClientUpdate = Partial<{
+  name: string;
+  description: string | null;
+  type: 'product' | 'service';
+  unitAmountMinor: number | null;
+  currency: string | null;
+  active: boolean;
+  deactivatedAt: Date | null;
+}>;
 
 @Injectable()
 export class ClientCatalogItemsService {
@@ -158,7 +163,7 @@ export class ClientCatalogItemsService {
         : existing.currency;
     this.assertMoneyPair(nextUnit, nextCurrency, client.billingCurrency);
 
-    const patch: Record<string, unknown> = {};
+    const patch: ClientCatalogItemClientUpdate = {};
     if (dto.name !== undefined) patch.name = dto.name.trim();
     if (dto.description !== undefined) {
       patch.description =
@@ -182,7 +187,7 @@ export class ClientCatalogItemsService {
     const updated = await this.catalogItemRepository.updateByIdForClient(
       catalogItemId,
       clientId,
-      patch as any,
+      patch,
     );
     if (!updated) {
       throw new NotFoundException('Catalog item not found');
@@ -198,7 +203,7 @@ export class ClientCatalogItemsService {
       {
         active: false,
         deactivatedAt: new Date(),
-      } as any,
+      },
     );
     if (!updated) {
       throw new NotFoundException('Catalog item not found');

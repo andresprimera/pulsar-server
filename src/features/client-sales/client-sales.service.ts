@@ -11,14 +11,21 @@ import { ClientCatalogItemRepository } from '@persistence/repositories/client-ca
 import { ClientsService } from '@clients/clients.service';
 import { CreateClientSaleDto } from './dto/create-client-sale.dto';
 import { UpdateClientSaleDto } from './dto/update-client-sale.dto';
-import type { ClientSale } from '@persistence/schemas/client-sale.schema';
+import type {
+  ClientSale,
+  ClientSaleStatus,
+} from '@persistence/schemas/client-sale.schema';
+import { isMongoDuplicateKeyError } from '@shared/mongo-duplicate-key.util';
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-function isMongoDuplicateKeyError(error: unknown): boolean {
-  return isRecord(error) && error.code === 11000;
-}
+/** Matches {@link ClientSaleRepository.updateByIdForClient} $set shape. */
+type ClientSaleClientUpdate = Partial<{
+  title: string;
+  notes: string | null;
+  status: ClientSaleStatus;
+  occurredAt: Date;
+  amountMinor: number;
+  catalogItemId: Types.ObjectId | null;
+}>;
 
 function parseOccurredAt(raw: string | number): Date {
   if (typeof raw === 'number') {
@@ -144,6 +151,26 @@ export class ClientSalesService {
     return true;
   }
 
+  private async findSaleByIdempotencyKeyWithRetry(
+    clientId: string,
+    idempotencyKey: string,
+  ): Promise<ClientSale | null> {
+    const delaysMs = [0, 25, 75];
+    for (let i = 0; i < delaysMs.length; i += 1) {
+      if (delaysMs[i] > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delaysMs[i]));
+      }
+      const doc = await this.saleRepository.findByClientAndIdempotencyKey(
+        clientId,
+        idempotencyKey,
+      );
+      if (doc) {
+        return doc;
+      }
+    }
+    return null;
+  }
+
   async create(
     clientId: string,
     dto: CreateClientSaleDto,
@@ -176,12 +203,14 @@ export class ClientSalesService {
       if (!idempotencyKey || !isMongoDuplicateKeyError(error)) {
         throw error;
       }
-      const existing = await this.saleRepository.findByClientAndIdempotencyKey(
+      const existing = await this.findSaleByIdempotencyKeyWithRetry(
         clientId,
         idempotencyKey,
       );
       if (!existing) {
-        throw error;
+        throw new ConflictException(
+          'Duplicate idempotency key but sale record is not visible yet; retry the request',
+        );
       }
       if (!this.matchesIdempotentCreate(existing, dto, occurredAt)) {
         throw new ConflictException(
@@ -221,7 +250,7 @@ export class ClientSalesService {
       throw new NotFoundException('Sale not found');
     }
 
-    const patch: Record<string, unknown> = {};
+    const patch: ClientSaleClientUpdate = {};
     if (dto.title !== undefined) {
       patch.title = dto.title.trim();
     }
@@ -262,7 +291,7 @@ export class ClientSalesService {
     const updated = await this.saleRepository.updateByIdForClient(
       saleId,
       clientId,
-      patch as any,
+      patch,
     );
     if (!updated) {
       throw new NotFoundException('Sale not found');
