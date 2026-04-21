@@ -22,6 +22,11 @@ import { ChannelPriceRepository } from '@persistence/repositories/channel-price.
 import { ClientPhoneRepository } from '@persistence/repositories/client-phone.repository';
 import { encryptRecord, encrypt } from '@shared/crypto.util';
 
+/** Internal: only the database seeder may pass a fixed client `_id`. */
+export type RegisterAndHireSeedOptions = {
+  fixedClientMongoId: string;
+};
+
 export interface RegisterAndHireResult {
   user: {
     _id: string;
@@ -67,6 +72,7 @@ export class OnboardingService {
 
   async registerAndHire(
     dto: RegisterAndHireDto,
+    seedOptions?: RegisterAndHireSeedOptions,
   ): Promise<RegisterAndHireResult> {
     // PRE-TRANSACTION VALIDATIONS (fail fast, no rollback needed)
 
@@ -130,6 +136,15 @@ export class OnboardingService {
         billingCurrency,
         billingAnchor: new Date(),
       };
+      if (seedOptions?.fixedClientMongoId) {
+        const raw = seedOptions.fixedClientMongoId.trim();
+        if (!Types.ObjectId.isValid(raw)) {
+          throw new BadRequestException('Invalid fixed client id for seeding');
+        }
+        (clientPayload as { _id?: Types.ObjectId })._id = new Types.ObjectId(
+          raw,
+        );
+      }
       if (dto.client.llmConfig) {
         clientPayload.llmConfig = {
           provider: dto.client.llmConfig.provider,

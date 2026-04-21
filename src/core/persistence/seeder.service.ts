@@ -327,18 +327,26 @@ export class SeederService implements OnApplicationBootstrap {
             model: clientLlmConfig.model ?? 'gpt-4o',
           };
         }
-        const result = await this.runOnboardingWithRetry({
-          user: {
-            email: userSeed.email,
-            name: userSeed.name,
+        const fixedClientMongoId = (userSeed as any).fixedClientMongoId as
+          | string
+          | undefined;
+        const result = await this.runOnboardingWithRetry(
+          {
+            user: {
+              email: userSeed.email,
+              name: userSeed.name,
+            },
+            client: clientPayload,
+            agentHiring: {
+              agentId: firstAgent._id.toString(),
+              personalityId: defaultPersonalityId,
+            },
+            channels: channelsDto as any,
           },
-          client: clientPayload,
-          agentHiring: {
-            agentId: firstAgent._id.toString(),
-            personalityId: defaultPersonalityId,
-          },
-          channels: channelsDto as any,
-        });
+          fixedClientMongoId?.trim()
+            ? { fixedClientMongoId: fixedClientMongoId.trim() }
+            : undefined,
+        );
 
         this.logger.log(`User onboarded successfully:`);
         this.logger.log(`  - User: ${result.user._id} (${result.user.email})`);
@@ -502,10 +510,13 @@ export class SeederService implements OnApplicationBootstrap {
     }
   }
 
-  private async runOnboardingWithRetry(dto: any): Promise<any> {
+  private async runOnboardingWithRetry(
+    dto: any,
+    seedOptions?: { fixedClientMongoId: string },
+  ): Promise<any> {
     for (let attempt = 1; attempt <= this.onboardingRetryAttempts; attempt++) {
       try {
-        return await this.onboardingService.registerAndHire(dto);
+        return await this.onboardingService.registerAndHire(dto, seedOptions);
       } catch (error) {
         const isRetryable = this.isTransientMongoTransactionError(error);
         const hasMoreAttempts = attempt < this.onboardingRetryAttempts;

@@ -321,6 +321,7 @@ describe('SeederService', () => {
           systemPrompt: SEED_DATA.agents[2].systemPrompt,
           status: 'active',
           createdBySeeder: true,
+          toolingProfileId: 'sales-catalog',
         }),
       );
 
@@ -338,6 +339,13 @@ describe('SeederService', () => {
             }),
           ]),
         }),
+        undefined,
+      );
+      expect(mockOnboardingService.registerAndHire).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user: expect.objectContaining({ email: SEED_DATA.users[2].email }),
+        }),
+        { fixedClientMongoId: 'deadbeefdeadbeefdeadbeef' },
       );
 
       // Verify channel provisioning
@@ -416,6 +424,7 @@ describe('SeederService', () => {
             agentId: mockAgentId.toString(),
           }),
         }),
+        undefined,
       );
     });
 
@@ -475,6 +484,7 @@ describe('SeederService', () => {
             }),
           ]),
         }),
+        undefined,
       );
     });
 
@@ -755,6 +765,7 @@ describe('SeederService', () => {
               name: (seedUser.client as any).name,
             }),
           }),
+          undefined,
         );
       } finally {
         (SEED_DATA as any).users = originalUsers;

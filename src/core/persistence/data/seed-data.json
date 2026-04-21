@@ -122,7 +122,8 @@
       "name": "Order & Sales Agent",
       "systemPrompt": "You are an order-taking sales assistant. Your job is to listen to what the customer wants to buy, ask only the questions needed to complete the order (items, quantities, variants, delivery or pickup, and payment preference), confirm price and terms in plain language, then clearly restate the order as a sale record: line items, unit prices, subtotal, taxes or fees if applicable, total, customer contact, and any promised next step (e.g. payment, confirmation, or fulfillment). If something is unclear or out of stock, say so and offer alternatives. Never invent inventory, discounts, or delivery dates you cannot stand behind.",
       "status": "active",
-      "defaultPrice": 100
+      "defaultPrice": 100,
+      "toolingProfileId": "sales-catalog"
     }
   ],
   "channels": [
@@ -219,6 +220,7 @@
     {
       "email": "admin@codingbox.app",
       "name": "CodingBox User",
+      "fixedClientMongoId": "deadbeefdeadbeefdeadbeef",
       "client": {
         "type": "organization",
         "name": "Coding Box LLC"
@@ -266,6 +268,21 @@
               "status": "active",
               "credentials": {
                 "instagramAccountId": "17841400000000003",
+                "accessToken": "__REPLACE_ME_INSTAGRAM_ACCESS_TOKEN__"
+              }
+            }
+          ]
+        },
+        {
+          "agentName": "Order & Sales Agent",
+          "price": 100,
+          "channels": [
+            {
+              "channelName": "Instagram",
+              "provider": "instagram",
+              "status": "active",
+              "credentials": {
+                "instagramAccountId": "17841400000000999",
                 "accessToken": "__REPLACE_ME_INSTAGRAM_ACCESS_TOKEN__"
               }
             }

@@ -4,6 +4,7 @@ import { AppModule } from '../src/app.module';
 import { Connection } from 'mongoose';
 import { getConnectionToken } from '@nestjs/mongoose';
 import * as SEED_DATA from '../src/core/persistence/data/seed-data.json';
+import { SEED_DEV_PORTAL_CLIENT_MONGO_ID } from '../src/shared/seed-dev-portal-client-id';
 
 describe('Seeder (e2e)', () => {
   let app: INestApplication;
@@ -175,7 +176,7 @@ describe('Seeder (e2e)', () => {
       expect(orderSalesAgent.systemPrompt).toContain('order-taking');
       expect(orderSalesAgent.status).toBe('active');
       expect(orderSalesAgent.createdBySeeder).toBe(true);
-      expect(orderSalesAgent.toolingProfileId).toBeUndefined();
+      expect(orderSalesAgent.toolingProfileId).toBe('sales-catalog');
     });
   });
 
@@ -417,6 +418,7 @@ describe('Seeder (e2e)', () => {
         .collection('clients')
         .findOne({ _id: user.clientId });
       expect(client).toBeDefined();
+      expect(user.clientId.toString()).toBe(SEED_DEV_PORTAL_CLIENT_MONGO_ID);
       expect(client.billingCurrency).toBe(
         (SEED_DATA as any).billingCurrency ?? 'USD',
       );
@@ -424,7 +426,7 @@ describe('Seeder (e2e)', () => {
       expect(client.billingAnchor).toBeInstanceOf(Date);
     });
 
-    it('should hire both agents for User 3', async () => {
+    it('should hire all seeded agents for User 3', async () => {
       const user = await connection
         .collection('users')
         .findOne({ email: seedUser3.email });
@@ -475,7 +477,25 @@ describe('Seeder (e2e)', () => {
       expect(clientAgent.status).toBe('active');
     });
 
-    it('should configure both agents with multichannel combinations for User 3', async () => {
+    it(`should have ${seedUser3.agentHirings[2].agentName} as one of User 3 agents`, async () => {
+      const user = await connection
+        .collection('users')
+        .findOne({ email: seedUser3.email });
+
+      const agent = await connection
+        .collection('agents')
+        .findOne({ name: seedUser3.agentHirings[2].agentName });
+
+      const clientAgent = await connection.collection('client_agents').findOne({
+        clientId: user.clientId.toString(),
+        agentId: agent._id.toString(),
+      });
+
+      expect(clientAgent).toBeDefined();
+      expect(clientAgent.status).toBe('active');
+    });
+
+    it('should configure all agents with expected channel counts for User 3', async () => {
       const user = await connection
         .collection('users')
         .findOne({ email: seedUser3.email });
