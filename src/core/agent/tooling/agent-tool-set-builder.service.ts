@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { ToolSet } from 'ai';
 import {
   CHAT_STANDARD_TOOLING_PROFILE_ID,
+  SALES_CATALOG_TOOLING_PROFILE_ID,
   type AgentToolingProfileId,
 } from '@shared/agent-tooling-profile.constants';
 import type { AgentToolRunCorrelation } from './agent-tool-run-correlation';
@@ -22,6 +23,8 @@ export class AgentToolSetBuilderService {
         return {
           agent_debug_log: createAgentDebugLogTool(this.logger, correlation),
         };
+      case SALES_CATALOG_TOOLING_PROFILE_ID:
+        return {};
       default:
         this.logger.error(`Unhandled tooling profile: ${String(profileId)}`);
         return {};

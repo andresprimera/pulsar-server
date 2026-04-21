@@ -11,6 +11,7 @@ import { ClientRepository } from '@persistence/repositories/client.repository';
 import {
   ClientCatalogItemBulkChunkError,
   ClientCatalogItemRepository,
+  type ClientCatalogItemUpdatePatch,
 } from '@persistence/repositories/client-catalog-item.repository';
 import {
   clientCatalogItemUpsertSchema,
@@ -69,9 +70,17 @@ export class ClientCatalogItemsService {
     return { upserted: parsed.length };
   }
 
-  async findAllForClient(clientId: string) {
+  async findAllForClient(clientId: string): Promise<{
+    items: Awaited<
+      ReturnType<ClientCatalogItemRepository['findActiveByClientId']>
+    >;
+    total: number;
+  }> {
     await this.assertClientExists(clientId);
-    return this.catalogItemRepository.findActiveByClientId(clientId);
+    const items = await this.catalogItemRepository.findActiveByClientId(
+      clientId,
+    );
+    return { items, total: items.length };
   }
 
   async findOne(clientId: string, catalogItemId: string) {
@@ -92,7 +101,7 @@ export class ClientCatalogItemsService {
     dto: UpdateClientCatalogItemDto,
   ) {
     await this.assertClientExists(clientId);
-    const patch: Partial<ClientCatalogItemUpsert> = {};
+    const patch: ClientCatalogItemUpdatePatch = {};
     if (dto.sku !== undefined) {
       patch.sku = dto.sku;
     }
@@ -109,7 +118,13 @@ export class ClientCatalogItemsService {
       patch.unitAmountMinor = dto.unitAmountMinor;
     }
     if (dto.currency !== undefined) {
-      patch.currency = dto.currency?.toUpperCase();
+      patch.currency =
+        dto.currency === null || dto.currency === ''
+          ? null
+          : dto.currency.toUpperCase();
+    }
+    if (dto.active !== undefined) {
+      patch.active = dto.active;
     }
     if (
       patch.unitAmountMinor !== undefined &&

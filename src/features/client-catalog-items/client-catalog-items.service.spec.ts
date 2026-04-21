@@ -13,7 +13,10 @@ import { ClientCatalogItemsService } from './client-catalog-items.service';
 describe('ClientCatalogItemsService', () => {
   let service: ClientCatalogItemsService;
   let catalogRepo: jest.Mocked<
-    Pick<ClientCatalogItemRepository, 'bulkUpsertChunked'>
+    Pick<
+      ClientCatalogItemRepository,
+      'bulkUpsertChunked' | 'findActiveByClientId'
+    >
   >;
   let clientRepo: jest.Mocked<Pick<ClientRepository, 'findById'>>;
   let agentService: jest.Mocked<
@@ -40,7 +43,10 @@ describe('ClientCatalogItemsService', () => {
     } as Express.Multer.File);
 
   beforeEach(async () => {
-    catalogRepo = { bulkUpsertChunked: jest.fn().mockResolvedValue(undefined) };
+    catalogRepo = {
+      bulkUpsertChunked: jest.fn().mockResolvedValue(undefined),
+      findActiveByClientId: jest.fn(),
+    };
     clientRepo = { findById: jest.fn().mockResolvedValue({ _id: clientId }) };
     agentService = { extractCatalogImportBatch: jest.fn() };
     agentContext = {
@@ -124,5 +130,17 @@ describe('ClientCatalogItemsService', () => {
       };
       expect(body.code).toBe('CATALOG_IMPORT_LLM_ROW_INVALID');
     }
+  });
+
+  it('findAllForClient returns items and total', async () => {
+    const rows = [
+      { sku: 'a', name: 'A', type: 'product' as const, active: true },
+      { sku: 'b', name: 'B', type: 'service' as const, active: true },
+    ];
+    catalogRepo.findActiveByClientId.mockResolvedValue(rows as never);
+    const result = await service.findAllForClient(clientId);
+    expect(result.total).toBe(2);
+    expect(result.items).toHaveLength(2);
+    expect(catalogRepo.findActiveByClientId).toHaveBeenCalledWith(clientId);
   });
 });

@@ -5,6 +5,13 @@ import { ClientCatalogItem } from '@persistence/schemas/client-catalog-item.sche
 import type { ClientCatalogItemUpsert } from '@shared/client-catalog-item.contract';
 import { CATALOG_IMPORT_DB_CHUNK_SIZE } from '@shared/client-catalog-item.contract';
 
+/** PATCH payload fields beyond upsert shape (null clears price in Mongo). */
+export type ClientCatalogItemUpdatePatch = Partial<ClientCatalogItemUpsert> & {
+  active?: boolean;
+  unitAmountMinor?: number | null;
+  currency?: string | null;
+};
+
 export class ClientCatalogItemBulkChunkError extends Error {
   constructor(
     message: string,
@@ -131,7 +138,7 @@ export class ClientCatalogItemRepository {
   async updateForClient(
     clientId: string,
     catalogItemId: string,
-    patch: Partial<ClientCatalogItemUpsert>,
+    patch: ClientCatalogItemUpdatePatch,
   ): Promise<ClientCatalogItem | null> {
     const $set: Record<string, unknown> = {};
     if (patch.name !== undefined) {
@@ -151,6 +158,10 @@ export class ClientCatalogItemRepository {
     }
     if (patch.sku !== undefined) {
       $set.sku = patch.sku;
+    }
+    if (patch.active !== undefined) {
+      $set.active = patch.active;
+      $set.deactivatedAt = patch.active ? null : new Date();
     }
     if (Object.keys($set).length === 0) {
       return this.findOneForClient(clientId, catalogItemId);

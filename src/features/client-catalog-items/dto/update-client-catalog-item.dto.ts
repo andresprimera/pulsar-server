@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsEnum,
   IsInt,
   IsOptional,
@@ -21,30 +22,38 @@ export class UpdateClientCatalogItemDto {
   name?: string;
 
   @IsOptional()
+  @ValidateIf(
+    (_o: UpdateClientCatalogItemDto, v: unknown) =>
+      v !== null && v !== undefined,
+  )
   @IsString()
   @MaxLength(4000)
-  description?: string;
+  description?: string | null;
 
   @IsOptional()
   @IsEnum(['product', 'service'])
   type?: 'product' | 'service';
 
   @IsOptional()
-  @Type(() => Number)
   @ValidateIf(
-    (o: UpdateClientCatalogItemDto) =>
-      o.unitAmountMinor !== undefined && o.unitAmountMinor !== null,
+    (_o: UpdateClientCatalogItemDto, v: unknown) =>
+      v !== null && v !== undefined,
   )
+  @Type(() => Number)
   @IsInt()
   @Min(0)
-  unitAmountMinor?: number;
+  unitAmountMinor?: number | null;
 
   @IsOptional()
+  @ValidateIf(
+    (_o: UpdateClientCatalogItemDto, v: unknown) =>
+      v !== null && v !== undefined,
+  )
   @IsString()
   @MaxLength(3)
-  @ValidateIf(
-    (o: UpdateClientCatalogItemDto) =>
-      o.unitAmountMinor !== undefined && o.unitAmountMinor !== null,
-  )
-  currency?: string;
+  currency?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
 }
