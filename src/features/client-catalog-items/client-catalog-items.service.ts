@@ -18,6 +18,7 @@ import {
   stableSerializeCatalogItem,
   type ClientCatalogItemUpsert,
 } from '@shared/client-catalog-item.contract';
+import { ZodError } from 'zod';
 import { CreateClientCatalogItemDto } from './dto/create-client-catalog-item.dto';
 import { UpdateClientCatalogItemDto } from './dto/update-client-catalog-item.dto';
 import {
@@ -28,6 +29,9 @@ import {
   CATALOG_IMPORT_ALLOWED_MIMES,
   CATALOG_IMPORT_MAX_FILE_BYTES,
 } from './catalog-import.constants';
+
+const CATALOG_IMPORT_DB_CHUNK_FAILED_MESSAGE =
+  'Catalog upsert failed while writing to the database. Each successful chunk was committed atomically; the failing chunk was rolled back. Re-upload the full file to converge (SKU upserts are idempotent).';
 
 @Injectable()
 export class ClientCatalogItemsService {
@@ -189,7 +193,20 @@ export class ClientCatalogItemsService {
       });
       this.assertNoConflictingDuplicatesInBatch(batch);
       for (const raw of batch) {
-        const parsed = clientCatalogItemUpsertSchema.parse(raw);
+        let parsed: ClientCatalogItemUpsert;
+        try {
+          parsed = clientCatalogItemUpsertSchema.parse(raw);
+        } catch (e) {
+          if (e instanceof ZodError) {
+            throw new BadRequestException({
+              code: 'CATALOG_IMPORT_LLM_ROW_INVALID',
+              message:
+                'The model returned a row that does not match the catalog schema.',
+              issues: e.flatten(),
+            });
+          }
+          throw e;
+        }
         const key = normalizeCatalogSku(parsed.sku);
         merged.set(key, parsed);
       }
@@ -210,8 +227,7 @@ export class ClientCatalogItemsService {
         throw new HttpException(
           {
             code: 'CATALOG_IMPORT_DB_CHUNK_FAILED',
-            message:
-              'Catalog upsert failed while writing to the database. You may retry by re-uploading the same file; earlier chunks may already be persisted.',
+            message: CATALOG_IMPORT_DB_CHUNK_FAILED_MESSAGE,
             committedChunks: err.committedChunks,
           },
           HttpStatus.BAD_GATEWAY,
@@ -255,8 +271,7 @@ export class ClientCatalogItemsService {
       throw new HttpException(
         {
           code: 'CATALOG_IMPORT_DB_CHUNK_FAILED',
-          message:
-            'Catalog upsert failed while writing to the database. You may retry by re-uploading the same file.',
+          message: CATALOG_IMPORT_DB_CHUNK_FAILED_MESSAGE,
           committedChunks: err.committedChunks,
         },
         HttpStatus.BAD_GATEWAY,

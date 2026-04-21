@@ -10,6 +10,7 @@ import { LlmUsageLogRepository } from '@persistence/repositories/llm-usage-log.r
 import { PromptBuilderService } from './prompt-builder.service';
 import { ClientContextSuggestionExecutor } from './client-context-suggestion.executor';
 import { ClientCatalogImportExecutor } from './client-catalog-import.executor';
+import type { CatalogImportLlmBatchInput } from './contracts/catalog-import-llm.input';
 import { AgentToolSetBuilderService } from './tooling/agent-tool-set-builder.service';
 import * as llmFactory from './llm/llm.factory';
 import * as ai from 'ai';
@@ -27,6 +28,7 @@ jest.mock('./llm/llm.factory', () => ({
 
 describe('AgentService', () => {
   let service: AgentService;
+  let testingModule: TestingModule;
   let messagePersistenceService: jest.Mocked<MessagePersistenceService>;
   let llmUsageLogRepository: jest.Mocked<LlmUsageLogRepository>;
   let promptBuilder: jest.Mocked<PromptBuilderService>;
@@ -59,7 +61,7 @@ describe('AgentService', () => {
   };
 
   beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
+    testingModule = await Test.createTestingModule({
       providers: [
         AgentService,
         {
@@ -124,10 +126,10 @@ describe('AgentService', () => {
       ],
     }).compile();
 
-    service = module.get<AgentService>(AgentService);
-    messagePersistenceService = module.get(MessagePersistenceService);
-    llmUsageLogRepository = module.get(LlmUsageLogRepository);
-    promptBuilder = module.get(PromptBuilderService);
+    service = testingModule.get<AgentService>(AgentService);
+    messagePersistenceService = testingModule.get(MessagePersistenceService);
+    llmUsageLogRepository = testingModule.get(LlmUsageLogRepository);
+    promptBuilder = testingModule.get(PromptBuilderService);
     logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
     errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
     jest.clearAllMocks();
@@ -140,6 +142,25 @@ describe('AgentService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  describe('extractCatalogImportBatch', () => {
+    it('delegates to ClientCatalogImportExecutor.extractBatch', async () => {
+      const executor = testingModule.get(ClientCatalogImportExecutor);
+      const items = [{ sku: 'S', name: 'N', type: 'product' as const }];
+      const spy = jest.spyOn(executor, 'extractBatch').mockResolvedValue(items);
+      const input: CatalogImportLlmBatchInput = {
+        llmConfig: {
+          provider: LlmProvider.OpenAI,
+          apiKey: 'sk-test',
+          model: 'gpt-4o',
+        },
+        userText: 'batch text',
+      };
+      const out = await service.extractCatalogImportBatch(input);
+      expect(spy).toHaveBeenCalledWith(input);
+      expect(out).toEqual(items);
+    });
   });
 
   describe('run', () => {

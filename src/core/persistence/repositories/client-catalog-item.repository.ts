@@ -53,15 +53,23 @@ export class ClientCatalogItemRepository {
     let committedChunks = 0;
     for (let i = 0; i < ops.length; i += CATALOG_IMPORT_DB_CHUNK_SIZE) {
       const chunk = ops.slice(i, i + CATALOG_IMPORT_DB_CHUNK_SIZE);
+      const session = await this.model.db.startSession();
       try {
-        await this.model.bulkWrite(chunk, { ordered: true });
+        await session.withTransaction(async () => {
+          await this.model.bulkWrite(chunk, {
+            ordered: false,
+            session,
+          });
+        });
         committedChunks += 1;
       } catch (err) {
         throw new ClientCatalogItemBulkChunkError(
-          'Catalog bulk upsert failed mid-chunk',
+          'Catalog bulk upsert failed for one chunk (chunk rolled back)',
           committedChunks,
           err,
         );
+      } finally {
+        await session.endSession();
       }
     }
   }
