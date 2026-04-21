@@ -50,12 +50,16 @@
     "bullmq": "^5.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
+    "csv-parse": "^6.2.1",
     "imapflow": "^1.2.9",
     "ioredis": "^5.3.2",
+    "mammoth": "^1.12.0",
     "mongoose": "^7.8.8",
     "nodemailer": "^8.0.1",
+    "pdf-parse": "^1.1.1",
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.2.0",
+    "xlsx": "^0.18.5",
     "zod": "^3.25.76"
   },
   "devDependencies": {
@@ -112,7 +116,8 @@
       "^@client-agents/(.*)$": "<rootDir>/features/client-agents/$1",
       "^@users/(.*)$": "<rootDir>/features/users/$1",
       "^@onboarding/(.*)$": "<rootDir>/features/onboarding/$1",
-      "^@client-context-suggestions/(.*)$": "<rootDir>/features/client-context-suggestions/$1"
+      "^@client-context-suggestions/(.*)$": "<rootDir>/features/client-context-suggestions/$1",
+      "^@client-catalog-items/(.*)$": "<rootDir>/features/client-catalog-items/$1"
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"

@@ -17,6 +17,7 @@ import {
 } from '@shared/agent-tooling-profile.constants';
 import { RouteCandidate } from '@domain/routing/agent-routing.service';
 import { LlmProvider } from '@domain/llm/provider.enum';
+import type { LLMConfig } from '@domain/llm/llm.factory';
 
 @Injectable()
 export class AgentContextService {
@@ -27,6 +28,57 @@ export class AgentContextService {
     private readonly clientRepository: ClientRepository,
     private readonly personalityRepository: PersonalityRepository,
   ) {}
+
+  /**
+   * Resolves provider/model/apiKey for a client using the same precedence as
+   * {@link buildContextFromRoute} (client llmConfig when usable, else env + preferences).
+   */
+  async resolveEffectiveLlmConfigForClientId(
+    clientId: string,
+  ): Promise<LLMConfig | null> {
+    const client = await this.clientRepository.findByIdWithLlmCredentials(
+      clientId,
+    );
+    if (!client) {
+      return null;
+    }
+    return this.resolveLlmConfigFromLoadedClient(client);
+  }
+
+  private resolveLlmConfigFromLoadedClient(client: Client | null): LLMConfig {
+    if (!client) {
+      const rawApiKey = process.env.OPENAI_API_KEY ?? '';
+      return {
+        provider: LlmProvider.OpenAI,
+        apiKey: decrypt(rawApiKey),
+        model: 'gpt-4o',
+      };
+    }
+
+    const clientLlm = client.llmConfig;
+    const useClientLlm =
+      clientLlm?.apiKey != null &&
+      String(clientLlm.apiKey) !== '' &&
+      !String(clientLlm.apiKey).includes('REPLACE_ME');
+
+    const rawApiKey =
+      useClientLlm && clientLlm
+        ? clientLlm.apiKey
+        : process.env.OPENAI_API_KEY ?? '';
+    const apiKey = decrypt(rawApiKey);
+
+    const provider: LlmProvider =
+      useClientLlm && clientLlm
+        ? (clientLlm.provider as LlmProvider)
+        : (client?.llmPreferences?.provider as LlmProvider) ??
+          LlmProvider.OpenAI;
+    const model =
+      useClientLlm && clientLlm
+        ? clientLlm.model
+        : client?.llmPreferences?.defaultModel ?? 'gpt-4o';
+
+    return { provider, apiKey, model };
+  }
 
   private resolveToolingProfileId(
     hireRaw: string | undefined,
@@ -71,27 +123,8 @@ export class AgentContextService {
       clientAgent.clientId,
     );
 
-    const clientLlm = client?.llmConfig;
-    const useClientLlm =
-      clientLlm?.apiKey != null &&
-      String(clientLlm.apiKey) !== '' &&
-      !String(clientLlm.apiKey).includes('REPLACE_ME');
-
-    const rawApiKey =
-      useClientLlm && clientLlm
-        ? clientLlm.apiKey
-        : process.env.OPENAI_API_KEY ?? '';
-    const apiKey = decrypt(rawApiKey);
-
-    const provider: LlmProvider =
-      useClientLlm && clientLlm
-        ? (clientLlm.provider as LlmProvider)
-        : (client?.llmPreferences?.provider as LlmProvider) ??
-          LlmProvider.OpenAI;
-    const model =
-      useClientLlm && clientLlm
-        ? clientLlm.model
-        : client?.llmPreferences?.defaultModel ?? 'gpt-4o';
+    const { provider, apiKey, model } =
+      this.resolveLlmConfigFromLoadedClient(client);
 
     const channelConfigDecrypted =
       channelConfig.credentials &&
@@ -135,11 +168,7 @@ export class AgentContextService {
       channelId: channelConfig.channelId.toString(),
       systemPrompt: agent.systemPrompt,
       personality,
-      llmConfig: {
-        provider,
-        apiKey,
-        model,
-      },
+      llmConfig: { provider, apiKey, model },
       channelConfig: channelConfigDecrypted,
       toolingProfileId,
       ...(promptSupplementTrimmed

@@ -11,6 +11,9 @@ import { MetadataExposureService } from './metadata-exposure.service';
 import { LlmUsageLogRepository } from '@persistence/repositories/llm-usage-log.repository';
 import { PromptBuilderService } from './prompt-builder.service';
 import { ClientContextSuggestionExecutor } from './client-context-suggestion.executor';
+import { ClientCatalogImportExecutor } from './client-catalog-import.executor';
+import type { CatalogImportLlmBatchInput } from './contracts/catalog-import-llm.input';
+import type { ClientCatalogItemUpsert } from '@shared/client-catalog-item.contract';
 import type {
   CompanyBriefSuggestionInput,
   PromptSupplementSuggestionInput,
@@ -30,6 +33,7 @@ export class AgentService {
     private readonly llmUsageLogRepository: LlmUsageLogRepository,
     private readonly promptBuilder: PromptBuilderService,
     private readonly clientContextSuggestionExecutor: ClientContextSuggestionExecutor,
+    private readonly clientCatalogImportExecutor: ClientCatalogImportExecutor,
     private readonly agentToolSetBuilderService: AgentToolSetBuilderService,
   ) {}
 
@@ -216,5 +220,14 @@ export class AgentService {
     return this.clientContextSuggestionExecutor.generatePromptSupplementMarkdown(
       input,
     );
+  }
+
+  /**
+   * Client-scoped LLM: structured catalog extraction for import batches.
+   */
+  extractCatalogImportBatch(
+    input: CatalogImportLlmBatchInput,
+  ): Promise<ClientCatalogItemUpsert[]> {
+    return this.clientCatalogImportExecutor.extractBatch(input);
   }
 }

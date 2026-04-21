@@ -32,4 +32,12 @@ describe('AgentToolSetBuilderService', () => {
     });
     expect(Object.keys(tools)).toEqual(['agent_debug_log']);
   });
+
+  it('sales-catalog profile yields empty tool set', () => {
+    const tools = service.buildToolSet('sales-catalog', {
+      ...correlation,
+      toolingProfileId: 'sales-catalog',
+    });
+    expect(Object.keys(tools)).toHaveLength(0);
+  });
 });

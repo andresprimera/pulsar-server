@@ -8,6 +8,7 @@ import { MetadataExposureService } from './metadata-exposure.service';
 import { MessagePersistenceService } from '@persistence/message-persistence.service';
 import { DomainModule } from '@domain/domain.module';
 import { ClientContextSuggestionExecutor } from './client-context-suggestion.executor';
+import { ClientCatalogImportExecutor } from './client-catalog-import.executor';
 import { AgentToolSetBuilderService } from './tooling/agent-tool-set-builder.service';
 
 @Module({
@@ -16,6 +17,7 @@ import { AgentToolSetBuilderService } from './tooling/agent-tool-set-builder.ser
     AgentService,
     AgentToolSetBuilderService,
     ClientContextSuggestionExecutor,
+    ClientCatalogImportExecutor,
     AgentContextService,
     PromptBuilderService,
     ConversationSummaryService,
