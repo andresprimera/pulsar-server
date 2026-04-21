@@ -46,6 +46,11 @@ import {
 import { BillingRecordRepository } from './repositories/billing-record.repository';
 import { Personality, PersonalitySchema } from './schemas/personality.schema';
 import { PersonalityRepository } from './repositories/personality.repository';
+import {
+  ClientCatalogItem,
+  ClientCatalogItemSchema,
+} from './schemas/client-catalog-item.schema';
+import { ClientCatalogItemRepository } from './repositories/client-catalog-item.repository';
 import { EventIdempotencyService } from './event-idempotency.service';
 import { OnboardingModule } from '@onboarding/onboarding.module';
 
@@ -55,6 +60,7 @@ const repositories = [
   ChannelRepository,
   ClientAgentRepository,
   PersonalityRepository,
+  ClientCatalogItemRepository,
   AgentPriceRepository,
   ChannelPriceRepository,
   BillingRecordRepository,
@@ -85,6 +91,7 @@ const repositories = [
       { name: Channel.name, schema: ChannelSchema },
       { name: ClientAgent.name, schema: ClientAgentSchema },
       { name: Personality.name, schema: PersonalitySchema },
+      { name: ClientCatalogItem.name, schema: ClientCatalogItemSchema },
 
       { name: ClientPhone.name, schema: ClientPhoneSchema },
       { name: Contact.name, schema: ContactSchema },

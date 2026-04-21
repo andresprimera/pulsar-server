@@ -9,6 +9,7 @@ import { MetadataExposureService } from './metadata-exposure.service';
 import { LlmUsageLogRepository } from '@persistence/repositories/llm-usage-log.repository';
 import { PromptBuilderService } from './prompt-builder.service';
 import { ClientContextSuggestionExecutor } from './client-context-suggestion.executor';
+import { ClientCatalogImportExecutor } from './client-catalog-import.executor';
 import { AgentToolSetBuilderService } from './tooling/agent-tool-set-builder.service';
 import * as llmFactory from './llm/llm.factory';
 import * as ai from 'ai';
@@ -88,6 +89,10 @@ describe('AgentService', () => {
             generateCompanyBriefMarkdown: jest.fn(),
             generatePromptSupplementMarkdown: jest.fn(),
           },
+        },
+        {
+          provide: ClientCatalogImportExecutor,
+          useValue: { extractBatch: jest.fn() },
         },
         AgentToolSetBuilderService,
         {
