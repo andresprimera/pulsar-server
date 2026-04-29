@@ -196,4 +196,24 @@ export class ClientAgentRepository {
       .select('+channels.credentials +channels.llmConfig.apiKey')
       .exec();
   }
+
+  /**
+   * Same routing query as findActiveByTelegramBotId but does not load encrypted
+   * credentials (for webhook secret verification using plaintext hex only).
+   */
+  async findActiveByTelegramBotIdForWebhookAuth(
+    telegramBotId: string,
+  ): Promise<ClientAgent[]> {
+    return this.model
+      .find({
+        status: 'active',
+        channels: {
+          $elemMatch: {
+            status: 'active',
+            telegramBotId,
+          },
+        },
+      })
+      .exec();
+  }
 }

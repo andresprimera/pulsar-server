@@ -22,6 +22,7 @@ import { ChannelPriceRepository } from '@persistence/repositories/channel-price.
 import { ClientPhoneRepository } from '@persistence/repositories/client-phone.repository';
 import { encryptRecord, encrypt } from '@shared/crypto.util';
 import {
+  deriveTelegramWebhookSecret,
   isValidTelegramBotTokenShape,
   parseTelegramBotIdFromToken,
 } from '@shared/telegram-webhook-secret.util';
@@ -260,6 +261,7 @@ export class OnboardingService {
         let tiktokUserId: string | undefined;
         let instagramAccountId: string | undefined;
         let telegramBotId: string | undefined;
+        let telegramWebhookSecretHex: string | undefined;
 
         if (
           channelConfig.credentials &&
@@ -339,6 +341,7 @@ export class OnboardingService {
                 'Telegram requires botToken in credentials (format: <bot_id>:<secret>)',
               );
             }
+            telegramWebhookSecretHex = deriveTelegramWebhookSecret(bt);
             credentialsToStore = encryptRecord({ botToken: bt });
           } else {
             credentialsToStore = encryptRecord({
@@ -356,6 +359,7 @@ export class OnboardingService {
           tiktokUserId,
           instagramAccountId,
           telegramBotId,
+          telegramWebhookSecretHex,
           amount: channelAmount,
           currency: billingCurrency,
           monthlyMessageQuota: channelMonthlyMessageQuota,

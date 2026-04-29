@@ -134,6 +134,7 @@ describe('Telegram Channel (e2e)', () => {
           provider: ChannelProvider.Telegram,
           status: 'active',
           telegramBotId,
+          telegramWebhookSecretHex: deriveTelegramWebhookSecret(botToken),
           credentials: {
             botToken,
           },

@@ -48,6 +48,10 @@ export class HireChannelConfig {
   @Prop({ type: String, required: false, index: true })
   telegramBotId?: string;
 
+  /** SHA-256(UTF-8(botToken)) lowercase hex; used for webhook auth without decrypting credentials. */
+  @Prop({ type: String, required: false })
+  telegramWebhookSecretHex?: string;
+
   @Prop({ required: true, min: 0, default: 0 })
   amount: number;
 

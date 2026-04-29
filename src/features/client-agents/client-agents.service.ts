@@ -15,6 +15,7 @@ import { ChannelPriceRepository } from '@persistence/repositories/channel-price.
 import { PersonalityRepository } from '@persistence/repositories/personality.repository';
 import { encryptRecord } from '@shared/crypto.util';
 import {
+  deriveTelegramWebhookSecret,
   isValidTelegramBotTokenShape,
   parseTelegramBotIdFromToken,
 } from '@shared/telegram-webhook-secret.util';
@@ -174,6 +175,7 @@ export class ClientAgentsService {
       }
 
       let telegramBotId: string | undefined;
+      let telegramWebhookSecretHex: string | undefined;
       let credentialsToStore = channelConfig.credentials;
       if (channel.type === 'telegram') {
         const botToken = channelConfig.credentials?.botToken;
@@ -190,6 +192,7 @@ export class ClientAgentsService {
           throw new BadRequestException('Invalid Telegram bot token');
         }
         telegramBotId = parsedId;
+        telegramWebhookSecretHex = deriveTelegramWebhookSecret(botToken);
         credentialsToStore = { botToken };
       }
 
@@ -202,6 +205,7 @@ export class ClientAgentsService {
         tiktokUserId,
         instagramAccountId,
         telegramBotId,
+        telegramWebhookSecretHex,
         amount: channelAmount,
         currency,
         monthlyMessageQuota: channelMonthlyMessageQuota,

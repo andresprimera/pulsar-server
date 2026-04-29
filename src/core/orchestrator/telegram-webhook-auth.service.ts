@@ -1,13 +1,10 @@
 import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { ClientAgentRepository } from '@persistence/repositories/client-agent.repository';
-import { decryptRecord } from '@shared/crypto.util';
-import {
-  deriveTelegramWebhookSecret,
-  timingSafeEqualHex,
-} from '@shared/telegram-webhook-secret.util';
+import { timingSafeEqualHex } from '@shared/telegram-webhook-secret.util';
 
 /**
  * Validates Telegram webhook `X-Telegram-Bot-Api-Secret-Token` against hires.
+ * Uses {@link HireChannelConfig.telegramWebhookSecretHex} only (no credential decrypt).
  * Lives in orchestration (not transport) so channels/ never imports repositories.
  */
 @Injectable()
@@ -18,20 +15,21 @@ export class TelegramWebhookAuthService {
 
   /**
    * Ensures at least one active hire for `telegramBotId` exists and the header
-   * matches SHA-256(UTF-8(botToken)) for that hire's decrypted token.
+   * matches a stored `telegramWebhookSecretHex` (set at hire from SHA-256(botToken)).
    */
   async assertValidWebhookSecret(
     telegramBotId: string,
     secretHeader: string | undefined,
   ): Promise<void> {
-    const trimmedHeader = secretHeader?.trim();
+    const trimmedHeader = secretHeader?.trim().toLowerCase();
     if (!trimmedHeader) {
       throw new ForbiddenException('Missing Telegram webhook secret');
     }
 
-    const agents = await this.clientAgentRepository.findActiveByTelegramBotId(
-      telegramBotId,
-    );
+    const agents =
+      await this.clientAgentRepository.findActiveByTelegramBotIdForWebhookAuth(
+        telegramBotId,
+      );
 
     if (agents.length === 0) {
       this.logger.warn(
@@ -40,34 +38,22 @@ export class TelegramWebhookAuthService {
       throw new ForbiddenException('Unknown Telegram bot');
     }
 
-    const expectedSecrets: string[] = [];
+    const expectedHexes: string[] = [];
 
     for (const agent of agents) {
       for (const ch of agent.channels) {
         if (ch.status !== 'active' || ch.telegramBotId !== telegramBotId) {
           continue;
         }
-        if (!ch.credentials || typeof ch.credentials !== 'object') {
+        const hex = ch.telegramWebhookSecretHex?.trim().toLowerCase();
+        if (!hex) {
           continue;
         }
-        let botToken: string;
-        try {
-          const decrypted = decryptRecord(
-            ch.credentials as Record<string, unknown>,
-          );
-          botToken =
-            typeof decrypted?.botToken === 'string' ? decrypted.botToken : '';
-        } catch {
-          continue;
-        }
-        if (!botToken) {
-          continue;
-        }
-        expectedSecrets.push(deriveTelegramWebhookSecret(botToken));
+        expectedHexes.push(hex);
       }
     }
 
-    const ok = expectedSecrets.some((expected) =>
+    const ok = expectedHexes.some((expected) =>
       timingSafeEqualHex(trimmedHeader, expected),
     );
 

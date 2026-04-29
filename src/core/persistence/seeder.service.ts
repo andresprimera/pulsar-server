@@ -22,6 +22,7 @@ import { PersonalityRepository } from './repositories/personality.repository';
 import { Personality } from './schemas/personality.schema';
 import { encryptRecord, encrypt } from '@shared/crypto.util';
 import {
+  deriveTelegramWebhookSecret,
   isValidTelegramBotTokenShape,
   parseTelegramBotIdFromToken,
 } from '@shared/telegram-webhook-secret.util';
@@ -393,6 +394,7 @@ export class SeederService implements OnApplicationBootstrap {
                 let tiktokUserId: string | undefined;
                 let instagramAccountId: string | undefined;
                 let telegramBotId: string | undefined;
+                let telegramWebhookSecretHex: string | undefined;
                 if (
                   channelSeed.credentials &&
                   typeof channelSeed.credentials === 'object'
@@ -485,6 +487,7 @@ export class SeederService implements OnApplicationBootstrap {
                       );
                       continue;
                     }
+                    telegramWebhookSecretHex = deriveTelegramWebhookSecret(bt);
                     credentialsToStore = encryptRecord({ botToken: bt });
                   } else {
                     credentialsToStore = encryptRecord(channelSeed.credentials);
@@ -500,6 +503,7 @@ export class SeederService implements OnApplicationBootstrap {
                   tiktokUserId,
                   instagramAccountId,
                   telegramBotId,
+                  telegramWebhookSecretHex,
                   amount: 0,
                   currency: client.billingCurrency,
                   monthlyMessageQuota:
