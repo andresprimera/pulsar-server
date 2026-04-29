@@ -4,6 +4,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { BullModule } from '@nestjs/bullmq';
 import Redis from 'ioredis';
 import { IncomingMessageOrchestrator } from './incoming-message.orchestrator';
+import { TelegramWebhookAuthService } from './telegram-webhook-auth.service';
 import { ContactIdentityResolver } from './contact-identity.resolver';
 import { QuotaEnforcementService } from './quota-enforcement.service';
 import { BillingGeneratorService } from './billing-generator.service';
@@ -66,6 +67,7 @@ const isWorkerMode = process.env.WORKER_MODE === 'true';
     },
     DistributedLockService,
     IncomingMessageOrchestrator,
+    TelegramWebhookAuthService,
     ContactIdentityResolver,
     QuotaEnforcementService,
     BillingGeneratorService,
@@ -74,6 +76,10 @@ const isWorkerMode = process.env.WORKER_MODE === 'true';
       ? [QueueHealthService, DeadLetterService, BillingJobProcessor]
       : [BillingJobScheduler]),
   ],
-  exports: [IncomingMessageOrchestrator, BillingGeneratorService],
+  exports: [
+    IncomingMessageOrchestrator,
+    TelegramWebhookAuthService,
+    BillingGeneratorService,
+  ],
 })
 export class OrchestratorModule {}

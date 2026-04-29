@@ -45,6 +45,9 @@ export class HireChannelConfig {
   @Prop({ type: String, required: false, index: true })
   instagramAccountId?: string;
 
+  @Prop({ type: String, required: false, index: true })
+  telegramBotId?: string;
+
   @Prop({ required: true, min: 0, default: 0 })
   amount: number;
 
@@ -118,4 +121,5 @@ ClientAgentSchema.index({ clientId: 1, agentId: 1 }, { unique: true });
 ClientAgentSchema.index({ status: 1, 'channels.phoneNumberId': 1 });
 ClientAgentSchema.index({ status: 1, 'channels.tiktokUserId': 1 });
 ClientAgentSchema.index({ status: 1, 'channels.instagramAccountId': 1 });
+ClientAgentSchema.index({ status: 1, 'channels.telegramBotId': 1 });
 ClientAgentSchema.index({ 'channels.status': 1 });

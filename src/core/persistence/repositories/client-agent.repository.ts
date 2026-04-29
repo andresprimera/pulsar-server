@@ -176,4 +176,24 @@ export class ClientAgentRepository {
       .select('+channels.credentials +channels.llmConfig.apiKey')
       .exec();
   }
+
+  /**
+   * Find all active ClientAgents by Telegram bot user id (token prefix).
+   */
+  async findActiveByTelegramBotId(
+    telegramBotId: string,
+  ): Promise<ClientAgent[]> {
+    return this.model
+      .find({
+        status: 'active',
+        channels: {
+          $elemMatch: {
+            status: 'active',
+            telegramBotId,
+          },
+        },
+      })
+      .select('+channels.credentials +channels.llmConfig.apiKey')
+      .exec();
+  }
 }

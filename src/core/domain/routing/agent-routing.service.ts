@@ -156,6 +156,8 @@ export class AgentRoutingService {
         return this.clientAgentRepository.findActiveByInstagramAccountId(
           identifier,
         );
+      case CHANNEL_TYPES.TELEGRAM:
+        return this.clientAgentRepository.findActiveByTelegramBotId(identifier);
       default:
         return [];
     }
@@ -181,6 +183,8 @@ export class AgentRoutingService {
               return channel.tiktokUserId === identifier;
             case CHANNEL_TYPES.INSTAGRAM:
               return channel.instagramAccountId === identifier;
+            case CHANNEL_TYPES.TELEGRAM:
+              return channel.telegramBotId === identifier;
             default:
               return false;
           }

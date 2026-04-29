@@ -21,6 +21,10 @@ import { ChannelPriceRepository } from './repositories/channel-price.repository'
 import { PersonalityRepository } from './repositories/personality.repository';
 import { Personality } from './schemas/personality.schema';
 import { encryptRecord, encrypt } from '@shared/crypto.util';
+import {
+  isValidTelegramBotTokenShape,
+  parseTelegramBotIdFromToken,
+} from '@shared/telegram-webhook-secret.util';
 import * as SEED_DATA from './data/seed-data.json';
 import { ClientRepository } from './repositories/client.repository';
 
@@ -388,6 +392,7 @@ export class SeederService implements OnApplicationBootstrap {
                 let phoneNumberId: string | undefined;
                 let tiktokUserId: string | undefined;
                 let instagramAccountId: string | undefined;
+                let telegramBotId: string | undefined;
                 if (
                   channelSeed.credentials &&
                   typeof channelSeed.credentials === 'object'
@@ -402,6 +407,22 @@ export class SeederService implements OnApplicationBootstrap {
                     instagramAccountId =
                       channelSeed.credentials.instagramAccountId;
                   }
+                  if ('telegramBotId' in channelSeed.credentials) {
+                    telegramBotId = String(
+                      channelSeed.credentials.telegramBotId,
+                    );
+                  }
+                  if (
+                    'botToken' in channelSeed.credentials &&
+                    typeof channelSeed.credentials.botToken === 'string'
+                  ) {
+                    const fromToken = parseTelegramBotIdFromToken(
+                      channelSeed.credentials.botToken,
+                    );
+                    if (fromToken) {
+                      telegramBotId = telegramBotId ?? fromToken;
+                    }
+                  }
                 }
                 if (channelSeed.routingIdentifier?.trim()) {
                   const rid = channelSeed.routingIdentifier.trim();
@@ -411,6 +432,8 @@ export class SeederService implements OnApplicationBootstrap {
                     instagramAccountId = instagramAccountId ?? rid;
                   } else if (channelInfo.channel.type === 'tiktok') {
                     tiktokUserId = tiktokUserId ?? rid;
+                  } else if (channelInfo.channel.type === 'telegram') {
+                    telegramBotId = telegramBotId ?? rid;
                   }
                 }
 
@@ -445,12 +468,28 @@ export class SeederService implements OnApplicationBootstrap {
                   }
                 }
 
-                const credentialsToStore =
+                let credentialsToStore: Record<string, unknown> | undefined;
+                if (
                   channelSeed.credentials &&
                   typeof channelSeed.credentials === 'object' &&
                   Object.keys(channelSeed.credentials).length > 0
-                    ? encryptRecord(channelSeed.credentials)
-                    : undefined;
+                ) {
+                  if (channelInfo.channel.type === 'telegram') {
+                    const bt = (channelSeed.credentials as any).botToken;
+                    if (
+                      typeof bt !== 'string' ||
+                      !isValidTelegramBotTokenShape(bt)
+                    ) {
+                      this.logger.warn(
+                        `Skipping Telegram channel seed: invalid botToken for user additional hiring.`,
+                      );
+                      continue;
+                    }
+                    credentialsToStore = encryptRecord({ botToken: bt });
+                  } else {
+                    credentialsToStore = encryptRecord(channelSeed.credentials);
+                  }
+                }
 
                 additionalChannels.push({
                   channelId: channelInfo.channel._id as Types.ObjectId,
@@ -460,6 +499,7 @@ export class SeederService implements OnApplicationBootstrap {
                   phoneNumberId,
                   tiktokUserId,
                   instagramAccountId,
+                  telegramBotId,
                   amount: 0,
                   currency: client.billingCurrency,
                   monthlyMessageQuota:

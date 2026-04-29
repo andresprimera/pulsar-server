@@ -3,5 +3,6 @@ export enum ChannelProvider {
   Twilio = 'twilio',
   Tiktok = 'tiktok',
   Instagram = 'instagram',
+  Telegram = 'telegram',
   Dialog360 = 'dialog360',
 }

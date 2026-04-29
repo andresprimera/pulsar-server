@@ -21,6 +21,10 @@ import { AgentPriceRepository } from '@persistence/repositories/agent-price.repo
 import { ChannelPriceRepository } from '@persistence/repositories/channel-price.repository';
 import { ClientPhoneRepository } from '@persistence/repositories/client-phone.repository';
 import { encryptRecord, encrypt } from '@shared/crypto.util';
+import {
+  isValidTelegramBotTokenShape,
+  parseTelegramBotIdFromToken,
+} from '@shared/telegram-webhook-secret.util';
 
 export interface RegisterAndHireResult {
   user: {
@@ -255,6 +259,7 @@ export class OnboardingService {
         let phoneNumberId: string | undefined;
         let tiktokUserId: string | undefined;
         let instagramAccountId: string | undefined;
+        let telegramBotId: string | undefined;
 
         if (
           channelConfig.credentials &&
@@ -269,6 +274,20 @@ export class OnboardingService {
           if ('instagramAccountId' in channelConfig.credentials) {
             instagramAccountId = channelConfig.credentials.instagramAccountId;
           }
+          if ('telegramBotId' in channelConfig.credentials) {
+            telegramBotId = String(channelConfig.credentials.telegramBotId);
+          }
+          if (
+            'botToken' in channelConfig.credentials &&
+            typeof channelConfig.credentials.botToken === 'string'
+          ) {
+            const fromToken = parseTelegramBotIdFromToken(
+              channelConfig.credentials.botToken,
+            );
+            if (fromToken) {
+              telegramBotId = telegramBotId ?? fromToken;
+            }
+          }
         }
         if (channelConfig.routingIdentifier?.trim()) {
           const rid = channelConfig.routingIdentifier.trim();
@@ -278,15 +297,18 @@ export class OnboardingService {
             instagramAccountId = instagramAccountId ?? rid;
           } else if (channel.type === 'tiktok') {
             tiktokUserId = tiktokUserId ?? rid;
+          } else if (channel.type === 'telegram') {
+            telegramBotId = telegramBotId ?? rid;
           }
         }
 
         const needsRoutingId =
           channel.type === 'whatsapp' ||
           channel.type === 'instagram' ||
-          channel.type === 'tiktok';
+          channel.type === 'tiktok' ||
+          channel.type === 'telegram';
         const hasRoutingId =
-          phoneNumberId || tiktokUserId || instagramAccountId;
+          phoneNumberId || tiktokUserId || instagramAccountId || telegramBotId;
         if (needsRoutingId && !hasRoutingId && !platformHosted) {
           throw new BadRequestException(
             `Channel "${channel.name}" requires either credentials (with the appropriate routing field) or routingIdentifier.`,
@@ -310,9 +332,19 @@ export class OnboardingService {
           typeof channelConfig.credentials === 'object' &&
           Object.keys(channelConfig.credentials).length > 0
         ) {
-          credentialsToStore = encryptRecord({
-            ...channelConfig.credentials,
-          });
+          if (channel.type === 'telegram') {
+            const bt = channelConfig.credentials.botToken;
+            if (typeof bt !== 'string' || !isValidTelegramBotTokenShape(bt)) {
+              throw new BadRequestException(
+                'Telegram requires botToken in credentials (format: <bot_id>:<secret>)',
+              );
+            }
+            credentialsToStore = encryptRecord({ botToken: bt });
+          } else {
+            credentialsToStore = encryptRecord({
+              ...channelConfig.credentials,
+            });
+          }
         }
 
         hireChannels.push({
@@ -323,6 +355,7 @@ export class OnboardingService {
           phoneNumberId,
           tiktokUserId,
           instagramAccountId,
+          telegramBotId,
           amount: channelAmount,
           currency: billingCurrency,
           monthlyMessageQuota: channelMonthlyMessageQuota,

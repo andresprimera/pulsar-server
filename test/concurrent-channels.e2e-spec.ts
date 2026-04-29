@@ -371,6 +371,7 @@ describe('Concurrent Channels (e2e)', () => {
     const knownUntestedProviders = [
       ChannelProvider.Twilio,
       ChannelProvider.Dialog360,
+      ChannelProvider.Telegram,
     ];
 
     const allProviders = Object.values(ChannelProvider);

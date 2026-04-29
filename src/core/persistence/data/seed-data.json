@@ -140,6 +140,11 @@
       "name": "Instagram",
       "type": "instagram",
       "supportedProviders": ["instagram"]
+    },
+    {
+      "name": "Telegram",
+      "type": "telegram",
+      "supportedProviders": ["telegram"]
     }
   ],
   "users": [

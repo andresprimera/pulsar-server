@@ -14,6 +14,10 @@ import { AgentPriceRepository } from '@persistence/repositories/agent-price.repo
 import { ChannelPriceRepository } from '@persistence/repositories/channel-price.repository';
 import { PersonalityRepository } from '@persistence/repositories/personality.repository';
 import { encryptRecord } from '@shared/crypto.util';
+import {
+  isValidTelegramBotTokenShape,
+  parseTelegramBotIdFromToken,
+} from '@shared/telegram-webhook-secret.util';
 
 import { assertCurrencyMatch } from '@domain/billing/currency.validator';
 import { CreateClientAgentDto } from './dto/create-client-agent.dto';
@@ -169,7 +173,25 @@ export class ClientAgentsService {
         instagramAccountId = channelConfig.credentials.instagramAccountId;
       }
 
-      const credentialsToStore = channelConfig.credentials;
+      let telegramBotId: string | undefined;
+      let credentialsToStore = channelConfig.credentials;
+      if (channel.type === 'telegram') {
+        const botToken = channelConfig.credentials?.botToken;
+        if (
+          typeof botToken !== 'string' ||
+          !isValidTelegramBotTokenShape(botToken)
+        ) {
+          throw new BadRequestException(
+            'Telegram requires botToken in credentials (format: <bot_id>:<secret>)',
+          );
+        }
+        const parsedId = parseTelegramBotIdFromToken(botToken);
+        if (!parsedId) {
+          throw new BadRequestException('Invalid Telegram bot token');
+        }
+        telegramBotId = parsedId;
+        credentialsToStore = { botToken };
+      }
 
       channels.push({
         channelId: channelIdObj,
@@ -179,6 +201,7 @@ export class ClientAgentsService {
         phoneNumberId,
         tiktokUserId,
         instagramAccountId,
+        telegramBotId,
         amount: channelAmount,
         currency,
         monthlyMessageQuota: channelMonthlyMessageQuota,

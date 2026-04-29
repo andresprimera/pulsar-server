@@ -173,7 +173,7 @@ describe('Seeder (e2e)', () => {
   });
 
   describe('Channel Infrastructure Tests', () => {
-    it('should provision WhatsApp, TikTok, and Instagram channels', async () => {
+    it('should provision WhatsApp, TikTok, Instagram, and Telegram channels', async () => {
       const whatsappChannel = await connection
         .collection('channels')
         .findOne({ name: 'WhatsApp' });
@@ -194,6 +194,13 @@ describe('Seeder (e2e)', () => {
 
       expect(instagramChannel).toBeDefined();
       expect(instagramChannel.type).toBe('instagram');
+
+      const telegramChannel = await connection
+        .collection('channels')
+        .findOne({ name: 'Telegram' });
+
+      expect(telegramChannel).toBeDefined();
+      expect(telegramChannel.type).toBe('telegram');
     });
 
     it('should set correct supportedProviders for channels', async () => {
@@ -215,6 +222,12 @@ describe('Seeder (e2e)', () => {
         .findOne({ name: 'Instagram' });
 
       expect(instagramChannel.supportedProviders).toContain('instagram');
+
+      const telegramChannel = await connection
+        .collection('channels')
+        .findOne({ name: 'Telegram' });
+
+      expect(telegramChannel.supportedProviders).toContain('telegram');
     });
   });
 

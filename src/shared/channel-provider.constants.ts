@@ -8,6 +8,7 @@ export const CHANNEL_PROVIDER_VALUES = [
   'twilio',
   'tiktok',
   'instagram',
+  'telegram',
   'dialog360',
 ] as const;
 

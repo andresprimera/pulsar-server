@@ -117,7 +117,7 @@ class HireChannelConfigDto {
   @IsObject()
   credentials?: Record<string, any>;
 
-  /** Routing identifier for the channel (e.g. phoneNumberId for WhatsApp, instagramAccountId for Instagram). Required when credentials are omitted. */
+  /** Routing identifier for the channel (e.g. phoneNumberId for WhatsApp, instagramAccountId for Instagram, telegramBotId for Telegram). Required when credentials are omitted. */
   @IsOptional()
   @IsString()
   routingIdentifier?: string;

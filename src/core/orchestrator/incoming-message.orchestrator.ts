@@ -66,6 +66,7 @@ export class IncomingMessageOrchestrator {
         fallbackConfig?.phoneNumberId ??
         fallbackConfig?.instagramAccountId ??
         fallbackConfig?.tiktokUserId ??
+        fallbackConfig?.telegramBotId ??
         event.routeChannelIdentifier;
       return {
         reply: {
@@ -171,6 +172,7 @@ export class IncomingMessageOrchestrator {
       channelConfig.phoneNumberId ??
       channelConfig.instagramAccountId ??
       channelConfig.tiktokUserId ??
+      channelConfig.telegramBotId ??
       event.routeChannelIdentifier;
     return {
       ...output,
@@ -190,6 +192,8 @@ export class IncomingMessageOrchestrator {
         return 'Instagram';
       case CHANNEL_TYPES.TIKTOK:
         return 'TikTok';
+      case CHANNEL_TYPES.TELEGRAM:
+        return 'Telegram';
       default:
         return channelId || 'Channel';
     }
