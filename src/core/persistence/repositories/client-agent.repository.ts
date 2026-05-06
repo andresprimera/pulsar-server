@@ -216,4 +216,77 @@ export class ClientAgentRepository {
       })
       .exec();
   }
+
+  async findActiveByTelegramBotIdForWebhookRegistration(
+    telegramBotId: string,
+  ): Promise<ClientAgent[]> {
+    return this.model
+      .find({
+        status: 'active',
+        channels: { $elemMatch: { status: 'active', telegramBotId } },
+      })
+      .select(
+        '_id channels.channelId channels.provider channels.status ' +
+          'channels.telegramBotId channels.telegramWebhookSecretHex ' +
+          'channels.credentials channels.webhookRegistration',
+      )
+      .select('+channels.credentials')
+      .exec();
+  }
+
+  async updateWebhookRegistrationByTelegramBotId(input: {
+    telegramBotId: string;
+    status: 'registering' | 'registered' | 'failed';
+    fingerprint?: string;
+    lastError?: string;
+  }): Promise<{ matched: boolean }> {
+    const now = new Date();
+
+    const $set: Record<string, unknown> = {
+      'channels.$[ch].webhookRegistration.status': input.status,
+      'channels.$[ch].webhookRegistration.lastAttemptAt': now,
+    };
+    if (input.fingerprint !== undefined) {
+      $set['channels.$[ch].webhookRegistration.fingerprint'] =
+        input.fingerprint;
+    }
+    if (input.status === 'registered') {
+      $set['channels.$[ch].webhookRegistration.registeredAt'] = now;
+      $set['channels.$[ch].webhookRegistration.lastError'] = null;
+    }
+    if (input.lastError !== undefined) {
+      $set['channels.$[ch].webhookRegistration.lastError'] = input.lastError;
+    }
+
+    const $inc: Record<string, number> = {
+      'channels.$[ch].webhookRegistration.attemptCount': 1,
+    };
+
+    const filter: Record<string, unknown> = {
+      status: 'active',
+      channels: {
+        $elemMatch: { status: 'active', telegramBotId: input.telegramBotId },
+      },
+    };
+
+    const arrayFilterCh: Record<string, unknown> = {
+      'ch.status': 'active',
+      'ch.telegramBotId': input.telegramBotId,
+    };
+    if (input.status === 'registering' && input.fingerprint !== undefined) {
+      arrayFilterCh['ch.webhookRegistration.fingerprint'] = {
+        $ne: input.fingerprint,
+      };
+    }
+
+    const res = await this.model
+      .updateOne(
+        filter,
+        { $set, $inc },
+        { arrayFilters: [{ ch: arrayFilterCh }] },
+      )
+      .exec();
+
+    return { matched: res.matchedCount > 0 && res.modifiedCount > 0 };
+  }
 }

@@ -26,7 +26,11 @@ import { UpdateClientAgentDto } from './dto/update-client-agent.dto';
 import { UpdateClientAgentStatusDto } from './dto/update-client-agent-status.dto';
 import { ClientsService } from '@clients/clients.service';
 import { AgentsService } from '@agents/agents.service';
-import { ClientAgent } from '@persistence/schemas/client-agent.schema';
+import {
+  ClientAgent,
+  HireChannelConfig,
+} from '@persistence/schemas/client-agent.schema';
+import { WebhookRegistrationCoordinator } from '@orchestrator/jobs/webhook/webhook-registration.coordinator';
 
 @Injectable()
 export class ClientAgentsService {
@@ -41,7 +45,41 @@ export class ClientAgentsService {
     private readonly agentPriceRepository: AgentPriceRepository,
     private readonly channelPriceRepository: ChannelPriceRepository,
     private readonly personalityRepository: PersonalityRepository,
+    private readonly webhookRegistrationCoordinator: WebhookRegistrationCoordinator,
   ) {}
+
+  private collectActiveTelegramBotIds(agent: ClientAgent | null): string[] {
+    if (!agent) return [];
+    return (agent.channels ?? [])
+      .filter(
+        (c: HireChannelConfig) =>
+          c.provider === 'telegram' &&
+          c.status === 'active' &&
+          typeof c.telegramBotId === 'string' &&
+          c.telegramBotId.length > 0,
+      )
+      .map((c: HireChannelConfig) => c.telegramBotId as string);
+  }
+
+  private async triggerTelegramWebhookRegistration(
+    agent: ClientAgent,
+  ): Promise<void> {
+    if (agent.status !== 'active') return;
+    const telegramBotIds = this.collectActiveTelegramBotIds(agent);
+    if (telegramBotIds.length === 0) return;
+    try {
+      await this.webhookRegistrationCoordinator.enqueueForTelegramChannels({
+        clientAgentId: String((agent as any)._id ?? (agent as any).id),
+        telegramBotIds,
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Telegram webhook registration enqueue failed for clientAgentId=${
+          (agent as any)._id ?? (agent as any).id
+        }: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
 
   async create(data: CreateClientAgentDto): Promise<ClientAgent> {
     if (!Array.isArray(data.channels) || data.channels.length === 0) {
@@ -225,8 +263,9 @@ export class ClientAgentsService {
 
     const supplementTrimmed = data.promptSupplement?.trim();
 
+    let created: ClientAgent;
     try {
-      return await this.clientAgentRepository.create({
+      created = await this.clientAgentRepository.create({
         clientId: data.clientId,
         agentId: data.agentId,
         personalityId: new Types.ObjectId(data.personalityId),
@@ -243,6 +282,9 @@ export class ClientAgentsService {
       }
       throw error;
     }
+
+    await this.triggerTelegramWebhookRegistration(created);
+    return created;
   }
 
   async findByClient(clientId: string): Promise<ClientAgent[]> {
@@ -318,6 +360,8 @@ export class ClientAgentsService {
       throw new BadRequestException('Cannot modify archived ClientAgent');
     }
 
+    const previousStatus = clientAgent.status;
+
     const updated = await this.clientAgentRepository.update(id, {
       status: data.status,
     });
@@ -329,6 +373,10 @@ export class ClientAgentsService {
       this.logger.log(
         `[ClientAgent] Archived ClientAgent clientId=${clientAgent.clientId}, agentId=${clientAgent.agentId} (Channels embedded)`,
       );
+    }
+
+    if (previousStatus !== 'active' && updated.status === 'active') {
+      await this.triggerTelegramWebhookRegistration(updated);
     }
 
     return updated;

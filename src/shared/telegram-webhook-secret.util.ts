@@ -10,6 +10,21 @@ export function deriveTelegramWebhookSecret(botToken: string): string {
   return createHash('sha256').update(botToken, 'utf8').digest('hex');
 }
 
+/**
+ * Deterministic fingerprint for a registered Telegram webhook.
+ * Combines the full webhook URL and the derived `secret_token` so two registrations
+ * for the same bot are idempotent if and only if both the URL and secret match.
+ *
+ * Both the registrar (BullMQ processor) and TelegramService MUST use this single
+ * function so the on-disk fingerprint cannot drift between writers.
+ */
+export function computeTelegramWebhookFingerprint(
+  url: string,
+  secretToken: string,
+): string {
+  return createHash('sha256').update(`${url}|${secretToken}`).digest('hex');
+}
+
 export function parseTelegramBotIdFromToken(botToken: string): string | null {
   if (!BOT_TOKEN_PATTERN.test(botToken)) {
     return null;

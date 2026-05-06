@@ -1,9 +1,21 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { decryptRecord } from '@shared/crypto.util';
+import {
+  computeTelegramWebhookFingerprint,
+  deriveTelegramWebhookSecret,
+} from '@shared/telegram-webhook-secret.util';
 import { CHANNEL_TYPES } from '@domain/channels/channel-type.constants';
 import { IncomingMessageOrchestrator } from '@orchestrator/incoming-message.orchestrator';
 import { TelegramWebhookAuthService } from '@orchestrator/telegram-webhook-auth.service';
 import { IncomingChannelEvent } from '@domain/channels/incoming-channel-event.interface';
+import { RecoverableJobError } from '@orchestrator/errors/job-errors';
+import {
+  ChannelLifecycleAdapter,
+  RegisterWebhookInput,
+  RegisterWebhookResult,
+} from '@channels/channel-lifecycle-adapter.interface';
+
+const TELEGRAM_WEBHOOK_HTTP_TIMEOUT_MS = 5_000;
 
 interface ParsedTelegramTextMessage {
   text: string;
@@ -15,6 +27,12 @@ interface ParsedTelegramTextMessage {
 @Injectable()
 export class TelegramService {
   private readonly logger = new Logger(TelegramService.name);
+
+  readonly lifecycle: ChannelLifecycleAdapter = {
+    channel: CHANNEL_TYPES.TELEGRAM,
+    registerWebhook: (input: RegisterWebhookInput) =>
+      this.registerWebhookForInput(input),
+  };
 
   constructor(
     private readonly incomingMessageOrchestrator: IncomingMessageOrchestrator,
@@ -161,5 +179,123 @@ export class TelegramService {
     }
 
     this.logger.log(`[Telegram] Message sent successfully to chatId=${chatId}`);
+  }
+
+  private async registerWebhookForInput(
+    input: RegisterWebhookInput,
+  ): Promise<RegisterWebhookResult> {
+    let botToken: string;
+    if (input.kind === 'plaintext') {
+      botToken = input.botToken;
+    } else {
+      const decrypted = decryptRecord(input.encryptedCredentials);
+      const token = decrypted?.botToken;
+      if (typeof token !== 'string' || !token.length) {
+        throw new Error('[Telegram] Missing botToken in credentials');
+      }
+      botToken = token;
+    }
+
+    return this.registerWebhookOnce({
+      telegramBotId: input.telegramBotId,
+      botToken,
+      publicBaseUrl: input.publicBaseUrl,
+    });
+  }
+
+  private async registerWebhookOnce(input: {
+    telegramBotId: string;
+    botToken: string;
+    publicBaseUrl: string;
+  }): Promise<RegisterWebhookResult> {
+    const url = `${input.publicBaseUrl}/telegram/webhook/${input.telegramBotId}`;
+    const secretToken = deriveTelegramWebhookSecret(input.botToken);
+    const fingerprint = computeTelegramWebhookFingerprint(url, secretToken);
+
+    const apiUrl = `https://api.telegram.org/bot${input.botToken}/setWebhook`;
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      TELEGRAM_WEBHOOK_HTTP_TIMEOUT_MS,
+    );
+
+    let response: Response;
+    try {
+      response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url,
+          secret_token: secretToken,
+          drop_pending_updates: false,
+          allowed_updates: ['message'],
+        }),
+        signal: controller.signal,
+      });
+    } catch (err) {
+      const message = this.sanitizeTelegramMessage(
+        err instanceof Error ? err.message : String(err),
+        input.botToken,
+      );
+      throw new RecoverableJobError(
+        `[Telegram] setWebhook network/timeout: ${message}`,
+        err,
+      );
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    const status = response.status;
+
+    let bodyText = '';
+    try {
+      bodyText = await response.text();
+    } catch {
+      bodyText = '';
+    }
+    const sanitizedBody = this.sanitizeTelegramMessage(
+      bodyText,
+      input.botToken,
+    );
+
+    if (status >= 200 && status < 300) {
+      let body: { ok?: boolean; description?: string } | null = null;
+      try {
+        body = bodyText ? JSON.parse(bodyText) : null;
+      } catch {
+        body = null;
+      }
+      if (body && body.ok === true) {
+        return { registered: true, fingerprint };
+      }
+      const description = body?.description
+        ? this.sanitizeTelegramMessage(body.description, input.botToken)
+        : sanitizedBody || `status=${status}`;
+      return { registered: false, fingerprint, error: description };
+    }
+
+    if (status === 400 || status === 401 || status === 403) {
+      return {
+        registered: false,
+        fingerprint,
+        error: `Telegram setWebhook rejected: status=${status} body=${sanitizedBody}`,
+      };
+    }
+
+    if (status === 429 || status >= 500) {
+      throw new RecoverableJobError(
+        `[Telegram] setWebhook transient failure: status=${status} body=${sanitizedBody}`,
+      );
+    }
+
+    throw new RecoverableJobError(
+      `[Telegram] setWebhook unexpected status=${status} body=${sanitizedBody}`,
+    );
+  }
+
+  private sanitizeTelegramMessage(message: string, botToken: string): string {
+    if (!message) return '';
+    const escaped = botToken.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return message.replace(new RegExp(escaped, 'g'), '[REDACTED]');
   }
 }

@@ -22,6 +22,35 @@ export const AgentPricingSnapshotSchema =
   SchemaFactory.createForClass(AgentPricingSnapshot);
 
 @Schema({ _id: false })
+export class WebhookRegistrationState {
+  @Prop({
+    type: String,
+    required: true,
+    enum: ['registering', 'registered', 'failed'],
+  })
+  status: 'registering' | 'registered' | 'failed';
+
+  @Prop({ type: Date, required: false })
+  lastAttemptAt?: Date;
+
+  @Prop({ type: Date, required: false })
+  registeredAt?: Date;
+
+  @Prop({ type: Number, required: true, default: 0 })
+  attemptCount: number;
+
+  @Prop({ type: String, required: false, maxlength: 500 })
+  lastError?: string;
+
+  @Prop({ type: String, required: false })
+  fingerprint?: string;
+}
+
+export const WebhookRegistrationStateSchema = SchemaFactory.createForClass(
+  WebhookRegistrationState,
+);
+
+@Schema({ _id: false })
 export class HireChannelConfig {
   @Prop({ type: Types.ObjectId, ref: 'Channel', required: true })
   channelId: Types.ObjectId;
@@ -60,6 +89,9 @@ export class HireChannelConfig {
 
   @Prop({ type: Number, default: null })
   monthlyMessageQuota: number | null;
+
+  @Prop({ type: WebhookRegistrationStateSchema, required: false })
+  webhookRegistration?: WebhookRegistrationState;
 }
 
 export const HireChannelConfigSchema =
@@ -127,3 +159,44 @@ ClientAgentSchema.index({ status: 1, 'channels.tiktokUserId': 1 });
 ClientAgentSchema.index({ status: 1, 'channels.instagramAccountId': 1 });
 ClientAgentSchema.index({ status: 1, 'channels.telegramBotId': 1 });
 ClientAgentSchema.index({ 'channels.status': 1 });
+ClientAgentSchema.index({
+  status: 1,
+  'channels.telegramBotId': 1,
+  'channels.webhookRegistration.status': 1,
+});
+
+function truncateLastErrorOnDoc(channels: unknown): void {
+  if (!Array.isArray(channels)) return;
+  for (const ch of channels) {
+    const wr = (ch as { webhookRegistration?: { lastError?: unknown } })
+      ?.webhookRegistration;
+    if (wr && typeof wr.lastError === 'string' && wr.lastError.length > 500) {
+      wr.lastError = wr.lastError.slice(0, 500);
+    }
+  }
+}
+
+ClientAgentSchema.pre('save', function (next) {
+  truncateLastErrorOnDoc((this as any).channels);
+  next();
+});
+
+ClientAgentSchema.pre(
+  ['updateOne', 'findOneAndUpdate', 'updateMany'],
+  function (next) {
+    const update: any = (this as any).getUpdate?.() ?? {};
+    const set = update.$set ?? update;
+    for (const key of Object.keys(set)) {
+      if (
+        /^channels\.\$\.webhookRegistration\.lastError$/.test(key) ||
+        /^channels\.\$\[.*?\]\.webhookRegistration\.lastError$/.test(key) ||
+        /^channels\.\d+\.webhookRegistration\.lastError$/.test(key)
+      ) {
+        if (typeof set[key] === 'string' && set[key].length > 500) {
+          set[key] = set[key].slice(0, 500);
+        }
+      }
+    }
+    next();
+  },
+);

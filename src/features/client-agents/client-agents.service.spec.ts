@@ -13,6 +13,7 @@ import { ClientPhoneRepository } from '@persistence/repositories/client-phone.re
 import { AgentPriceRepository } from '@persistence/repositories/agent-price.repository';
 import { ChannelPriceRepository } from '@persistence/repositories/channel-price.repository';
 import { PersonalityRepository } from '@persistence/repositories/personality.repository';
+import { WebhookRegistrationCoordinator } from '@orchestrator/jobs/webhook/webhook-registration.coordinator';
 
 describe('ClientAgentsService', () => {
   let service: ClientAgentsService;
@@ -24,6 +25,7 @@ describe('ClientAgentsService', () => {
   let mockAgentPriceRepository: any;
   let mockChannelPriceRepository: any;
   let mockPersonalityRepository: any;
+  let mockWebhookRegistrationCoordinator: any;
 
   const mockClientAgent = {
     id: 'ca-1',
@@ -97,6 +99,10 @@ describe('ClientAgentsService', () => {
       findActiveById: jest.fn().mockResolvedValue(mockPersonality),
     };
 
+    mockWebhookRegistrationCoordinator = {
+      enqueueForTelegramChannels: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ClientAgentsService,
@@ -131,6 +137,10 @@ describe('ClientAgentsService', () => {
         {
           provide: PersonalityRepository,
           useValue: mockPersonalityRepository,
+        },
+        {
+          provide: WebhookRegistrationCoordinator,
+          useValue: mockWebhookRegistrationCoordinator,
         },
       ],
     }).compile();
@@ -563,6 +573,186 @@ describe('ClientAgentsService', () => {
       mockClientAgentRepository.findByClientAndStatus.mockResolvedValue([]);
       const result = await service.calculateClientTotal('client-1');
       expect(result).toEqual({ total: 0, currency: 'USD' });
+    });
+  });
+
+  describe('telegram webhook registration triggers', () => {
+    const baseDto: any = {
+      clientId: '507f1f77bcf86cd799439011',
+      agentId: '507f1f77bcf86cd799439012',
+      personalityId: '507f1f77bcf86cd799439099',
+      channels: [
+        {
+          channelId: '507f1f77bcf86cd799439013',
+          provider: 'telegram',
+          credentials: {
+            botToken: '123456789:ABCDEF1234567890abcdef1234567890ABC',
+          },
+        },
+      ],
+    };
+
+    function setupCommonMocks() {
+      mockClientsService.findById.mockResolvedValue(mockClient);
+      mockAgentsService.findOne.mockResolvedValue(mockAgent);
+      mockAgentPriceRepository.findActiveByAgentAndCurrency.mockResolvedValue({
+        amount: 100,
+      });
+      mockChannelPriceRepository.findActiveByChannelAndCurrency.mockResolvedValue(
+        { amount: 0 },
+      );
+      mockClientAgentRepository.findByClientAndAgent.mockResolvedValue(null);
+      mockChannelRepository.findByIdOrFail.mockResolvedValue({
+        _id: '507f1f77bcf86cd799439013',
+        name: 'Telegram',
+        type: 'telegram',
+        supportedProviders: ['telegram'],
+        monthlyMessageQuota: null,
+      });
+    }
+
+    it('enqueues registration after create when telegram channel is active', async () => {
+      setupCommonMocks();
+      mockClientAgentRepository.create.mockResolvedValue({
+        _id: 'ca-tg-1',
+        status: 'active',
+        channels: [
+          {
+            provider: 'telegram',
+            status: 'active',
+            telegramBotId: '123456789',
+          },
+        ],
+      });
+
+      await service.create(baseDto as any);
+
+      expect(
+        mockWebhookRegistrationCoordinator.enqueueForTelegramChannels,
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({
+          clientAgentId: 'ca-tg-1',
+          telegramBotIds: ['123456789'],
+        }),
+      );
+    });
+
+    it('does not enqueue for non-telegram channels on create', async () => {
+      setupCommonMocks();
+      mockClientAgentRepository.create.mockResolvedValue({
+        _id: 'ca-1',
+        status: 'active',
+        channels: [
+          {
+            provider: 'instagram',
+            status: 'active',
+            instagramAccountId: 'i-1',
+          },
+        ],
+      });
+
+      const instagramDto = {
+        ...baseDto,
+        channels: [
+          {
+            channelId: '507f1f77bcf86cd799439013',
+            provider: 'instagram',
+            credentials: { instagramAccountId: '17841400000000009' },
+          },
+        ],
+      };
+      mockChannelRepository.findByIdOrFail.mockResolvedValue({
+        _id: '507f1f77bcf86cd799439013',
+        name: 'Instagram',
+        type: 'instagram',
+        supportedProviders: ['instagram'],
+        monthlyMessageQuota: null,
+      });
+
+      await service.create(instagramDto as any);
+
+      expect(
+        mockWebhookRegistrationCoordinator.enqueueForTelegramChannels,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('does not roll back create when coordinator throws', async () => {
+      setupCommonMocks();
+      mockWebhookRegistrationCoordinator.enqueueForTelegramChannels.mockRejectedValue(
+        new Error('queue down'),
+      );
+      const created = {
+        _id: 'ca-tg-2',
+        status: 'active',
+        channels: [
+          {
+            provider: 'telegram',
+            status: 'active',
+            telegramBotId: '123456789',
+          },
+        ],
+      };
+      mockClientAgentRepository.create.mockResolvedValue(created);
+
+      const result = await service.create(baseDto as any);
+      expect(result).toBe(created);
+    });
+
+    it('enqueues registration after updateStatus transitions inactive to active', async () => {
+      mockClientAgentRepository.findById.mockResolvedValue({
+        _id: 'ca-1',
+        status: 'inactive',
+        clientId: 'client-1',
+        agentId: 'agent-1',
+      });
+      mockClientAgentRepository.update.mockResolvedValue({
+        _id: 'ca-1',
+        status: 'active',
+        channels: [
+          {
+            provider: 'telegram',
+            status: 'active',
+            telegramBotId: '987654321',
+          },
+        ],
+      });
+
+      await service.updateStatus('ca-1', { status: 'active' });
+
+      expect(
+        mockWebhookRegistrationCoordinator.enqueueForTelegramChannels,
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({
+          clientAgentId: 'ca-1',
+          telegramBotIds: ['987654321'],
+        }),
+      );
+    });
+
+    it('does not enqueue when updateStatus stays active or transitions to non-active', async () => {
+      mockClientAgentRepository.findById.mockResolvedValue({
+        _id: 'ca-1',
+        status: 'active',
+        clientId: 'client-1',
+        agentId: 'agent-1',
+      });
+      mockClientAgentRepository.update.mockResolvedValue({
+        _id: 'ca-1',
+        status: 'inactive',
+        channels: [
+          {
+            provider: 'telegram',
+            status: 'active',
+            telegramBotId: '987654321',
+          },
+        ],
+      });
+
+      await service.updateStatus('ca-1', { status: 'inactive' });
+
+      expect(
+        mockWebhookRegistrationCoordinator.enqueueForTelegramChannels,
+      ).not.toHaveBeenCalled();
     });
   });
 });

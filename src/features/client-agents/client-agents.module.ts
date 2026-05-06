@@ -4,9 +4,10 @@ import { ClientAgentsController } from './client-agents.controller';
 import { DatabaseModule } from '@persistence/database.module';
 import { ClientsModule } from '@clients/clients.module';
 import { AgentsModule } from '@agents/agents.module';
+import { OrchestratorModule } from '@orchestrator/orchestrator.module';
 
 @Module({
-  imports: [DatabaseModule, ClientsModule, AgentsModule],
+  imports: [DatabaseModule, ClientsModule, AgentsModule, OrchestratorModule],
   controllers: [ClientAgentsController],
   providers: [ClientAgentsService],
 })

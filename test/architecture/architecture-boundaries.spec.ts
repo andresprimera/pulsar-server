@@ -138,6 +138,17 @@ describe('Architecture Boundaries', () => {
     }
   });
 
+  it('Telegram webhook registrar must not import persistence', () => {
+    const registrarPath = path.resolve(
+      SRC_ROOT,
+      'core/channels/telegram/webhook/telegram-webhook.registrar.ts',
+    );
+    expect(fs.existsSync(registrarPath)).toBe(true);
+    const content = fs.readFileSync(registrarPath, 'utf8');
+    expect(content).not.toMatch(/@persistence\//);
+    expect(content).not.toMatch(/from\s+['"][^'"]*core\/persistence\//);
+  });
+
   it('No relative parent imports across layers', () => {
     for (const file of files) {
       const content = fs.readFileSync(file, 'utf8');

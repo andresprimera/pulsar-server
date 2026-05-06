@@ -113,6 +113,15 @@ MessagingGatewayService → ChannelRouter → ChannelAdapter → ProviderRouter 
 -   Adding a new channel: (1) implement `ChannelAdapter`,
     (2) decorate with `@ChannelAdapterProvider()`,
     (3) import channel module in `MessagingGatewayModule`.
+-   Channel-side BullMQ processors that perform outbound provider lifecycle calls
+    (e.g. `TelegramWebhookRegistrar` calling Telegram's `setWebhook`) MAY import
+    `@orchestrator/errors` (for `PermanentJobError` / `RecoverableJobError`) and
+    `@orchestrator/observability/*` (for `JobMetricsService`, `DeadLetterService`).
+    This is the same `channels → orchestrator` edge already permitted by ESLint
+    boundaries (`.eslintrc.architecture.js`, `{ from: 'channels', allow: ['orchestrator', 'domain'] }`).
+    These processors MUST NOT import `@persistence/*` directly; persistence write-back
+    goes through a port symbol exported from `@shared/ports` whose adapter lives in
+    `persistence/` and is bound in `DatabaseModule`.
 
 ------------------------------------------------------------------------
 

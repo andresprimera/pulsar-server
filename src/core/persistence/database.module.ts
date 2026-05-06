@@ -53,6 +53,8 @@ import {
 import { ClientCatalogItemRepository } from './repositories/client-catalog-item.repository';
 import { EventIdempotencyService } from './event-idempotency.service';
 import { OnboardingModule } from '@onboarding/onboarding.module';
+import { HireChannelLifecycleAdapter } from './ports/hire-channel-lifecycle.adapter';
+import { HIRE_CHANNEL_LIFECYCLE_PORT } from '@shared/ports/hire-channel-lifecycle.port';
 
 const repositories = [
   ClientRepository,
@@ -106,7 +108,20 @@ const repositories = [
     ]),
     forwardRef(() => OnboardingModule),
   ],
-  providers: [...repositories, SeederService, EventIdempotencyService],
-  exports: [...repositories, EventIdempotencyService],
+  providers: [
+    ...repositories,
+    SeederService,
+    EventIdempotencyService,
+    HireChannelLifecycleAdapter,
+    {
+      provide: HIRE_CHANNEL_LIFECYCLE_PORT,
+      useClass: HireChannelLifecycleAdapter,
+    },
+  ],
+  exports: [
+    ...repositories,
+    EventIdempotencyService,
+    HIRE_CHANNEL_LIFECYCLE_PORT,
+  ],
 })
 export class DatabaseModule {}

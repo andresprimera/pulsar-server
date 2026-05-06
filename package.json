@@ -25,6 +25,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:integration": "jest --config ./test/jest-integration.json",
     "prepare": "husky",
     "seed": "ts-node src/core/persistence/seed.ts",
     "db:reset": "ts-node -r tsconfig-paths/register scripts/drop-db-and-seed.ts",

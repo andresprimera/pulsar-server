@@ -1,0 +1,27 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": ".",
+  "testEnvironment": "node",
+  "testRegex": "integration/.*\\.spec\\.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "moduleNameMapper": {
+    "^@core/(.*)$": "<rootDir>/../src/core/$1",
+    "^@channels/(.*)$": "<rootDir>/../src/core/channels/$1",
+    "^@agent/(.*)$": "<rootDir>/../src/core/agent/$1",
+    "^@orchestrator/(.*)$": "<rootDir>/../src/core/orchestrator/$1",
+    "^@persistence/(.*)$": "<rootDir>/../src/core/persistence/$1",
+    "^@domain/(.*)$": "<rootDir>/../src/core/domain/$1",
+    "^@shared/(.*)$": "<rootDir>/../src/shared/$1",
+    "^@agents/(.*)$": "<rootDir>/../src/features/agents/$1",
+    "^@clients/(.*)$": "<rootDir>/../src/features/clients/$1",
+    "^@client-agents/(.*)$": "<rootDir>/../src/features/client-agents/$1",
+    "^@users/(.*)$": "<rootDir>/../src/features/users/$1",
+    "^@onboarding/(.*)$": "<rootDir>/../src/features/onboarding/$1",
+    "^@client-context-suggestions/(.*)$": "<rootDir>/../src/features/client-context-suggestions/$1",
+    "^@client-catalog-items/(.*)$": "<rootDir>/../src/features/client-catalog-items/$1"
+  },
+  "testTimeout": 30000,
+  "maxWorkers": 1
+}

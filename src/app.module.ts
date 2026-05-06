@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { validateEnv } from './config/env.validate';
 import { AppController } from './app.controller';
 import { DatabaseModule } from './core/persistence/database.module';
 import { WhatsappModule } from './core/channels/whatsapp/whatsapp.module';
@@ -21,7 +22,7 @@ import { ClientCatalogItemsModule } from './features/client-catalog-items/client
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     DatabaseModule,
     WhatsappModule,
     MessagingGatewayModule,
