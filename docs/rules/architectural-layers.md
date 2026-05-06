@@ -29,6 +29,11 @@ Inbound message flow (orchestrator):
 6. Build AgentContext
 7. Agent execution (contact resolution, conversation resolution, AgentService)
 
+Inbound webhook authentication (transport → orchestrator, read-only persistence):
+
+- Transport parses the webhook and must not import repositories.
+- For Telegram, the coordination layer may perform a read-only hire lookup (for example `findActiveByTelegramBotIdForWebhookAuth`) and compare `X-Telegram-Bot-Api-Secret-Token` to stored `telegramWebhookSecretHex` on `HireChannelConfig` — no `credentials` decrypt. See `docs/rules/credential-encryption.md`.
+
 Outbound message flow (gateway):
 
 ```
