@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
 import { ClientAgentRepository } from './client-agent.repository';
+import {
+  CLIENT_AGENT_LIST_PROJECTION,
+  CLIENT_AGENT_LIST_PROJECTION_STRING,
+} from './client-agent.repository.constants';
 import { ClientAgent } from '@persistence/schemas/client-agent.schema';
 
 describe('ClientAgentRepository telegram webhook methods', () => {
@@ -12,6 +16,7 @@ describe('ClientAgentRepository telegram webhook methods', () => {
       find: jest.fn(),
       updateOne: jest.fn(),
       aggregate: jest.fn(),
+      countDocuments: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -326,6 +331,62 @@ describe('ClientAgentRepository telegram webhook methods', () => {
 
       expect(rows[0].attemptCount).toBe(0);
       expect(rows[0].currentStatus).toBeUndefined();
+    });
+  });
+
+  describe('findPageWithProjection', () => {
+    it('invokes model.find with the safe projection string and applies sort/skip/limit', async () => {
+      const exec = jest.fn().mockResolvedValue([{ _id: 'ca-1' }]);
+      const lean = jest.fn().mockReturnValue({ exec });
+      const limit = jest.fn().mockReturnValue({ lean });
+      const skip = jest.fn().mockReturnValue({ limit });
+      const sort = jest.fn().mockReturnValue({ skip });
+      mockModel.find.mockReturnValue({ sort });
+
+      const filter = { status: 'active' };
+      const result = await repository.findPageWithProjection(filter, {
+        skip: 10,
+        limit: 5,
+        sort: { createdAt: -1 },
+      });
+
+      expect(mockModel.find).toHaveBeenCalledWith(
+        filter,
+        CLIENT_AGENT_LIST_PROJECTION_STRING,
+      );
+      expect(sort).toHaveBeenCalledWith({ createdAt: -1 });
+      expect(skip).toHaveBeenCalledWith(10);
+      expect(limit).toHaveBeenCalledWith(5);
+      expect(lean).toHaveBeenCalled();
+      expect(result).toEqual([{ _id: 'ca-1' }]);
+    });
+  });
+
+  describe('CLIENT_AGENT_LIST_PROJECTION redaction guarantees', () => {
+    it('does not leak secret-bearing channel paths', () => {
+      expect(CLIENT_AGENT_LIST_PROJECTION).not.toContain(
+        'channels.credentials',
+      );
+      expect(CLIENT_AGENT_LIST_PROJECTION).not.toContain(
+        'channels.telegramWebhookSecretHex',
+      );
+      expect(CLIENT_AGENT_LIST_PROJECTION).not.toContain(
+        'channels.webhookRegistration.fingerprint',
+      );
+      expect(CLIENT_AGENT_LIST_PROJECTION).not.toContain('promptSupplement');
+    });
+  });
+
+  describe('countByFilter', () => {
+    it('invokes model.countDocuments with the given filter', async () => {
+      const exec = jest.fn().mockResolvedValue(7);
+      mockModel.countDocuments.mockReturnValue({ exec });
+
+      const filter = { clientId: 'client-1' };
+      const result = await repository.countByFilter(filter);
+
+      expect(mockModel.countDocuments).toHaveBeenCalledWith(filter);
+      expect(result).toBe(7);
     });
   });
 });

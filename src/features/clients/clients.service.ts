@@ -46,6 +46,11 @@ export class ClientsService {
     return client;
   }
 
+  async findManyByIds(ids: string[]): Promise<Client[]> {
+    if (ids.length === 0) return [];
+    return this.clientRepository.findManyByIds(ids);
+  }
+
   async update(id: string, dto: UpdateClientDto) {
     const existing = await this.findById(id);
 

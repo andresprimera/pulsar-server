@@ -20,6 +20,7 @@ describe('ClientsService', () => {
       findAll: jest.fn(),
       findById: jest.fn(),
       findByStatus: jest.fn(),
+      findManyByIds: jest.fn(),
       update: jest.fn(),
       updateWithQuery: jest.fn(),
     };
@@ -98,6 +99,23 @@ describe('ClientsService', () => {
       await expect(service.findById('unknown')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('findManyByIds', () => {
+    it('returns [] and does not call repo for empty input', async () => {
+      const result = await service.findManyByIds([]);
+      expect(result).toEqual([]);
+      expect(mockClientRepository.findManyByIds).not.toHaveBeenCalled();
+    });
+
+    it('passes non-empty input through to the repo', async () => {
+      mockClientRepository.findManyByIds.mockResolvedValue([mockClient]);
+      const result = await service.findManyByIds(['client-1']);
+      expect(mockClientRepository.findManyByIds).toHaveBeenCalledWith([
+        'client-1',
+      ]);
+      expect(result).toEqual([mockClient]);
     });
   });
 

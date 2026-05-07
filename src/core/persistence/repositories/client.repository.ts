@@ -23,6 +23,12 @@ export class ClientRepository {
     return this.model.find().exec();
   }
 
+  async findManyByIds(ids: string[]): Promise<Client[]> {
+    if (ids.length === 0) return [];
+    const dedupedIds = Array.from(new Set(ids));
+    return this.model.find({ _id: { $in: dedupedIds } }).exec();
+  }
+
   async findById(id: string): Promise<Client | null> {
     return this.model.findById(id).exec();
   }
