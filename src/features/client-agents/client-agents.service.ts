@@ -1,4 +1,5 @@
 import {
+  Inject,
   Injectable,
   NotFoundException,
   BadRequestException,
@@ -19,6 +20,10 @@ import {
   isValidTelegramBotTokenShape,
   parseTelegramBotIdFromToken,
 } from '@shared/telegram-webhook-secret.util';
+import {
+  HIRE_CHANNEL_LIFECYCLE_PORT,
+  HireChannelLifecyclePort,
+} from '@shared/ports/hire-channel-lifecycle.port';
 
 import { assertCurrencyMatch } from '@domain/billing/currency.validator';
 import { CreateClientAgentDto } from './dto/create-client-agent.dto';
@@ -30,7 +35,7 @@ import {
   ClientAgent,
   HireChannelConfig,
 } from '@persistence/schemas/client-agent.schema';
-import { WebhookRegistrationCoordinator } from '@orchestrator/jobs/webhook/webhook-registration.coordinator';
+import { HireChannelLifecyclePublisher } from '@orchestrator/lifecycle/hire-channel-lifecycle.publisher';
 
 @Injectable()
 export class ClientAgentsService {
@@ -45,7 +50,9 @@ export class ClientAgentsService {
     private readonly agentPriceRepository: AgentPriceRepository,
     private readonly channelPriceRepository: ChannelPriceRepository,
     private readonly personalityRepository: PersonalityRepository,
-    private readonly webhookRegistrationCoordinator: WebhookRegistrationCoordinator,
+    private readonly lifecyclePublisher: HireChannelLifecyclePublisher,
+    @Inject(HIRE_CHANNEL_LIFECYCLE_PORT)
+    private readonly lifecycle: HireChannelLifecyclePort,
   ) {}
 
   private collectActiveTelegramBotIds(agent: ClientAgent | null): string[] {
@@ -61,22 +68,52 @@ export class ClientAgentsService {
       .map((c: HireChannelConfig) => c.telegramBotId as string);
   }
 
+  /**
+   * Post-commit, pre-enqueue stamping of `pending` on every active telegram
+   * channel for this hire, followed by the happy-path BullMQ enqueue. The
+   * `pending` write uses a disjunctive `expectStatus` filter so:
+   *   - rows with `webhookRegistration` absent (legacy) get stamped to `pending`
+   *   - rows already in `pending`/`failed`/`registering` are re-stamped
+   *   - rows already in `registered` are NOT clobbered (registrar's
+   *     skip-if-fingerprint-matches path stays valid)
+   *   - rows already in `quarantined` are NOT clobbered (operator-only reset)
+   */
   private async triggerTelegramWebhookRegistration(
     agent: ClientAgent,
   ): Promise<void> {
     if (agent.status !== 'active') return;
     const telegramBotIds = this.collectActiveTelegramBotIds(agent);
     if (telegramBotIds.length === 0) return;
+
+    const clientAgentId = String((agent as any)._id ?? (agent as any).id);
+
+    for (const botId of telegramBotIds) {
+      try {
+        await this.lifecycle.recordOutcome({
+          telegramBotId: botId,
+          status: 'pending',
+          incrementAttempt: false,
+          expectStatus: ['absent', 'pending', 'failed', 'registering'],
+        });
+      } catch (err) {
+        this.logger.warn(
+          `event=hire_pending_stamp_failed botId=${botId} clientAgentId=${clientAgentId} error=${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
+
     try {
-      await this.webhookRegistrationCoordinator.enqueueForTelegramChannels({
-        clientAgentId: String((agent as any)._id ?? (agent as any).id),
+      await this.lifecyclePublisher.publishHappyPath({
+        clientAgentId,
         telegramBotIds,
       });
     } catch (err) {
       this.logger.warn(
-        `Telegram webhook registration enqueue failed for clientAgentId=${
-          (agent as any)._id ?? (agent as any).id
-        }: ${err instanceof Error ? err.message : String(err)}`,
+        `event=hire_lifecycle_happy_path_enqueue_failed clientAgentId=${clientAgentId} error=${
+          err instanceof Error ? err.message : String(err)
+        }`,
       );
     }
   }

@@ -53,6 +53,7 @@ orchestrator → agent\
 orchestrator → persistence — allowed only for:
   - Idempotency enforcement (Phase C), and
   - Read-only hire-channel queries used solely to authenticate inbound provider webhooks (for example: resolve an active hire by a stable routing id such as `telegramBotId`, compare a dedicated verification secret stored as plaintext verification material such as `telegramWebhookSecretHex`). These reads MUST NOT decrypt `credentials`, MUST NOT persist messages or conversations, and MUST use repository methods that do not select encrypted credential fields.
+  - Hire-lifecycle reconciliation writes to `client_agents.channels[].webhookRegistration` sub-documents (no credential decrypt, no writes outside the sub-document) flowing exclusively through the `HIRE_CHANNEL_LIFECYCLE_PORT` symbol bound in `DatabaseModule`.
 
 agent → domain\
 agent → persistence
@@ -150,7 +151,9 @@ Orchestrator owns inbound event lifecycle.
 - Directly persist messages
 - Access transport APIs
 
-Exception (narrow): orchestrator may call persistence for the read-only webhook authentication path described in section 1.1 (no credential decrypt; no writes).
+Exception (narrow, read-only): orchestrator may call persistence for the read-only webhook authentication path described in section 1.1 (no credential decrypt; no writes).
+
+Exception (narrow, lifecycle write-back): orchestrator may write to `client_agents.channels[].webhookRegistration` sub-documents through the `HIRE_CHANNEL_LIFECYCLE_PORT` symbol exported from `@shared/ports/hire-channel-lifecycle.port.ts`, exclusively for hire-lifecycle reconciliation of provider webhook registration (transitions among `pending`, `registering`, `registered`, `failed`, and `quarantined`, plus `attemptCount`, `lastAttemptAt`, `lastError`, `fingerprint`, `registeredAt`). This exception MUST NOT decrypt `credentials`, MUST NOT persist messages or conversations, and MUST NOT write outside the `webhookRegistration` sub-document. Persistence access flows exclusively through the port adapter bound in `DatabaseModule`; orchestrator code MUST NOT import `@persistence/repositories/*`.
 
 ---
 

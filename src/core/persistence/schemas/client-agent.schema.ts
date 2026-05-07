@@ -26,9 +26,9 @@ export class WebhookRegistrationState {
   @Prop({
     type: String,
     required: true,
-    enum: ['registering', 'registered', 'failed'],
+    enum: ['pending', 'registering', 'registered', 'failed', 'quarantined'],
   })
-  status: 'registering' | 'registered' | 'failed';
+  status: 'pending' | 'registering' | 'registered' | 'failed' | 'quarantined';
 
   @Prop({ type: Date, required: false })
   lastAttemptAt?: Date;

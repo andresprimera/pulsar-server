@@ -149,6 +149,24 @@ describe('Architecture Boundaries', () => {
     expect(content).not.toMatch(/from\s+['"][^'"]*core\/persistence\//);
   });
 
+  it('Orchestrator lifecycle services must not import persistence repositories', () => {
+    // Per .cursorrules §3 (lifecycle write-back exception): orchestrator may
+    // write to webhookRegistration sub-documents only through
+    // HIRE_CHANNEL_LIFECYCLE_PORT. Direct persistence repository imports are
+    // forbidden in the lifecycle subdirectory.
+    const lifecycleDir = path.resolve(SRC_ROOT, 'core/orchestrator/lifecycle');
+    expect(fs.existsSync(lifecycleDir)).toBe(true);
+    const lifecycleFiles = getAllFiles(lifecycleDir);
+    expect(lifecycleFiles.length).toBeGreaterThan(0);
+    for (const file of lifecycleFiles) {
+      const content = fs.readFileSync(file, 'utf8');
+      expect(content).not.toMatch(/@persistence\/repositories\//);
+      expect(content).not.toMatch(
+        /from\s+['"][^'"]*core\/persistence\/repositories\//,
+      );
+    }
+  });
+
   it('No relative parent imports across layers', () => {
     for (const file of files) {
       const content = fs.readFileSync(file, 'utf8');

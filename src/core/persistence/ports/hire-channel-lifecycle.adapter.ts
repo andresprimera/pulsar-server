@@ -3,6 +3,8 @@ import { ClientAgentRepository } from '@persistence/repositories/client-agent.re
 import { HireChannelConfig } from '@persistence/schemas/client-agent.schema';
 import {
   HireChannelLifecyclePort,
+  ReconcilableTelegramHire,
+  RecordOutcomeInput,
   WebhookRegistrationStateSnapshot,
 } from '@shared/ports/hire-channel-lifecycle.port';
 
@@ -10,12 +12,7 @@ import {
 export class HireChannelLifecycleAdapter implements HireChannelLifecyclePort {
   constructor(private readonly clientAgentRepository: ClientAgentRepository) {}
 
-  recordOutcome(input: {
-    telegramBotId: string;
-    status: 'registering' | 'registered' | 'failed';
-    fingerprint?: string;
-    lastError?: string;
-  }): Promise<{ matched: boolean }> {
+  recordOutcome(input: RecordOutcomeInput): Promise<{ matched: boolean }> {
     return this.clientAgentRepository.updateWebhookRegistrationByTelegramBotId(
       input,
     );
@@ -41,5 +38,20 @@ export class HireChannelLifecycleAdapter implements HireChannelLifecyclePort {
         ? { ...ch.webhookRegistration }
         : undefined,
     };
+  }
+
+  quarantineTelegramRegistration(input: {
+    telegramBotId: string;
+    lastError?: string;
+  }): Promise<{ matched: boolean }> {
+    return this.clientAgentRepository.quarantineWebhookRegistration(input);
+  }
+
+  findReconcilableTelegramHires(input: {
+    limit: number;
+    stuckRegisteringCutoff: Date;
+    quarantineThreshold: number;
+  }): Promise<ReconcilableTelegramHire[]> {
+    return this.clientAgentRepository.findReconcilableTelegramHires(input);
   }
 }

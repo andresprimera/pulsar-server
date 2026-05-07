@@ -11,6 +11,7 @@ describe('ClientAgentRepository telegram webhook methods', () => {
     mockModel = {
       find: jest.fn(),
       updateOne: jest.fn(),
+      aggregate: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -50,7 +51,7 @@ describe('ClientAgentRepository telegram webhook methods', () => {
   });
 
   describe('updateWebhookRegistrationByTelegramBotId', () => {
-    it('issues updateOne with arrayFilters containing botId and emits matched=true when both counts > 0', async () => {
+    it('does NOT $inc attemptCount by default (incrementAttempt omitted)', async () => {
       const exec = jest
         .fn()
         .mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
@@ -72,9 +73,7 @@ describe('ClientAgentRepository telegram webhook methods', () => {
           }),
         }),
       );
-      expect(update.$inc).toEqual({
-        'channels.$[ch].webhookRegistration.attemptCount': 1,
-      });
+      expect(update.$inc).toBeUndefined();
       expect(update.$set['channels.$[ch].webhookRegistration.status']).toBe(
         'registered',
       );
@@ -97,6 +96,25 @@ describe('ClientAgentRepository telegram webhook methods', () => {
       expect(result).toEqual({ matched: true });
     });
 
+    it('emits $inc only when incrementAttempt=true', async () => {
+      const exec = jest
+        .fn()
+        .mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
+      mockModel.updateOne.mockReturnValue({ exec });
+
+      await repository.updateWebhookRegistrationByTelegramBotId({
+        telegramBotId: '12345',
+        status: 'failed',
+        lastError: 'boom',
+        incrementAttempt: true,
+      });
+
+      const [, update] = mockModel.updateOne.mock.calls[0];
+      expect(update.$inc).toEqual({
+        'channels.$[ch].webhookRegistration.attemptCount': 1,
+      });
+    });
+
     it('adds fingerprint $ne short-circuit only when status=registering and fingerprint provided', async () => {
       const exec = jest
         .fn()
@@ -113,6 +131,88 @@ describe('ClientAgentRepository telegram webhook methods', () => {
       expect(
         opts.arrayFilters[0].ch['ch.webhookRegistration.fingerprint'],
       ).toEqual({ $ne: 'fp-1' });
+    });
+
+    it('expectStatus with concrete values applies $in array-filter predicate', async () => {
+      const exec = jest
+        .fn()
+        .mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
+      mockModel.updateOne.mockReturnValue({ exec });
+
+      await repository.updateWebhookRegistrationByTelegramBotId({
+        telegramBotId: '12345',
+        status: 'registering',
+        expectStatus: ['pending', 'failed'],
+      });
+
+      const [, , opts] = mockModel.updateOne.mock.calls[0];
+      expect(opts.arrayFilters[0].ch['ch.webhookRegistration.status']).toEqual({
+        $in: ['pending', 'failed'],
+      });
+    });
+
+    it("expectStatus = ['absent'] requires webhookRegistration to be missing", async () => {
+      const exec = jest
+        .fn()
+        .mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
+      mockModel.updateOne.mockReturnValue({ exec });
+
+      await repository.updateWebhookRegistrationByTelegramBotId({
+        telegramBotId: '12345',
+        status: 'pending',
+        expectStatus: ['absent'],
+      });
+
+      const [, , opts] = mockModel.updateOne.mock.calls[0];
+      expect(opts.arrayFilters[0].ch['ch.webhookRegistration']).toEqual({
+        $exists: false,
+      });
+    });
+
+    it("expectStatus mixing 'absent' and concrete statuses produces $or disjunction", async () => {
+      const exec = jest
+        .fn()
+        .mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
+      mockModel.updateOne.mockReturnValue({ exec });
+
+      await repository.updateWebhookRegistrationByTelegramBotId({
+        telegramBotId: '12345',
+        status: 'pending',
+        expectStatus: ['absent', 'pending', 'failed', 'registering'],
+      });
+
+      const [, , opts] = mockModel.updateOne.mock.calls[0];
+      const arrayFilter = opts.arrayFilters[0].ch;
+      expect(arrayFilter.$or).toEqual(
+        expect.arrayContaining([
+          {
+            'ch.webhookRegistration.status': {
+              $in: ['pending', 'failed', 'registering'],
+            },
+          },
+          { 'ch.webhookRegistration': { $exists: false } },
+        ]),
+      );
+    });
+
+    it('expectLastAttemptAtBefore appends $lt predicate to array filter', async () => {
+      const exec = jest
+        .fn()
+        .mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
+      mockModel.updateOne.mockReturnValue({ exec });
+
+      const cutoff = new Date('2026-05-07T00:00:00Z');
+      await repository.updateWebhookRegistrationByTelegramBotId({
+        telegramBotId: '12345',
+        status: 'failed',
+        expectStatus: ['registering'],
+        expectLastAttemptAtBefore: cutoff,
+      });
+
+      const [, , opts] = mockModel.updateOne.mock.calls[0];
+      expect(
+        opts.arrayFilters[0].ch['ch.webhookRegistration.lastAttemptAt'],
+      ).toEqual({ $lt: cutoff });
     });
 
     it('returns matched=false when modifiedCount is 0 even if matchedCount > 0', async () => {
@@ -146,6 +246,86 @@ describe('ClientAgentRepository telegram webhook methods', () => {
       expect(update.$set['channels.$[ch].webhookRegistration.lastError']).toBe(
         'Unauthorized',
       );
+    });
+  });
+
+  describe('quarantineWebhookRegistration', () => {
+    it("sets status='quarantined' without $inc", async () => {
+      const exec = jest
+        .fn()
+        .mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
+      mockModel.updateOne.mockReturnValue({ exec });
+
+      const result = await repository.quarantineWebhookRegistration({
+        telegramBotId: '12345',
+        lastError: 'reconciler:quarantine_threshold_exceeded',
+      });
+
+      const [, update] = mockModel.updateOne.mock.calls[0];
+      expect(update.$set['channels.$[ch].webhookRegistration.status']).toBe(
+        'quarantined',
+      );
+      expect(update.$inc).toBeUndefined();
+      expect(update.$set['channels.$[ch].webhookRegistration.lastError']).toBe(
+        'reconciler:quarantine_threshold_exceeded',
+      );
+      expect(result).toEqual({ matched: true });
+    });
+  });
+
+  describe('findReconcilableTelegramHires', () => {
+    it('runs an aggregation pipeline filtering active hires + telegram channels in eligible states', async () => {
+      const exec = jest.fn().mockResolvedValue([
+        {
+          _id: 'a-1',
+          ch: {
+            telegramBotId: '12345',
+            webhookRegistration: { status: 'pending', attemptCount: 0 },
+          },
+        },
+      ]);
+      mockModel.aggregate.mockReturnValue({ exec });
+
+      const cutoff = new Date('2026-05-07T00:00:00Z');
+      const rows = await repository.findReconcilableTelegramHires({
+        limit: 100,
+        stuckRegisteringCutoff: cutoff,
+        quarantineThreshold: 4,
+      });
+
+      expect(mockModel.aggregate).toHaveBeenCalledTimes(1);
+      const pipeline = mockModel.aggregate.mock.calls[0][0];
+      expect(pipeline[0]).toEqual({ $match: { status: 'active' } });
+      expect(pipeline[1]).toEqual({ $unwind: '$channels' });
+      expect(pipeline[pipeline.length - 1]).toEqual({ $limit: 100 });
+
+      expect(rows).toEqual([
+        {
+          clientAgentId: 'a-1',
+          telegramBotId: '12345',
+          currentStatus: 'pending',
+          attemptCount: 0,
+        },
+      ]);
+    });
+
+    it('returns attemptCount=0 when not present', async () => {
+      const exec = jest.fn().mockResolvedValue([
+        {
+          _id: 'a-1',
+          ch: { telegramBotId: '999' },
+        },
+      ]);
+      mockModel.aggregate.mockReturnValue({ exec });
+
+      const rows = await repository.findReconcilableTelegramHires({
+        limit: 10,
+        stuckRegisteringCutoff: new Date(),
+        quarantineThreshold: 4,
+      });
+
+      expect(rows[0].attemptCount).toBe(0);
+      expect(rows[0].currentStatus).toBeUndefined();
     });
   });
 });

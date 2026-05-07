@@ -1,3 +1,5 @@
+import * as mongoose from 'mongoose';
+import { Types } from 'mongoose';
 import { ClientAgentSchema } from './client-agent.schema';
 
 function getPreHooks(hookName: string): Array<(next: () => void) => void> {
@@ -104,5 +106,98 @@ describe('ClientAgentSchema webhookRegistration.lastError truncation', () => {
     expect(update.$set['channels.0.webhookRegistration.lastError']).toBe(
       'short message',
     );
+  });
+});
+
+describe('ClientAgentSchema webhookRegistration.status enum', () => {
+  // Reaches into the schema to inspect the embedded HireChannelConfig schema
+  // and asserts the WebhookRegistrationState.status enum is forward-only
+  // extended per `docs/rules/data-modeling.md` (no removals once added).
+  function getStatusEnum(): string[] {
+    const channelsPathOptions = (ClientAgentSchema as any).path(
+      'channels',
+    ).options;
+    const embeddedSchema =
+      channelsPathOptions?.type?.[0] ??
+      channelsPathOptions?.['type']?.[0] ??
+      channelsPathOptions?.[0];
+    const wrPath = (embeddedSchema as any).path('webhookRegistration');
+    // The embedded webhookRegistration is itself a sub-schema.
+    const wrSchema = (wrPath as any).schema ?? wrPath?.options?.type;
+    const statusPath = (wrSchema as any).path('status');
+    return statusPath.options.enum as string[];
+  }
+
+  it('accepts the five canonical status values', () => {
+    const enumValues = getStatusEnum();
+    for (const v of [
+      'pending',
+      'registering',
+      'registered',
+      'failed',
+      'quarantined',
+    ]) {
+      expect(enumValues).toContain(v);
+    }
+  });
+
+  it('does not list any status outside the canonical five (forward-only widening only)', () => {
+    const enumValues = getStatusEnum();
+    expect(enumValues).toHaveLength(5);
+  });
+});
+
+describe('ClientAgentSchema webhookRegistration document validation', () => {
+  // Mongoose `validateSync()` on a constructed sub-document path is the
+  // mechanical guard against an accidental enum revert.
+  let Model: any;
+
+  beforeAll(() => {
+    Model =
+      (mongoose as any).models.ClientAgentSchemaSpecModel ??
+      (mongoose as any).model('ClientAgentSchemaSpecModel', ClientAgentSchema);
+  });
+
+  function makeDoc(status: string) {
+    return new Model({
+      clientId: 'c-1',
+      agentId: 'a-1',
+      personalityId: new Types.ObjectId(),
+      status: 'active',
+      agentPricing: { amount: 0, currency: 'USD', monthlyTokenQuota: null },
+      billingAnchor: new Date(),
+      channels: [
+        {
+          channelId: new Types.ObjectId(),
+          provider: 'telegram',
+          status: 'active',
+          currency: 'USD',
+          webhookRegistration: { status, attemptCount: 0 },
+        },
+      ],
+    });
+  }
+
+  for (const v of [
+    'pending',
+    'registering',
+    'registered',
+    'failed',
+    'quarantined',
+  ]) {
+    it(`accepts webhookRegistration.status = '${v}'`, () => {
+      const err = makeDoc(v).validateSync();
+      // Other validation errors may exist (e.g. types), but none for the
+      // status path under test.
+      const flat = err ? JSON.stringify(err.errors) : '';
+      expect(flat).not.toMatch(/webhookRegistration\.status/);
+    });
+  }
+
+  it("rejects webhookRegistration.status = 'unknown'", () => {
+    const err = makeDoc('unknown').validateSync();
+    expect(err).toBeDefined();
+    if (!err) throw new Error('expected validation error');
+    expect(JSON.stringify(err.errors)).toMatch(/webhookRegistration\.status/);
   });
 });

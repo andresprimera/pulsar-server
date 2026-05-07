@@ -13,7 +13,8 @@ import { ClientPhoneRepository } from '@persistence/repositories/client-phone.re
 import { AgentPriceRepository } from '@persistence/repositories/agent-price.repository';
 import { ChannelPriceRepository } from '@persistence/repositories/channel-price.repository';
 import { PersonalityRepository } from '@persistence/repositories/personality.repository';
-import { WebhookRegistrationCoordinator } from '@orchestrator/jobs/webhook/webhook-registration.coordinator';
+import { HireChannelLifecyclePublisher } from '@orchestrator/lifecycle/hire-channel-lifecycle.publisher';
+import { HIRE_CHANNEL_LIFECYCLE_PORT } from '@shared/ports/hire-channel-lifecycle.port';
 
 describe('ClientAgentsService', () => {
   let service: ClientAgentsService;
@@ -25,7 +26,8 @@ describe('ClientAgentsService', () => {
   let mockAgentPriceRepository: any;
   let mockChannelPriceRepository: any;
   let mockPersonalityRepository: any;
-  let mockWebhookRegistrationCoordinator: any;
+  let mockLifecyclePublisher: any;
+  let mockLifecyclePort: any;
 
   const mockClientAgent = {
     id: 'ca-1',
@@ -99,8 +101,18 @@ describe('ClientAgentsService', () => {
       findActiveById: jest.fn().mockResolvedValue(mockPersonality),
     };
 
-    mockWebhookRegistrationCoordinator = {
-      enqueueForTelegramChannels: jest.fn().mockResolvedValue(undefined),
+    mockLifecyclePublisher = {
+      publishHappyPath: jest.fn().mockResolvedValue(undefined),
+      publishProbe: jest.fn().mockResolvedValue(undefined),
+    };
+
+    mockLifecyclePort = {
+      recordOutcome: jest.fn().mockResolvedValue({ matched: true }),
+      loadForRegistration: jest.fn(),
+      quarantineTelegramRegistration: jest
+        .fn()
+        .mockResolvedValue({ matched: true }),
+      findReconcilableTelegramHires: jest.fn().mockResolvedValue([]),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -139,8 +151,12 @@ describe('ClientAgentsService', () => {
           useValue: mockPersonalityRepository,
         },
         {
-          provide: WebhookRegistrationCoordinator,
-          useValue: mockWebhookRegistrationCoordinator,
+          provide: HireChannelLifecyclePublisher,
+          useValue: mockLifecyclePublisher,
+        },
+        {
+          provide: HIRE_CHANNEL_LIFECYCLE_PORT,
+          useValue: mockLifecyclePort,
         },
       ],
     }).compile();
@@ -627,9 +643,7 @@ describe('ClientAgentsService', () => {
 
       await service.create(baseDto as any);
 
-      expect(
-        mockWebhookRegistrationCoordinator.enqueueForTelegramChannels,
-      ).toHaveBeenCalledWith(
+      expect(mockLifecyclePublisher.publishHappyPath).toHaveBeenCalledWith(
         expect.objectContaining({
           clientAgentId: 'ca-tg-1',
           telegramBotIds: ['123456789'],
@@ -671,14 +685,12 @@ describe('ClientAgentsService', () => {
 
       await service.create(instagramDto as any);
 
-      expect(
-        mockWebhookRegistrationCoordinator.enqueueForTelegramChannels,
-      ).not.toHaveBeenCalled();
+      expect(mockLifecyclePublisher.publishHappyPath).not.toHaveBeenCalled();
     });
 
     it('does not roll back create when coordinator throws', async () => {
       setupCommonMocks();
-      mockWebhookRegistrationCoordinator.enqueueForTelegramChannels.mockRejectedValue(
+      mockLifecyclePublisher.publishHappyPath.mockRejectedValue(
         new Error('queue down'),
       );
       const created = {
@@ -719,9 +731,7 @@ describe('ClientAgentsService', () => {
 
       await service.updateStatus('ca-1', { status: 'active' });
 
-      expect(
-        mockWebhookRegistrationCoordinator.enqueueForTelegramChannels,
-      ).toHaveBeenCalledWith(
+      expect(mockLifecyclePublisher.publishHappyPath).toHaveBeenCalledWith(
         expect.objectContaining({
           clientAgentId: 'ca-1',
           telegramBotIds: ['987654321'],
@@ -750,9 +760,88 @@ describe('ClientAgentsService', () => {
 
       await service.updateStatus('ca-1', { status: 'inactive' });
 
-      expect(
-        mockWebhookRegistrationCoordinator.enqueueForTelegramChannels,
-      ).not.toHaveBeenCalled();
+      expect(mockLifecyclePublisher.publishHappyPath).not.toHaveBeenCalled();
+    });
+
+    it('stamps pending via the lifecycle port BEFORE publishing the happy-path enqueue', async () => {
+      setupCommonMocks();
+      mockClientAgentRepository.create.mockResolvedValue({
+        _id: 'ca-tg-order',
+        status: 'active',
+        channels: [
+          {
+            provider: 'telegram',
+            status: 'active',
+            telegramBotId: '777777777',
+          },
+        ],
+      });
+
+      const order: string[] = [];
+      mockLifecyclePort.recordOutcome.mockImplementation(async () => {
+        order.push('recordOutcome');
+        return { matched: true };
+      });
+      mockLifecyclePublisher.publishHappyPath.mockImplementation(async () => {
+        order.push('publishHappyPath');
+      });
+
+      await service.create(baseDto as any);
+
+      expect(mockLifecyclePort.recordOutcome).toHaveBeenCalledWith(
+        expect.objectContaining({
+          telegramBotId: '777777777',
+          status: 'pending',
+          incrementAttempt: false,
+          expectStatus: ['absent', 'pending', 'failed', 'registering'],
+        }),
+      );
+      expect(order[0]).toBe('recordOutcome');
+      expect(order[order.length - 1]).toBe('publishHappyPath');
+    });
+
+    it('does not abort the publish when the lifecycle port reports matched=false (registered/quarantined no-clobber)', async () => {
+      setupCommonMocks();
+      mockClientAgentRepository.create.mockResolvedValue({
+        _id: 'ca-tg-noop',
+        status: 'active',
+        channels: [
+          {
+            provider: 'telegram',
+            status: 'active',
+            telegramBotId: '888888888',
+          },
+        ],
+      });
+      mockLifecyclePort.recordOutcome.mockResolvedValue({ matched: false });
+
+      await service.create(baseDto as any);
+
+      expect(mockLifecyclePublisher.publishHappyPath).toHaveBeenCalledWith(
+        expect.objectContaining({ telegramBotIds: ['888888888'] }),
+      );
+    });
+
+    it('does not abort the publish when the lifecycle port throws on stamping', async () => {
+      setupCommonMocks();
+      mockClientAgentRepository.create.mockResolvedValue({
+        _id: 'ca-tg-err',
+        status: 'active',
+        channels: [
+          {
+            provider: 'telegram',
+            status: 'active',
+            telegramBotId: '999999999',
+          },
+        ],
+      });
+      mockLifecyclePort.recordOutcome.mockRejectedValueOnce(
+        new Error('mongo-down'),
+      );
+
+      const result = await service.create(baseDto as any);
+      expect(result).toBeDefined();
+      expect(mockLifecyclePublisher.publishHappyPath).toHaveBeenCalled();
     });
   });
 });

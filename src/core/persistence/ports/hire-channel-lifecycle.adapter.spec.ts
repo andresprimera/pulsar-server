@@ -7,6 +7,8 @@ describe('HireChannelLifecycleAdapter', () => {
       ClientAgentRepository,
       | 'findActiveByTelegramBotIdForWebhookRegistration'
       | 'updateWebhookRegistrationByTelegramBotId'
+      | 'quarantineWebhookRegistration'
+      | 'findReconcilableTelegramHires'
     >
   >;
   let adapter: HireChannelLifecycleAdapter;
@@ -15,6 +17,8 @@ describe('HireChannelLifecycleAdapter', () => {
     repo = {
       findActiveByTelegramBotIdForWebhookRegistration: jest.fn(),
       updateWebhookRegistrationByTelegramBotId: jest.fn(),
+      quarantineWebhookRegistration: jest.fn(),
+      findReconcilableTelegramHires: jest.fn(),
     } as any;
     adapter = new HireChannelLifecycleAdapter(repo as any);
   });
@@ -79,6 +83,42 @@ describe('HireChannelLifecycleAdapter', () => {
     expect(result).toEqual({
       encryptedCredentials: { botToken: 'enc' },
       webhookRegistration: { status: 'registered', fingerprint: 'fp' },
+    });
+  });
+
+  it('quarantineTelegramRegistration delegates to repository', async () => {
+    repo.quarantineWebhookRegistration.mockResolvedValue({ matched: true });
+    const result = await adapter.quarantineTelegramRegistration({
+      telegramBotId: '999',
+      lastError: 'r',
+    });
+    expect(result).toEqual({ matched: true });
+    expect(repo.quarantineWebhookRegistration).toHaveBeenCalledWith({
+      telegramBotId: '999',
+      lastError: 'r',
+    });
+  });
+
+  it('findReconcilableTelegramHires delegates to repository', async () => {
+    repo.findReconcilableTelegramHires.mockResolvedValue([
+      {
+        clientAgentId: 'a',
+        telegramBotId: '999',
+        currentStatus: 'pending',
+        attemptCount: 0,
+      },
+    ]);
+    const cutoff = new Date();
+    const out = await adapter.findReconcilableTelegramHires({
+      limit: 10,
+      stuckRegisteringCutoff: cutoff,
+      quarantineThreshold: 4,
+    });
+    expect(out).toHaveLength(1);
+    expect(repo.findReconcilableTelegramHires).toHaveBeenCalledWith({
+      limit: 10,
+      stuckRegisteringCutoff: cutoff,
+      quarantineThreshold: 4,
     });
   });
 });

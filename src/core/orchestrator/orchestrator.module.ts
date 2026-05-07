@@ -22,6 +22,8 @@ import { JobMetricsService } from './observability/job-metrics.service';
 import { QueueHealthService } from './observability/queue-health.service';
 import { DeadLetterService } from './observability/dead-letter.service';
 import { WebhookRegistrationCoordinator } from './jobs/webhook/webhook-registration.coordinator';
+import { HireChannelLifecyclePublisher } from './lifecycle/hire-channel-lifecycle.publisher';
+import { WebhookRegistrationReconciler } from './lifecycle/webhook-registration.reconciler';
 import { AgentModule } from '@agent/agent.module';
 import { DomainModule } from '@domain/domain.module';
 
@@ -79,15 +81,17 @@ const isWorkerMode = process.env.WORKER_MODE === 'true';
     BillingGeneratorService,
     JobMetricsService,
     WebhookRegistrationCoordinator,
+    HireChannelLifecyclePublisher,
     ...(isWorkerMode
       ? [QueueHealthService, DeadLetterService, BillingJobProcessor]
-      : [BillingJobScheduler]),
+      : [BillingJobScheduler, WebhookRegistrationReconciler]),
   ],
   exports: [
     IncomingMessageOrchestrator,
     TelegramWebhookAuthService,
     BillingGeneratorService,
     WebhookRegistrationCoordinator,
+    HireChannelLifecyclePublisher,
     JobMetricsService,
     ...(isWorkerMode ? [DeadLetterService] : []),
   ],
