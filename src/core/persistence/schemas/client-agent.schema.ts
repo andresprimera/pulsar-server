@@ -42,6 +42,7 @@ export class WebhookRegistrationState {
   @Prop({ type: String, required: false, maxlength: 500 })
   lastError?: string;
 
+  // TODO(client-agents-admin-list): add { select: false } once all read paths whitelist-include this field.
   @Prop({ type: String, required: false })
   fingerprint?: string;
 }
@@ -78,6 +79,7 @@ export class HireChannelConfig {
   telegramBotId?: string;
 
   /** SHA-256(UTF-8(botToken)) lowercase hex; used for webhook auth without decrypting credentials. */
+  // TODO(client-agents-admin-list): add { select: false } once all read paths whitelist-include this field.
   @Prop({ type: String, required: false })
   telegramWebhookSecretHex?: string;
 

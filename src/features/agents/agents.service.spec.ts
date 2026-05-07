@@ -27,6 +27,7 @@ describe('AgentsService', () => {
       findAll: jest.fn(),
       findById: jest.fn(),
       findByStatus: jest.fn(),
+      findManyByIds: jest.fn(),
       update: jest.fn(),
     };
     mockAgentPriceRepository = {
@@ -91,6 +92,24 @@ describe('AgentsService', () => {
 
       expect(mockAgentRepository.findByStatus).toHaveBeenCalledWith('active');
       expect(result).toEqual([agentWithPrices(mockAgent)]);
+    });
+  });
+
+  describe('findManyByIds', () => {
+    it('returns [] and does not call repo for empty input', async () => {
+      const result = await service.findManyByIds([]);
+      expect(result).toEqual([]);
+      expect(mockAgentRepository.findManyByIds).not.toHaveBeenCalled();
+    });
+
+    it('passes non-empty input through to the repo (no price hydration)', async () => {
+      mockAgentRepository.findManyByIds.mockResolvedValue([mockAgent]);
+      const result = await service.findManyByIds(['agent-1']);
+      expect(mockAgentRepository.findManyByIds).toHaveBeenCalledWith([
+        'agent-1',
+      ]);
+      // No prices hydrated — returns plain Agent[] only
+      expect(result).toEqual([mockAgent]);
     });
   });
 

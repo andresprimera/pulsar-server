@@ -18,6 +18,7 @@ describe('ClientAgentsController', () => {
     mockClientAgentsService = {
       create: jest.fn(),
       findByClient: jest.fn(),
+      findAllHydrated: jest.fn(),
       update: jest.fn(),
       updateStatus: jest.fn(),
       calculateClientTotal: jest.fn(),
@@ -64,6 +65,27 @@ describe('ClientAgentsController', () => {
 
       expect(mockClientAgentsService.create).toHaveBeenCalledWith(dto);
       expect(result).toEqual(mockClientAgent);
+    });
+  });
+
+  describe('findAll', () => {
+    it('delegates to service.findAllHydrated with the parsed query', async () => {
+      const query = { page: 2, limit: 10, status: 'active' as const };
+      const envelope = {
+        items: [],
+        page: 2,
+        limit: 10,
+        total: 0,
+        totalPages: 1,
+      };
+      mockClientAgentsService.findAllHydrated.mockResolvedValue(envelope);
+
+      const result = await controller.findAll(query as any);
+
+      expect(mockClientAgentsService.findAllHydrated).toHaveBeenCalledWith(
+        query,
+      );
+      expect(result).toEqual(envelope);
     });
   });
 

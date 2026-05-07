@@ -20,6 +20,12 @@ export class AgentRepository {
     return this.model.find().exec();
   }
 
+  async findManyByIds(ids: string[]): Promise<Agent[]> {
+    if (ids.length === 0) return [];
+    const dedupedIds = Array.from(new Set(ids));
+    return this.model.find({ _id: { $in: dedupedIds } }).exec();
+  }
+
   async findActiveById(id: string): Promise<Agent | null> {
     return this.model.findOne({ _id: id, status: 'active' }).exec();
   }

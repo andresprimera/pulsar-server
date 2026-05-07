@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { ClientSession, Model, UpdateQuery } from 'mongoose';
+import { ClientSession, FilterQuery, Model, UpdateQuery } from 'mongoose';
 import { ClientAgent } from '@persistence/schemas/client-agent.schema';
+import {
+  CLIENT_AGENT_LIST_PROJECTION_STRING,
+  type ClientAgentListProjectedField,
+} from './client-agent.repository.constants';
 import { normalizeToE164 } from '@shared/e164.util';
 
 @Injectable()
@@ -17,6 +21,29 @@ export class ClientAgentRepository {
 
   async findAll(): Promise<ClientAgent[]> {
     return this.model.find().exec();
+  }
+
+  /**
+   * Returns a page of ClientAgents projected to safe-to-expose fields only.
+   * The projection mirrors {@link CLIENT_AGENT_LIST_PROJECTION} and intentionally
+   * excludes encrypted credentials, telegram webhook secret, fingerprint, and
+   * promptSupplement.
+   */
+  async findPageWithProjection(
+    filter: FilterQuery<ClientAgent>,
+    opts: { skip: number; limit: number; sort: Record<string, 1 | -1> },
+  ): Promise<Pick<ClientAgent, ClientAgentListProjectedField>[]> {
+    return this.model
+      .find(filter, CLIENT_AGENT_LIST_PROJECTION_STRING)
+      .sort(opts.sort)
+      .skip(opts.skip)
+      .limit(opts.limit)
+      .lean()
+      .exec() as unknown as Pick<ClientAgent, ClientAgentListProjectedField>[];
+  }
+
+  async countByFilter(filter: FilterQuery<ClientAgent>): Promise<number> {
+    return this.model.countDocuments(filter).exec();
   }
 
   async create(
