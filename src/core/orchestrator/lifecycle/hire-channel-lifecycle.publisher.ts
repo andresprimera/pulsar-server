@@ -49,7 +49,7 @@ export class HireChannelLifecyclePublisher {
           TELEGRAM_WEBHOOK_REGISTER_JOB,
           { telegramBotId: botId } satisfies TelegramWebhookRegisterPayload,
           {
-            jobId: `${JOB_DEFINITIONS.telegramWebhookRegister.jobIdPrefix}:${botId}`,
+            jobId: `${JOB_DEFINITIONS.telegramWebhookRegister.jobIdPrefix}-${botId}`,
             ...JOB_DEFINITIONS.telegramWebhookRegister.defaultOptions,
           },
         );
@@ -76,7 +76,7 @@ export class HireChannelLifecyclePublisher {
         TELEGRAM_WEBHOOK_REGISTER_JOB,
         { telegramBotId } satisfies TelegramWebhookRegisterPayload,
         {
-          jobId: `${JOB_DEFINITIONS.telegramWebhookRegister.jobIdPrefix}:${telegramBotId}`,
+          jobId: `${JOB_DEFINITIONS.telegramWebhookRegister.jobIdPrefix}-${telegramBotId}`,
           ...TELEGRAM_WEBHOOK_RECONCILER_PROBE_OPTS,
         },
       );

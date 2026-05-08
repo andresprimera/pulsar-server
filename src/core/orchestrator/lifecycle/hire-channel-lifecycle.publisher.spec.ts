@@ -45,12 +45,12 @@ describe('HireChannelLifecyclePublisher', () => {
       expect(mockQueue.add).toHaveBeenCalledTimes(2);
       const [, payload1, opts1] = mockQueue.add.mock.calls[0];
       expect(payload1).toEqual({ telegramBotId: 'bot-1' });
-      expect(opts1.jobId).toBe('tg-webhook:bot-1');
+      expect(opts1.jobId).toBe('tg-webhook-bot-1');
       expect(opts1.attempts).toBe(6);
       expect(opts1.backoff).toEqual({ type: 'telegram-webhook-backoff' });
 
       const [, , opts2] = mockQueue.add.mock.calls[1];
-      expect(opts2.jobId).toBe('tg-webhook:bot-2');
+      expect(opts2.jobId).toBe('tg-webhook-bot-2');
     });
 
     it('swallows enqueue errors and logs a warning', async () => {
@@ -79,7 +79,7 @@ describe('HireChannelLifecyclePublisher', () => {
       expect(mockQueue.add).toHaveBeenCalledTimes(1);
       const [, payload, opts] = mockQueue.add.mock.calls[0];
       expect(payload).toEqual({ telegramBotId: 'bot-9' });
-      expect(opts.jobId).toBe('tg-webhook:bot-9');
+      expect(opts.jobId).toBe('tg-webhook-bot-9');
       expect(opts.attempts).toBe(2);
       expect(opts.backoff).toEqual({
         type: 'telegram-webhook-reconciler-backoff',

@@ -38,7 +38,7 @@ describe('WebhookRegistrationCoordinator', () => {
       TELEGRAM_WEBHOOK_REGISTER_JOB,
       { telegramBotId: '111' },
       expect.objectContaining({
-        jobId: 'tg-webhook:111',
+        jobId: 'tg-webhook-111',
         attempts: 6,
         backoff: { type: 'telegram-webhook-backoff' },
         removeOnComplete: { count: 1000 },
@@ -48,7 +48,7 @@ describe('WebhookRegistrationCoordinator', () => {
       2,
       TELEGRAM_WEBHOOK_REGISTER_JOB,
       { telegramBotId: '222' },
-      expect.objectContaining({ jobId: 'tg-webhook:222' }),
+      expect.objectContaining({ jobId: 'tg-webhook-222' }),
     );
   });
 
