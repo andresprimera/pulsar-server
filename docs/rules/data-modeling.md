@@ -11,6 +11,27 @@ ARCHITECTURE_CONTRACT.md has higher priority than this file.
 - Status fields must use explicit enums.
 - Service-layer create flows must set status explicitly.
 
+## Forward-only enum evolution
+- When extending a Mongoose schema enum, the schema-level enum extension MUST
+  remain on rollback even if the behavior that wrote new values is reverted.
+  Removing the enum entry would cause Mongoose validation failures on
+  documents written by the newer code.
+- Treat enum widenings as one-way; only deprecate (stop writing the value),
+  never delete from the enum list.
+- Document any forward-only enum change in the relevant runbook so on-call
+  understands the rollback constraint.
+
+## Bootstrap migrations vs SeederService
+- `SeederService.onApplicationBootstrap` is gated by `SEED_DB`/`NODE_ENV`
+  semantics and does NOT run unconditionally in production. Use it for catalog
+  seeding (agents, channels, prices, personalities, sample data).
+- Use a dedicated `OnApplicationBootstrap` provider under
+  `src/core/persistence/migrations/` for one-shot data migrations that MUST
+  run on every host startup regardless of environment (e.g. backfilling a new
+  required sub-document, idempotent enum-default stamping, schema repair).
+  These services must be idempotent (`$exists: false` style filters) and
+  bounded (chunked updates, hard iteration cap) to avoid stalling startup.
+
 ## Indexing
 - Add indexes for frequent lookup fields.
 - Add compound indexes for routing filters.

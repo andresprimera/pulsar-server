@@ -300,4 +300,164 @@ describe('TelegramWebhookRegistrar', () => {
       PermanentJobError,
     );
   });
+
+  describe('transient writes from process() do not increment attemptCount', () => {
+    it('the registering write does not pass incrementAttempt: true', async () => {
+      const lifecycle: any = {
+        loadForRegistration: jest.fn().mockResolvedValue({
+          encryptedCredentials: ENCRYPTED_CREDENTIALS,
+          webhookRegistration: undefined,
+        }),
+        recordOutcome: jest.fn().mockResolvedValue({ matched: true }),
+      };
+      const telegramService: any = {
+        lifecycle: {
+          registerWebhook: jest.fn().mockResolvedValue({ registered: true }),
+        },
+      };
+      const registrar = createRegistrar({ lifecycle, telegramService });
+
+      await registrar.process(makeJob());
+
+      // First call: registering. Second call: registered. Neither increments.
+      const calls = lifecycle.recordOutcome.mock.calls;
+      expect(calls.length).toBeGreaterThanOrEqual(1);
+      for (const [arg] of calls) {
+        expect(arg.incrementAttempt).not.toBe(true);
+      }
+    });
+
+    it('a recoverable failure write inside process() does not increment attemptCount', async () => {
+      const lifecycle: any = {
+        loadForRegistration: jest.fn().mockResolvedValue({
+          encryptedCredentials: ENCRYPTED_CREDENTIALS,
+          webhookRegistration: undefined,
+        }),
+        recordOutcome: jest.fn().mockResolvedValue({ matched: true }),
+      };
+      const telegramService: any = {
+        lifecycle: {
+          registerWebhook: jest
+            .fn()
+            .mockRejectedValue(new RecoverableJobError('upstream 502')),
+        },
+      };
+      const registrar = createRegistrar({ lifecycle, telegramService });
+
+      await expect(registrar.process(makeJob())).rejects.toBeInstanceOf(
+        RecoverableJobError,
+      );
+
+      for (const [arg] of lifecycle.recordOutcome.mock.calls) {
+        expect(arg.incrementAttempt).not.toBe(true);
+      }
+    });
+  });
+
+  describe('onFailed terminal $inc semantics', () => {
+    it('emits exactly one recordOutcome with incrementAttempt: true when isFinal is true (PermanentJobError)', async () => {
+      const lifecycle: any = {
+        loadForRegistration: jest.fn(),
+        recordOutcome: jest.fn().mockResolvedValue({ matched: true }),
+      };
+      const telegramService: any = {
+        lifecycle: { registerWebhook: jest.fn() },
+      };
+      const deadLetter: any = {
+        moveToDeadLetter: jest.fn().mockResolvedValue(undefined),
+      };
+      const registrar = createRegistrar({
+        lifecycle,
+        telegramService,
+        deadLetter,
+      });
+
+      const job = makeJob({ data: { telegramBotId: BOT_ID } });
+      job.attemptsMade = 1; // less than attempts; PermanentJobError forces isFinal
+      registrar.onFailed(job, new PermanentJobError('boom'));
+
+      // Allow the catch-attached promise chain to settle
+      await new Promise((r) => setImmediate(r));
+
+      const terminalCalls = lifecycle.recordOutcome.mock.calls.filter(
+        ([arg]: any[]) => arg.incrementAttempt === true,
+      );
+      expect(terminalCalls).toHaveLength(1);
+      expect(terminalCalls[0][0]).toEqual(
+        expect.objectContaining({
+          telegramBotId: BOT_ID,
+          status: 'failed',
+          lastError: 'boom',
+          incrementAttempt: true,
+        }),
+      );
+      expect(deadLetter.moveToDeadLetter).toHaveBeenCalledWith(
+        job,
+        expect.any(PermanentJobError),
+      );
+    });
+
+    it('emits exactly one terminal $inc when attemptsMade reaches attempts (recoverable exhausted)', async () => {
+      const lifecycle: any = {
+        loadForRegistration: jest.fn(),
+        recordOutcome: jest.fn().mockResolvedValue({ matched: true }),
+      };
+      const telegramService: any = {
+        lifecycle: { registerWebhook: jest.fn() },
+      };
+      const deadLetter: any = {
+        moveToDeadLetter: jest.fn().mockResolvedValue(undefined),
+      };
+      const registrar = createRegistrar({
+        lifecycle,
+        telegramService,
+        deadLetter,
+      });
+
+      const job = makeJob({ data: { telegramBotId: BOT_ID } });
+      job.attemptsMade = 6;
+      job.opts.attempts = 6;
+      registrar.onFailed(job, new Error('upstream timeout'));
+
+      await new Promise((r) => setImmediate(r));
+
+      const terminalCalls = lifecycle.recordOutcome.mock.calls.filter(
+        ([arg]: any[]) => arg.incrementAttempt === true,
+      );
+      expect(terminalCalls).toHaveLength(1);
+      expect(terminalCalls[0][0].telegramBotId).toBe(BOT_ID);
+      expect(terminalCalls[0][0].lastError).toBe('upstream timeout');
+    });
+
+    it('does NOT emit a terminal $inc on a non-final retry', async () => {
+      const lifecycle: any = {
+        loadForRegistration: jest.fn(),
+        recordOutcome: jest.fn().mockResolvedValue({ matched: true }),
+      };
+      const telegramService: any = {
+        lifecycle: { registerWebhook: jest.fn() },
+      };
+      const deadLetter: any = {
+        moveToDeadLetter: jest.fn().mockResolvedValue(undefined),
+      };
+      const registrar = createRegistrar({
+        lifecycle,
+        telegramService,
+        deadLetter,
+      });
+
+      const job = makeJob({ data: { telegramBotId: BOT_ID } });
+      job.attemptsMade = 1;
+      job.opts.attempts = 6;
+      registrar.onFailed(job, new Error('transient'));
+
+      await new Promise((r) => setImmediate(r));
+
+      const terminalCalls = lifecycle.recordOutcome.mock.calls.filter(
+        ([arg]: any[]) => arg.incrementAttempt === true,
+      );
+      expect(terminalCalls).toHaveLength(0);
+      expect(deadLetter.moveToDeadLetter).not.toHaveBeenCalled();
+    });
+  });
 });

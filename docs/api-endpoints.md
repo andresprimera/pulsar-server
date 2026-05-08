@@ -131,6 +131,7 @@ Note: `channelId` must reference an existing channel (use GET `/channels` or GET
 | Method | Path                                  | Body / Notes |
 |--------|---------------------------------------|--------------|
 | POST   | `/client-agents`                      | `clientId`, `agentId`, `personalityId` (MongoIds); optional `pricingOverride` (`agentAmount`, `agentMonthlyTokenQuota`); `channels[]`: each with `channelId`, `provider` (`meta` \| `twilio` \| `tiktok` \| `instagram` \| `dialog360`), `credentials`, `llmConfig` (`provider`, `apiKey`, `model`), optional `amountOverride`, `monthlyMessageQuotaOverride` |
+| GET    | `/client-agents`                      | Admin list. Returns hydrated, redacted summaries. Query params: `page?`, `limit?`, `sort?`, `status?`, `clientId?`, `agentId?`, `personalityId?`, `createdAfter?`, `createdBefore?`. See [Pagination envelope](#pagination-envelope) |
 | GET    | `/client-agents/client/:clientId`     | - |
 | PATCH  | `/client-agents/:id`                  | Optional: `personalityId` only (pricing is snapshotted at hire) |
 | PATCH  | `/client-agents/:id/status`           | Body: `status` |
@@ -151,3 +152,31 @@ Note: `channelId` must reference an existing channel (use GET `/channels` or GET
 ## Collections without REST API
 
 None; channels now support GET (list and by id). Channels are still created via seed (no POST/PATCH/DELETE).
+
+---
+
+## Pagination envelope
+
+Endpoints that return paginated results use the following response shape:
+
+```
+{
+  "items":      <T[]>,   // page contents
+  "page":       <int>,   // 1-indexed current page
+  "limit":      <int>,   // requested page size
+  "total":      <int>,   // total matching documents
+  "totalPages": <int>    // ceil(total / limit), minimum 1
+}
+```
+
+**Query parameter conventions:**
+
+- `page` — 1-indexed; defaults to `1`. Must be an integer ≥ 1.
+- `limit` — page size; defaults to `20`. Maximum `100`.
+- `sort` — single field with optional `-` prefix for descending order
+  (e.g. `sort=createdAt` or `sort=-updatedAt`). The whitelist for
+  `/client-agents` is `createdAt | updatedAt | status`. Multi-field
+  comma-separated sorts are not supported.
+- Date filters (e.g. `createdAfter`, `createdBefore`) accept ISO 8601 strings.
+  When both are supplied, `createdBefore` must be greater than or equal to
+  `createdAfter`.

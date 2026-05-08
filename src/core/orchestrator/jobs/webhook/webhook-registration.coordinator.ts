@@ -25,7 +25,7 @@ export class WebhookRegistrationCoordinator {
           TELEGRAM_WEBHOOK_REGISTER_JOB,
           { telegramBotId: botId } satisfies TelegramWebhookRegisterPayload,
           {
-            jobId: `tg-webhook:${botId}`,
+            jobId: `tg-webhook-${botId}`,
             attempts: 6,
             backoff: { type: 'telegram-webhook-backoff' },
             removeOnComplete: { count: 1000 },

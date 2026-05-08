@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Personality } from '@persistence/schemas/personality.schema';
 
 @Injectable()
@@ -20,6 +20,13 @@ export class PersonalityRepository {
 
   async findAll(): Promise<Personality[]> {
     return this.model.find().exec();
+  }
+
+  async findManyByIds(ids: string[]): Promise<Personality[]> {
+    if (ids.length === 0) return [];
+    const dedupedIds = Array.from(new Set(ids));
+    const objectIds = dedupedIds.map((id) => new Types.ObjectId(id));
+    return this.model.find({ _id: { $in: objectIds } }).exec();
   }
 
   async findByStatus(

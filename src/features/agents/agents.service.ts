@@ -11,6 +11,7 @@ import {
   toPlain,
   buildActivePricesMap,
 } from '@core/utils/catalog-pricing.util';
+import { Agent } from '@persistence/schemas/agent.schema';
 import { CreateAgentDto } from './dto/create-agent.dto';
 import { UpdateAgentDto } from './dto/update-agent.dto';
 import { UpdateAgentStatusDto } from './dto/update-agent-status.dto';
@@ -63,6 +64,11 @@ export class AgentsService {
         prices: priceMap.get(String(agent._id)) ?? EMPTY_PRICES,
       };
     });
+  }
+
+  async findManyByIds(ids: string[]): Promise<Agent[]> {
+    if (ids.length === 0) return [];
+    return this.agentRepository.findManyByIds(ids);
   }
 
   async findOne(id: string) {

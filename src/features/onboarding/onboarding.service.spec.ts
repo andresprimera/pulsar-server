@@ -10,6 +10,8 @@ import { PersonalityRepository } from '@persistence/repositories/personality.rep
 import { AgentPriceRepository } from '@persistence/repositories/agent-price.repository';
 import { ChannelPriceRepository } from '@persistence/repositories/channel-price.repository';
 import { ClientPhoneRepository } from '@persistence/repositories/client-phone.repository';
+import { HireChannelLifecyclePublisher } from '@orchestrator/lifecycle/hire-channel-lifecycle.publisher';
+import { HIRE_CHANNEL_LIFECYCLE_PORT } from '@shared/ports/hire-channel-lifecycle.port';
 
 describe('OnboardingService', () => {
   let service: OnboardingService;
@@ -28,6 +30,22 @@ describe('OnboardingService', () => {
         { provide: AgentPriceRepository, useValue: {} },
         { provide: ChannelPriceRepository, useValue: {} },
         { provide: ClientPhoneRepository, useValue: {} },
+        {
+          provide: HireChannelLifecyclePublisher,
+          useValue: {
+            publishHappyPath: jest.fn(),
+            publishProbe: jest.fn(),
+          },
+        },
+        {
+          provide: HIRE_CHANNEL_LIFECYCLE_PORT,
+          useValue: {
+            recordOutcome: jest.fn(),
+            loadForRegistration: jest.fn(),
+            quarantineTelegramRegistration: jest.fn(),
+            findReconcilableTelegramHires: jest.fn(),
+          },
+        },
       ],
     }).compile();
 

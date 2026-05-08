@@ -1,4 +1,5 @@
 import {
+  Inject,
   Injectable,
   ConflictException,
   BadRequestException,
@@ -26,6 +27,11 @@ import {
   isValidTelegramBotTokenShape,
   parseTelegramBotIdFromToken,
 } from '@shared/telegram-webhook-secret.util';
+import {
+  HIRE_CHANNEL_LIFECYCLE_PORT,
+  HireChannelLifecyclePort,
+} from '@shared/ports/hire-channel-lifecycle.port';
+import { HireChannelLifecyclePublisher } from '@orchestrator/lifecycle/hire-channel-lifecycle.publisher';
 
 export interface RegisterAndHireResult {
   user: {
@@ -68,6 +74,9 @@ export class OnboardingService {
     private readonly agentPriceRepository: AgentPriceRepository,
     private readonly channelPriceRepository: ChannelPriceRepository,
     private readonly clientPhoneRepository: ClientPhoneRepository,
+    private readonly lifecyclePublisher: HireChannelLifecyclePublisher,
+    @Inject(HIRE_CHANNEL_LIFECYCLE_PORT)
+    private readonly lifecycle: HireChannelLifecyclePort,
   ) {}
 
   async registerAndHire(
@@ -398,37 +407,6 @@ export class OnboardingService {
 
       // 12. Commit transaction
       await session.commitTransaction();
-
-      // 14. Return response
-      return {
-        user: {
-          _id: (user._id as Types.ObjectId).toString(),
-          email: user.email,
-          name: user.name,
-          clientId: (user.clientId as Types.ObjectId).toString(),
-          status: user.status,
-        },
-        client: {
-          _id: (client._id as Types.ObjectId).toString(),
-          type: client.type,
-          name: client.name,
-          ownerUserId: (user._id as Types.ObjectId).toString(),
-          status: client.status,
-          ...(client.companyBrief?.trim()
-            ? { companyBrief: client.companyBrief.trim() }
-            : {}),
-        },
-        clientAgent: {
-          _id: (clientAgent._id as Types.ObjectId).toString(),
-          clientId: clientAgent.clientId,
-          agentId: clientAgent.agentId,
-          agentPricing: clientAgent.agentPricing,
-          status: clientAgent.status,
-          ...(clientAgent.promptSupplement?.trim()
-            ? { promptSupplement: clientAgent.promptSupplement.trim() }
-            : {}),
-        },
-      };
     } catch (error) {
       // Abort transaction on error (may already be aborted by MongoDB on E11000)
       try {
@@ -456,6 +434,101 @@ export class OnboardingService {
       }
       session.endSession();
     }
+
+    // Post-commit, pre-enqueue: stamp `pending` on every active telegram
+    // channel and trigger the happy-path BullMQ enqueue. Failures are logged
+    // and swallowed — the reconciler will heal any miss because the row will
+    // either remain `pending` or stay without `webhookRegistration` (both
+    // states are picked up by the reconciler scan).
+    if (clientAgent && client && user) {
+      const clientAgentId = (clientAgent._id as Types.ObjectId).toString();
+      try {
+        await this.stampPendingAndPublish(clientAgent, clientAgentId);
+      } catch (err) {
+        this.logger.warn(
+          `event=onboarding_post_commit_publish_failed clientAgentId=${clientAgentId} error=${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+
+      return {
+        user: {
+          _id: (user._id as Types.ObjectId).toString(),
+          email: user.email,
+          name: user.name,
+          clientId: (user.clientId as Types.ObjectId).toString(),
+          status: user.status,
+        },
+        client: {
+          _id: (client._id as Types.ObjectId).toString(),
+          type: client.type,
+          name: client.name,
+          ownerUserId: (user._id as Types.ObjectId).toString(),
+          status: client.status,
+          ...(client.companyBrief?.trim()
+            ? { companyBrief: client.companyBrief.trim() }
+            : {}),
+        },
+        clientAgent: {
+          _id: clientAgentId,
+          clientId: clientAgent.clientId,
+          agentId: clientAgent.agentId,
+          agentPricing: clientAgent.agentPricing,
+          status: clientAgent.status,
+          ...(clientAgent.promptSupplement?.trim()
+            ? { promptSupplement: clientAgent.promptSupplement.trim() }
+            : {}),
+        },
+      };
+    }
+
+    // Unreachable in practice — control reaches this point only if the try
+    // block both (a) committed and (b) left clientAgent/client/user
+    // undefined, which the type system already prevents. Throw to satisfy
+    // the return-type contract.
+    throw new Error('Onboarding reached an inconsistent state');
+  }
+
+  private async stampPendingAndPublish(
+    clientAgent: NonNullable<
+      Awaited<ReturnType<ClientAgentRepository['create']>>
+    >,
+    clientAgentId: string,
+  ): Promise<void> {
+    const telegramBotIds = (clientAgent.channels ?? [])
+      .filter(
+        (c) =>
+          c.provider === 'telegram' &&
+          c.status === 'active' &&
+          typeof c.telegramBotId === 'string' &&
+          c.telegramBotId.length > 0,
+      )
+      .map((c) => c.telegramBotId as string);
+
+    if (telegramBotIds.length === 0) return;
+
+    for (const botId of telegramBotIds) {
+      try {
+        await this.lifecycle.recordOutcome({
+          telegramBotId: botId,
+          status: 'pending',
+          incrementAttempt: false,
+          expectStatus: ['absent', 'pending', 'failed', 'registering'],
+        });
+      } catch (err) {
+        this.logger.warn(
+          `event=onboarding_pending_stamp_failed botId=${botId} clientAgentId=${clientAgentId} error=${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
+
+    await this.lifecyclePublisher.publishHappyPath({
+      clientAgentId,
+      telegramBotIds,
+    });
   }
 
   private isDuplicateKeyError(error: any): boolean {

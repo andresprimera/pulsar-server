@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { Types } from 'mongoose';
 import {
   NotFoundException,
   BadRequestException,
@@ -13,7 +14,8 @@ import { ClientPhoneRepository } from '@persistence/repositories/client-phone.re
 import { AgentPriceRepository } from '@persistence/repositories/agent-price.repository';
 import { ChannelPriceRepository } from '@persistence/repositories/channel-price.repository';
 import { PersonalityRepository } from '@persistence/repositories/personality.repository';
-import { WebhookRegistrationCoordinator } from '@orchestrator/jobs/webhook/webhook-registration.coordinator';
+import { HireChannelLifecyclePublisher } from '@orchestrator/lifecycle/hire-channel-lifecycle.publisher';
+import { HIRE_CHANNEL_LIFECYCLE_PORT } from '@shared/ports/hire-channel-lifecycle.port';
 
 describe('ClientAgentsService', () => {
   let service: ClientAgentsService;
@@ -25,7 +27,8 @@ describe('ClientAgentsService', () => {
   let mockAgentPriceRepository: any;
   let mockChannelPriceRepository: any;
   let mockPersonalityRepository: any;
-  let mockWebhookRegistrationCoordinator: any;
+  let mockLifecyclePublisher: any;
+  let mockLifecyclePort: any;
 
   const mockClientAgent = {
     id: 'ca-1',
@@ -65,14 +68,18 @@ describe('ClientAgentsService', () => {
       findById: jest.fn(),
       update: jest.fn(),
       updateWithQuery: jest.fn(),
+      countByFilter: jest.fn(),
+      findPageWithProjection: jest.fn(),
     };
 
     mockClientsService = {
       findById: jest.fn(),
+      findManyByIds: jest.fn().mockResolvedValue([]),
     };
 
     mockAgentsService = {
       findOne: jest.fn(),
+      findManyByIds: jest.fn().mockResolvedValue([]),
     };
 
     mockChannelRepository = {
@@ -97,10 +104,21 @@ describe('ClientAgentsService', () => {
 
     mockPersonalityRepository = {
       findActiveById: jest.fn().mockResolvedValue(mockPersonality),
+      findManyByIds: jest.fn().mockResolvedValue([]),
     };
 
-    mockWebhookRegistrationCoordinator = {
-      enqueueForTelegramChannels: jest.fn().mockResolvedValue(undefined),
+    mockLifecyclePublisher = {
+      publishHappyPath: jest.fn().mockResolvedValue(undefined),
+      publishProbe: jest.fn().mockResolvedValue(undefined),
+    };
+
+    mockLifecyclePort = {
+      recordOutcome: jest.fn().mockResolvedValue({ matched: true }),
+      loadForRegistration: jest.fn(),
+      quarantineTelegramRegistration: jest
+        .fn()
+        .mockResolvedValue({ matched: true }),
+      findReconcilableTelegramHires: jest.fn().mockResolvedValue([]),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -139,8 +157,12 @@ describe('ClientAgentsService', () => {
           useValue: mockPersonalityRepository,
         },
         {
-          provide: WebhookRegistrationCoordinator,
-          useValue: mockWebhookRegistrationCoordinator,
+          provide: HireChannelLifecyclePublisher,
+          useValue: mockLifecyclePublisher,
+        },
+        {
+          provide: HIRE_CHANNEL_LIFECYCLE_PORT,
+          useValue: mockLifecyclePort,
         },
       ],
     }).compile();
@@ -576,6 +598,306 @@ describe('ClientAgentsService', () => {
     });
   });
 
+  describe('findAllHydrated', () => {
+    it('computes pagination math (total=37, page=2, limit=10 → totalPages=4, skip=10)', async () => {
+      mockClientAgentRepository.countByFilter.mockResolvedValue(37);
+      mockClientAgentRepository.findPageWithProjection.mockResolvedValue([]);
+
+      const result = await service.findAllHydrated({
+        page: 2,
+        limit: 10,
+      } as any);
+
+      expect(
+        mockClientAgentRepository.findPageWithProjection,
+      ).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({ skip: 10, limit: 10 }),
+      );
+      expect(result.totalPages).toBe(4);
+      expect(result.page).toBe(2);
+      expect(result.limit).toBe(10);
+      expect(result.total).toBe(37);
+    });
+
+    it('uses default sort { createdAt: -1 } when sort is undefined', async () => {
+      mockClientAgentRepository.countByFilter.mockResolvedValue(0);
+      mockClientAgentRepository.findPageWithProjection.mockResolvedValue([]);
+
+      await service.findAllHydrated({} as any);
+
+      expect(
+        mockClientAgentRepository.findPageWithProjection,
+      ).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({ sort: { createdAt: -1 } }),
+      );
+    });
+
+    it('parses descending sort prefix `-updatedAt`', async () => {
+      mockClientAgentRepository.countByFilter.mockResolvedValue(0);
+      mockClientAgentRepository.findPageWithProjection.mockResolvedValue([]);
+
+      await service.findAllHydrated({ sort: '-updatedAt' } as any);
+
+      expect(
+        mockClientAgentRepository.findPageWithProjection,
+      ).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({ sort: { updatedAt: -1 } }),
+      );
+    });
+
+    it('passes filters through to the repo correctly with personalityId as ObjectId', async () => {
+      mockClientAgentRepository.countByFilter.mockResolvedValue(0);
+      mockClientAgentRepository.findPageWithProjection.mockResolvedValue([]);
+
+      await service.findAllHydrated({
+        status: 'active',
+        clientId: 'c-1',
+        agentId: 'a-1',
+        personalityId: '507f1f77bcf86cd799439099',
+        createdAfter: new Date('2024-01-01T00:00:00Z'),
+        createdBefore: new Date('2024-12-31T00:00:00Z'),
+      } as any);
+
+      const filterArg =
+        mockClientAgentRepository.findPageWithProjection.mock.calls[0][0];
+      expect(filterArg.status).toBe('active');
+      expect(filterArg.clientId).toBe('c-1');
+      expect(filterArg.agentId).toBe('a-1');
+      expect(filterArg.personalityId).toBeInstanceOf(Types.ObjectId);
+      expect(String(filterArg.personalityId)).toBe('507f1f77bcf86cd799439099');
+      expect(filterArg.createdAt.$gte).toEqual(
+        new Date('2024-01-01T00:00:00Z'),
+      );
+      expect(filterArg.createdAt.$lt).toEqual(new Date('2024-12-31T00:00:00Z'));
+
+      expect(mockClientAgentRepository.countByFilter).toHaveBeenCalledWith(
+        filterArg,
+      );
+    });
+
+    it('hydrates a page with deduped fan-out calls per relation', async () => {
+      const rows = [
+        {
+          _id: 'ca-1',
+          clientId: 'client-A',
+          agentId: 'agent-X',
+          personalityId: 'pers-1',
+          status: 'active',
+          agentPricing: {
+            amount: 10,
+            currency: 'USD',
+            monthlyTokenQuota: null,
+          },
+          billingAnchor: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          channels: [],
+        },
+        {
+          _id: 'ca-2',
+          clientId: 'client-A',
+          agentId: 'agent-Y',
+          personalityId: 'pers-1',
+          status: 'active',
+          agentPricing: {
+            amount: 10,
+            currency: 'USD',
+            monthlyTokenQuota: null,
+          },
+          billingAnchor: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          channels: [],
+        },
+        {
+          _id: 'ca-3',
+          clientId: 'client-B',
+          agentId: 'agent-Y',
+          personalityId: 'pers-2',
+          status: 'active',
+          agentPricing: {
+            amount: 10,
+            currency: 'USD',
+            monthlyTokenQuota: null,
+          },
+          billingAnchor: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          channels: [],
+        },
+        {
+          _id: 'ca-4',
+          clientId: 'client-C',
+          agentId: 'agent-Z',
+          personalityId: 'pers-2',
+          status: 'active',
+          agentPricing: {
+            amount: 10,
+            currency: 'USD',
+            monthlyTokenQuota: null,
+          },
+          billingAnchor: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          channels: [],
+        },
+        {
+          _id: 'ca-5',
+          clientId: 'client-A',
+          agentId: 'agent-W',
+          personalityId: 'pers-1',
+          status: 'active',
+          agentPricing: {
+            amount: 10,
+            currency: 'USD',
+            monthlyTokenQuota: null,
+          },
+          billingAnchor: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          channels: [],
+        },
+      ];
+      mockClientAgentRepository.countByFilter.mockResolvedValue(rows.length);
+      mockClientAgentRepository.findPageWithProjection.mockResolvedValue(rows);
+      mockClientsService.findManyByIds.mockResolvedValue([]);
+      mockAgentsService.findManyByIds.mockResolvedValue([]);
+      mockPersonalityRepository.findManyByIds.mockResolvedValue([]);
+
+      await service.findAllHydrated({} as any);
+
+      expect(mockClientsService.findManyByIds).toHaveBeenCalledTimes(1);
+      expect(mockAgentsService.findManyByIds).toHaveBeenCalledTimes(1);
+      expect(mockPersonalityRepository.findManyByIds).toHaveBeenCalledTimes(1);
+
+      const clientIdsArg = mockClientsService.findManyByIds.mock.calls[0][0];
+      const agentIdsArg = mockAgentsService.findManyByIds.mock.calls[0][0];
+      const personalityIdsArg =
+        mockPersonalityRepository.findManyByIds.mock.calls[0][0];
+
+      expect(clientIdsArg.sort()).toEqual(
+        ['client-A', 'client-B', 'client-C'].sort(),
+      );
+      expect(agentIdsArg.sort()).toEqual(
+        ['agent-W', 'agent-X', 'agent-Y', 'agent-Z'].sort(),
+      );
+      expect(personalityIdsArg.sort()).toEqual(['pers-1', 'pers-2'].sort());
+    });
+
+    it('short-circuits fan-out when the page is empty', async () => {
+      mockClientAgentRepository.countByFilter.mockResolvedValue(0);
+      mockClientAgentRepository.findPageWithProjection.mockResolvedValue([]);
+
+      const result = await service.findAllHydrated({} as any);
+
+      expect(mockClientsService.findManyByIds).not.toHaveBeenCalled();
+      expect(mockAgentsService.findManyByIds).not.toHaveBeenCalled();
+      expect(mockPersonalityRepository.findManyByIds).not.toHaveBeenCalled();
+      expect(result.items).toEqual([]);
+      expect(result.totalPages).toBe(1);
+    });
+
+    it('keeps the row in items when a referenced entity is missing (null hydration)', async () => {
+      const row = {
+        _id: 'ca-1',
+        clientId: 'client-missing',
+        agentId: 'agent-missing',
+        personalityId: 'pers-missing',
+        status: 'active',
+        agentPricing: { amount: 10, currency: 'USD', monthlyTokenQuota: null },
+        billingAnchor: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        channels: [],
+      };
+      mockClientAgentRepository.countByFilter.mockResolvedValue(1);
+      mockClientAgentRepository.findPageWithProjection.mockResolvedValue([row]);
+      mockClientsService.findManyByIds.mockResolvedValue([]);
+      mockAgentsService.findManyByIds.mockResolvedValue([]);
+      mockPersonalityRepository.findManyByIds.mockResolvedValue([]);
+
+      const result = await service.findAllHydrated({} as any);
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].client).toBeNull();
+      expect(result.items[0].agent).toBeNull();
+      expect(result.items[0].personality).toBeNull();
+    });
+
+    it('redacts credentials, telegramWebhookSecretHex, fingerprint, and promptSupplement from output items', async () => {
+      const row = {
+        _id: 'ca-1',
+        clientId: 'client-1',
+        agentId: 'agent-1',
+        personalityId: 'pers-1',
+        status: 'active',
+        agentPricing: { amount: 10, currency: 'USD', monthlyTokenQuota: null },
+        billingAnchor: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        promptSupplement: 'should-not-leak',
+        channels: [
+          {
+            channelId: 'ch-1',
+            provider: 'telegram',
+            status: 'active',
+            amount: 0,
+            currency: 'USD',
+            monthlyMessageQuota: null,
+            credentials: { botToken: 'super-secret' },
+            telegramWebhookSecretHex: 'deadbeef',
+            telegramBotId: '123',
+            webhookRegistration: {
+              status: 'registered',
+              attemptCount: 1,
+              fingerprint: 'fp-secret',
+            },
+          },
+        ],
+      };
+      mockClientAgentRepository.countByFilter.mockResolvedValue(1);
+      mockClientAgentRepository.findPageWithProjection.mockResolvedValue([row]);
+      mockClientsService.findManyByIds.mockResolvedValue([]);
+      mockAgentsService.findManyByIds.mockResolvedValue([]);
+      mockPersonalityRepository.findManyByIds.mockResolvedValue([]);
+
+      const result = await service.findAllHydrated({} as any);
+
+      const item = result.items[0];
+
+      const json = JSON.stringify(result);
+      expect(json).not.toContain('super-secret');
+      expect(json).not.toContain('deadbeef');
+      expect(json).not.toContain('fp-secret');
+      expect(json).not.toContain('should-not-leak');
+
+      // Deep key scan
+      const collectKeys = (val: unknown, acc: Set<string>) => {
+        if (Array.isArray(val)) {
+          for (const v of val) collectKeys(v, acc);
+        } else if (val && typeof val === 'object') {
+          for (const [k, v] of Object.entries(val as Record<string, unknown>)) {
+            acc.add(k);
+            collectKeys(v, acc);
+          }
+        }
+      };
+      const keys = new Set<string>();
+      collectKeys(item, keys);
+      expect(keys.has('credentials')).toBe(false);
+      expect(keys.has('telegramWebhookSecretHex')).toBe(false);
+      expect(keys.has('fingerprint')).toBe(false);
+      expect(keys.has('promptSupplement')).toBe(false);
+
+      // Sanity: kept fields
+      expect(item.channels[0].telegramBotId).toBe('123');
+      expect(item.channels[0].webhookRegistration?.status).toBe('registered');
+    });
+  });
+
   describe('telegram webhook registration triggers', () => {
     const baseDto: any = {
       clientId: '507f1f77bcf86cd799439011',
@@ -627,9 +949,7 @@ describe('ClientAgentsService', () => {
 
       await service.create(baseDto as any);
 
-      expect(
-        mockWebhookRegistrationCoordinator.enqueueForTelegramChannels,
-      ).toHaveBeenCalledWith(
+      expect(mockLifecyclePublisher.publishHappyPath).toHaveBeenCalledWith(
         expect.objectContaining({
           clientAgentId: 'ca-tg-1',
           telegramBotIds: ['123456789'],
@@ -671,14 +991,12 @@ describe('ClientAgentsService', () => {
 
       await service.create(instagramDto as any);
 
-      expect(
-        mockWebhookRegistrationCoordinator.enqueueForTelegramChannels,
-      ).not.toHaveBeenCalled();
+      expect(mockLifecyclePublisher.publishHappyPath).not.toHaveBeenCalled();
     });
 
     it('does not roll back create when coordinator throws', async () => {
       setupCommonMocks();
-      mockWebhookRegistrationCoordinator.enqueueForTelegramChannels.mockRejectedValue(
+      mockLifecyclePublisher.publishHappyPath.mockRejectedValue(
         new Error('queue down'),
       );
       const created = {
@@ -719,9 +1037,7 @@ describe('ClientAgentsService', () => {
 
       await service.updateStatus('ca-1', { status: 'active' });
 
-      expect(
-        mockWebhookRegistrationCoordinator.enqueueForTelegramChannels,
-      ).toHaveBeenCalledWith(
+      expect(mockLifecyclePublisher.publishHappyPath).toHaveBeenCalledWith(
         expect.objectContaining({
           clientAgentId: 'ca-1',
           telegramBotIds: ['987654321'],
@@ -750,9 +1066,88 @@ describe('ClientAgentsService', () => {
 
       await service.updateStatus('ca-1', { status: 'inactive' });
 
-      expect(
-        mockWebhookRegistrationCoordinator.enqueueForTelegramChannels,
-      ).not.toHaveBeenCalled();
+      expect(mockLifecyclePublisher.publishHappyPath).not.toHaveBeenCalled();
+    });
+
+    it('stamps pending via the lifecycle port BEFORE publishing the happy-path enqueue', async () => {
+      setupCommonMocks();
+      mockClientAgentRepository.create.mockResolvedValue({
+        _id: 'ca-tg-order',
+        status: 'active',
+        channels: [
+          {
+            provider: 'telegram',
+            status: 'active',
+            telegramBotId: '777777777',
+          },
+        ],
+      });
+
+      const order: string[] = [];
+      mockLifecyclePort.recordOutcome.mockImplementation(async () => {
+        order.push('recordOutcome');
+        return { matched: true };
+      });
+      mockLifecyclePublisher.publishHappyPath.mockImplementation(async () => {
+        order.push('publishHappyPath');
+      });
+
+      await service.create(baseDto as any);
+
+      expect(mockLifecyclePort.recordOutcome).toHaveBeenCalledWith(
+        expect.objectContaining({
+          telegramBotId: '777777777',
+          status: 'pending',
+          incrementAttempt: false,
+          expectStatus: ['absent', 'pending', 'failed', 'registering'],
+        }),
+      );
+      expect(order[0]).toBe('recordOutcome');
+      expect(order[order.length - 1]).toBe('publishHappyPath');
+    });
+
+    it('does not abort the publish when the lifecycle port reports matched=false (registered/quarantined no-clobber)', async () => {
+      setupCommonMocks();
+      mockClientAgentRepository.create.mockResolvedValue({
+        _id: 'ca-tg-noop',
+        status: 'active',
+        channels: [
+          {
+            provider: 'telegram',
+            status: 'active',
+            telegramBotId: '888888888',
+          },
+        ],
+      });
+      mockLifecyclePort.recordOutcome.mockResolvedValue({ matched: false });
+
+      await service.create(baseDto as any);
+
+      expect(mockLifecyclePublisher.publishHappyPath).toHaveBeenCalledWith(
+        expect.objectContaining({ telegramBotIds: ['888888888'] }),
+      );
+    });
+
+    it('does not abort the publish when the lifecycle port throws on stamping', async () => {
+      setupCommonMocks();
+      mockClientAgentRepository.create.mockResolvedValue({
+        _id: 'ca-tg-err',
+        status: 'active',
+        channels: [
+          {
+            provider: 'telegram',
+            status: 'active',
+            telegramBotId: '999999999',
+          },
+        ],
+      });
+      mockLifecyclePort.recordOutcome.mockRejectedValueOnce(
+        new Error('mongo-down'),
+      );
+
+      const result = await service.create(baseDto as any);
+      expect(result).toBeDefined();
+      expect(mockLifecyclePublisher.publishHappyPath).toHaveBeenCalled();
     });
   });
 });

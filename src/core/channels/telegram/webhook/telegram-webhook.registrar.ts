@@ -98,6 +98,25 @@ export class TelegramWebhookRegistrar
       const isFinal =
         error instanceof PermanentJobError || job.attemptsMade >= attempts;
       if (isFinal) {
+        const telegramBotId = job.data?.telegramBotId;
+        if (telegramBotId) {
+          // Terminal $inc: exactly one attemptCount increment per BullMQ job
+          // lifetime, regardless of internal retry count.
+          this.lifecycle
+            .recordOutcome({
+              telegramBotId,
+              status: 'failed',
+              lastError: error.message,
+              incrementAttempt: true,
+            })
+            .catch((wrErr) => {
+              this.logger.error(
+                `Failed to record terminal failure for telegramBotId=${telegramBotId}: ${
+                  wrErr instanceof Error ? wrErr.message : String(wrErr)
+                }`,
+              );
+            });
+        }
         this.deadLetter.moveToDeadLetter(job, error).catch((dlqErr) => {
           this.logger.error(
             `Failed to move telegram webhook job to DLQ: jobId=${

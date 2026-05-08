@@ -58,10 +58,31 @@ const TELEGRAM_WEBHOOK_BACKOFF_CURVE_MS = [
   30_000, 120_000, 600_000, 3_600_000, 21_600_000, 86_400_000,
 ];
 
+const TELEGRAM_WEBHOOK_RECONCILER_BACKOFF_CURVE_MS = [60_000];
+
+/**
+ * Short-retry policy for reconciler-driven probe jobs. Distinct from the
+ * happy-path 6-attempt curve so each probe consumes ~1m of wall-clock time,
+ * keeping the quarantine SLA bounded.
+ */
+export const TELEGRAM_WEBHOOK_RECONCILER_PROBE_OPTS = {
+  attempts: 2,
+  backoff: { type: 'telegram-webhook-reconciler-backoff' as const },
+  removeOnComplete: { count: 1000 },
+  removeOnFail: { count: 1000 },
+} as const;
+
 export const TELEGRAM_WEBHOOK_PROCESSOR_OPTIONS = {
   concurrency: 5,
   settings: {
     backoffStrategy: (attemptsMade: number, type?: string) => {
+      if (type === 'telegram-webhook-reconciler-backoff') {
+        const idx = Math.min(
+          Math.max(attemptsMade - 1, 0),
+          TELEGRAM_WEBHOOK_RECONCILER_BACKOFF_CURVE_MS.length - 1,
+        );
+        return TELEGRAM_WEBHOOK_RECONCILER_BACKOFF_CURVE_MS[idx];
+      }
       if (type !== 'telegram-webhook-backoff') {
         return 0;
       }
