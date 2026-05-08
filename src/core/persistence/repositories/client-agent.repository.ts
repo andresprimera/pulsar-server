@@ -8,6 +8,14 @@ import {
 } from './client-agent.repository.constants';
 import { normalizeToE164 } from '@shared/e164.util';
 
+const LAST_ERROR_MAX_LENGTH = 500;
+
+function truncateLastError(value: string): string {
+  return value.length > LAST_ERROR_MAX_LENGTH
+    ? value.slice(0, LAST_ERROR_MAX_LENGTH)
+    : value;
+}
+
 @Injectable()
 export class ClientAgentRepository {
   constructor(
@@ -311,7 +319,9 @@ export class ClientAgentRepository {
       $set['channels.$[ch].webhookRegistration.lastError'] = null;
     }
     if (input.lastError !== undefined) {
-      $set['channels.$[ch].webhookRegistration.lastError'] = input.lastError;
+      $set['channels.$[ch].webhookRegistration.lastError'] = truncateLastError(
+        input.lastError,
+      );
     }
 
     const update: Record<string, unknown> = { $set };
@@ -340,20 +350,9 @@ export class ClientAgentRepository {
     if (input.expectStatus && input.expectStatus.length > 0) {
       const concrete = input.expectStatus.filter((s) => s !== 'absent');
       const wantsAbsent = input.expectStatus.includes('absent');
-      const orClauses: Record<string, unknown>[] = [];
-      if (concrete.length > 0) {
-        orClauses.push({
-          'ch.webhookRegistration.status': { $in: concrete },
-        });
-      }
-      if (wantsAbsent) {
-        orClauses.push({ 'ch.webhookRegistration': { $exists: false } });
-      }
-      if (orClauses.length === 1) {
-        Object.assign(arrayFilterCh, orClauses[0]);
-      } else if (orClauses.length > 1) {
-        arrayFilterCh.$or = orClauses;
-      }
+      const values: Array<string | null> = [...concrete];
+      if (wantsAbsent) values.push(null);
+      arrayFilterCh['ch.webhookRegistration.status'] = { $in: values };
     }
     if (input.expectLastAttemptAtBefore !== undefined) {
       arrayFilterCh['ch.webhookRegistration.lastAttemptAt'] = {
@@ -361,9 +360,9 @@ export class ClientAgentRepository {
       };
     }
 
-    const res = await this.model
-      .updateOne(filter, update, { arrayFilters: [{ ch: arrayFilterCh }] })
-      .exec();
+    const res = await this.model.collection.updateOne(filter, update, {
+      arrayFilters: [arrayFilterCh],
+    });
 
     return { matched: res.matchedCount > 0 && res.modifiedCount > 0 };
   }
@@ -383,32 +382,30 @@ export class ClientAgentRepository {
       'channels.$[ch].webhookRegistration.lastAttemptAt': now,
     };
     if (input.lastError !== undefined) {
-      $set['channels.$[ch].webhookRegistration.lastError'] = input.lastError;
+      $set['channels.$[ch].webhookRegistration.lastError'] = truncateLastError(
+        input.lastError,
+      );
     }
-    const res = await this.model
-      .updateOne(
-        {
-          status: 'active',
-          channels: {
-            $elemMatch: {
-              status: 'active',
-              telegramBotId: input.telegramBotId,
-            },
+    const res = await this.model.collection.updateOne(
+      {
+        status: 'active',
+        channels: {
+          $elemMatch: {
+            status: 'active',
+            telegramBotId: input.telegramBotId,
           },
         },
-        { $set },
-        {
-          arrayFilters: [
-            {
-              ch: {
-                'ch.status': 'active',
-                'ch.telegramBotId': input.telegramBotId,
-              },
-            },
-          ],
-        },
-      )
-      .exec();
+      },
+      { $set },
+      {
+        arrayFilters: [
+          {
+            'ch.status': 'active',
+            'ch.telegramBotId': input.telegramBotId,
+          },
+        ],
+      },
+    );
     return { matched: res.matchedCount > 0 && res.modifiedCount > 0 };
   }
 

@@ -17,6 +17,9 @@ describe('ClientAgentRepository telegram webhook methods', () => {
       updateOne: jest.fn(),
       aggregate: jest.fn(),
       countDocuments: jest.fn(),
+      collection: {
+        updateOne: jest.fn(),
+      },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -57,10 +60,10 @@ describe('ClientAgentRepository telegram webhook methods', () => {
 
   describe('updateWebhookRegistrationByTelegramBotId', () => {
     it('does NOT $inc attemptCount by default (incrementAttempt omitted)', async () => {
-      const exec = jest
-        .fn()
-        .mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
-      mockModel.updateOne.mockReturnValue({ exec });
+      mockModel.collection.updateOne.mockResolvedValue({
+        matchedCount: 1,
+        modifiedCount: 1,
+      });
 
       const result = await repository.updateWebhookRegistrationByTelegramBotId({
         telegramBotId: '12345',
@@ -68,8 +71,9 @@ describe('ClientAgentRepository telegram webhook methods', () => {
         fingerprint: 'fp',
       });
 
-      expect(mockModel.updateOne).toHaveBeenCalledTimes(1);
-      const [filter, update, opts] = mockModel.updateOne.mock.calls[0];
+      expect(mockModel.collection.updateOne).toHaveBeenCalledTimes(1);
+      const [filter, update, opts] =
+        mockModel.collection.updateOne.mock.calls[0];
       expect(filter).toEqual(
         expect.objectContaining({
           status: 'active',
@@ -91,10 +95,8 @@ describe('ClientAgentRepository telegram webhook methods', () => {
       expect(opts).toEqual({
         arrayFilters: [
           {
-            ch: {
-              'ch.status': 'active',
-              'ch.telegramBotId': '12345',
-            },
+            'ch.status': 'active',
+            'ch.telegramBotId': '12345',
           },
         ],
       });
@@ -102,10 +104,10 @@ describe('ClientAgentRepository telegram webhook methods', () => {
     });
 
     it('emits $inc only when incrementAttempt=true', async () => {
-      const exec = jest
-        .fn()
-        .mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
-      mockModel.updateOne.mockReturnValue({ exec });
+      mockModel.collection.updateOne.mockResolvedValue({
+        matchedCount: 1,
+        modifiedCount: 1,
+      });
 
       await repository.updateWebhookRegistrationByTelegramBotId({
         telegramBotId: '12345',
@@ -114,17 +116,17 @@ describe('ClientAgentRepository telegram webhook methods', () => {
         incrementAttempt: true,
       });
 
-      const [, update] = mockModel.updateOne.mock.calls[0];
+      const [, update] = mockModel.collection.updateOne.mock.calls[0];
       expect(update.$inc).toEqual({
         'channels.$[ch].webhookRegistration.attemptCount': 1,
       });
     });
 
     it('adds fingerprint $ne short-circuit only when status=registering and fingerprint provided', async () => {
-      const exec = jest
-        .fn()
-        .mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
-      mockModel.updateOne.mockReturnValue({ exec });
+      mockModel.collection.updateOne.mockResolvedValue({
+        matchedCount: 1,
+        modifiedCount: 1,
+      });
 
       await repository.updateWebhookRegistrationByTelegramBotId({
         telegramBotId: '12345',
@@ -132,17 +134,17 @@ describe('ClientAgentRepository telegram webhook methods', () => {
         fingerprint: 'fp-1',
       });
 
-      const [, , opts] = mockModel.updateOne.mock.calls[0];
+      const [, , opts] = mockModel.collection.updateOne.mock.calls[0];
       expect(
-        opts.arrayFilters[0].ch['ch.webhookRegistration.fingerprint'],
+        opts.arrayFilters[0]['ch.webhookRegistration.fingerprint'],
       ).toEqual({ $ne: 'fp-1' });
     });
 
     it('expectStatus with concrete values applies $in array-filter predicate', async () => {
-      const exec = jest
-        .fn()
-        .mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
-      mockModel.updateOne.mockReturnValue({ exec });
+      mockModel.collection.updateOne.mockResolvedValue({
+        matchedCount: 1,
+        modifiedCount: 1,
+      });
 
       await repository.updateWebhookRegistrationByTelegramBotId({
         telegramBotId: '12345',
@@ -150,17 +152,17 @@ describe('ClientAgentRepository telegram webhook methods', () => {
         expectStatus: ['pending', 'failed'],
       });
 
-      const [, , opts] = mockModel.updateOne.mock.calls[0];
-      expect(opts.arrayFilters[0].ch['ch.webhookRegistration.status']).toEqual({
+      const [, , opts] = mockModel.collection.updateOne.mock.calls[0];
+      expect(opts.arrayFilters[0]['ch.webhookRegistration.status']).toEqual({
         $in: ['pending', 'failed'],
       });
     });
 
-    it("expectStatus = ['absent'] requires webhookRegistration to be missing", async () => {
-      const exec = jest
-        .fn()
-        .mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
-      mockModel.updateOne.mockReturnValue({ exec });
+    it("expectStatus = ['absent'] matches via $in: [null]", async () => {
+      mockModel.collection.updateOne.mockResolvedValue({
+        matchedCount: 1,
+        modifiedCount: 1,
+      });
 
       await repository.updateWebhookRegistrationByTelegramBotId({
         telegramBotId: '12345',
@@ -168,17 +170,17 @@ describe('ClientAgentRepository telegram webhook methods', () => {
         expectStatus: ['absent'],
       });
 
-      const [, , opts] = mockModel.updateOne.mock.calls[0];
-      expect(opts.arrayFilters[0].ch['ch.webhookRegistration']).toEqual({
-        $exists: false,
+      const [, , opts] = mockModel.collection.updateOne.mock.calls[0];
+      expect(opts.arrayFilters[0]['ch.webhookRegistration.status']).toEqual({
+        $in: [null],
       });
     });
 
-    it("expectStatus mixing 'absent' and concrete statuses produces $or disjunction", async () => {
-      const exec = jest
-        .fn()
-        .mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
-      mockModel.updateOne.mockReturnValue({ exec });
+    it("expectStatus mixing 'absent' and concrete statuses adds null to $in", async () => {
+      mockModel.collection.updateOne.mockResolvedValue({
+        matchedCount: 1,
+        modifiedCount: 1,
+      });
 
       await repository.updateWebhookRegistrationByTelegramBotId({
         telegramBotId: '12345',
@@ -186,25 +188,17 @@ describe('ClientAgentRepository telegram webhook methods', () => {
         expectStatus: ['absent', 'pending', 'failed', 'registering'],
       });
 
-      const [, , opts] = mockModel.updateOne.mock.calls[0];
-      const arrayFilter = opts.arrayFilters[0].ch;
-      expect(arrayFilter.$or).toEqual(
-        expect.arrayContaining([
-          {
-            'ch.webhookRegistration.status': {
-              $in: ['pending', 'failed', 'registering'],
-            },
-          },
-          { 'ch.webhookRegistration': { $exists: false } },
-        ]),
-      );
+      const [, , opts] = mockModel.collection.updateOne.mock.calls[0];
+      expect(opts.arrayFilters[0]['ch.webhookRegistration.status']).toEqual({
+        $in: ['pending', 'failed', 'registering', null],
+      });
     });
 
     it('expectLastAttemptAtBefore appends $lt predicate to array filter', async () => {
-      const exec = jest
-        .fn()
-        .mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
-      mockModel.updateOne.mockReturnValue({ exec });
+      mockModel.collection.updateOne.mockResolvedValue({
+        matchedCount: 1,
+        modifiedCount: 1,
+      });
 
       const cutoff = new Date('2026-05-07T00:00:00Z');
       await repository.updateWebhookRegistrationByTelegramBotId({
@@ -214,17 +208,17 @@ describe('ClientAgentRepository telegram webhook methods', () => {
         expectLastAttemptAtBefore: cutoff,
       });
 
-      const [, , opts] = mockModel.updateOne.mock.calls[0];
+      const [, , opts] = mockModel.collection.updateOne.mock.calls[0];
       expect(
-        opts.arrayFilters[0].ch['ch.webhookRegistration.lastAttemptAt'],
+        opts.arrayFilters[0]['ch.webhookRegistration.lastAttemptAt'],
       ).toEqual({ $lt: cutoff });
     });
 
     it('returns matched=false when modifiedCount is 0 even if matchedCount > 0', async () => {
-      const exec = jest
-        .fn()
-        .mockResolvedValue({ matchedCount: 1, modifiedCount: 0 });
-      mockModel.updateOne.mockReturnValue({ exec });
+      mockModel.collection.updateOne.mockResolvedValue({
+        matchedCount: 1,
+        modifiedCount: 0,
+      });
 
       const result = await repository.updateWebhookRegistrationByTelegramBotId({
         telegramBotId: '12345',
@@ -236,10 +230,10 @@ describe('ClientAgentRepository telegram webhook methods', () => {
     });
 
     it('writes lastError when provided', async () => {
-      const exec = jest
-        .fn()
-        .mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
-      mockModel.updateOne.mockReturnValue({ exec });
+      mockModel.collection.updateOne.mockResolvedValue({
+        matchedCount: 1,
+        modifiedCount: 1,
+      });
 
       await repository.updateWebhookRegistrationByTelegramBotId({
         telegramBotId: '12345',
@@ -247,7 +241,7 @@ describe('ClientAgentRepository telegram webhook methods', () => {
         lastError: 'Unauthorized',
       });
 
-      const [, update] = mockModel.updateOne.mock.calls[0];
+      const [, update] = mockModel.collection.updateOne.mock.calls[0];
       expect(update.$set['channels.$[ch].webhookRegistration.lastError']).toBe(
         'Unauthorized',
       );
@@ -256,17 +250,17 @@ describe('ClientAgentRepository telegram webhook methods', () => {
 
   describe('quarantineWebhookRegistration', () => {
     it("sets status='quarantined' without $inc", async () => {
-      const exec = jest
-        .fn()
-        .mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
-      mockModel.updateOne.mockReturnValue({ exec });
+      mockModel.collection.updateOne.mockResolvedValue({
+        matchedCount: 1,
+        modifiedCount: 1,
+      });
 
       const result = await repository.quarantineWebhookRegistration({
         telegramBotId: '12345',
         lastError: 'reconciler:quarantine_threshold_exceeded',
       });
 
-      const [, update] = mockModel.updateOne.mock.calls[0];
+      const [, update] = mockModel.collection.updateOne.mock.calls[0];
       expect(update.$set['channels.$[ch].webhookRegistration.status']).toBe(
         'quarantined',
       );
