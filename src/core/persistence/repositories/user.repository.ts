@@ -28,8 +28,31 @@ export class UserRepository {
     email: string,
     session?: ClientSession,
   ): Promise<User | null> {
-    const query = this.model.findOne({ email });
+    const normalized = String(email).trim().toLowerCase();
+    const query = this.model
+      .findOne({ email: normalized })
+      .collation({ locale: 'en', strength: 2 });
     return (session ? query.session(session) : query).exec();
+  }
+
+  async findByEmailWithPasswordHash(
+    email: string,
+    session?: ClientSession,
+  ): Promise<User | null> {
+    const normalized = String(email).trim().toLowerCase();
+    const query = this.model
+      .findOne({ email: normalized })
+      .collation({ locale: 'en', strength: 2 })
+      .select('+passwordHash');
+    return (session ? query.session(session) : query).exec();
+  }
+
+  async setPasswordHash(id: string, hash: string): Promise<void> {
+    await this.model.updateOne({ _id: id }, { passwordHash: hash }).exec();
+  }
+
+  async setLastLoginAt(id: string, when: Date): Promise<void> {
+    await this.model.updateOne({ _id: id }, { lastLoginAt: when }).exec();
   }
 
   async findByStatus(

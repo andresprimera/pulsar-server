@@ -20,6 +20,7 @@ import { PersonalitiesModule } from './features/personalities/personalities.modu
 import { ClientContextSuggestionsModule } from './features/client-context-suggestions/client-context-suggestions.module';
 import { ClientCatalogItemsModule } from './features/client-catalog-items/client-catalog-items.module';
 import { AdminAuthModule } from './features/admin-auth/admin-auth.module';
+import { ClientAuthModule } from './features/client-auth/client-auth.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { AdminAuthModule } from './features/admin-auth/admin-auth.module';
     ClientCatalogItemsModule,
     OnboardingModule,
     AdminAuthModule,
+    ClientAuthModule,
   ],
 
   controllers: [AppController],

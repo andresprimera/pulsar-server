@@ -8,14 +8,14 @@ import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { IS_PUBLIC_KEY } from '@shared/decorators/public.decorator';
 import { IS_CLIENT_AUTH_KEY } from '@shared/decorators/client-auth.decorator';
-import { ADMIN_SESSION_COOKIE_NAME } from './session-cookie-options';
-import { AdminSessionsService } from './admin-sessions.service';
+import { CLIENT_SESSION_COOKIE_NAME } from './client-session-cookie-options';
+import { ClientSessionsService } from './client-sessions.service';
 
 @Injectable()
-export class AdminAuthGuard implements CanActivate {
+export class ClientAuthGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    private readonly adminSessionsService: AdminSessionsService,
+    private readonly clientSessionsService: ClientSessionsService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -31,7 +31,7 @@ export class AdminAuthGuard implements CanActivate {
       IS_CLIENT_AUTH_KEY,
       [context.getHandler(), context.getClass()],
     );
-    if (isClientAuth === true) {
+    if (isClientAuth !== true) {
       return true;
     }
 
@@ -41,18 +41,19 @@ export class AdminAuthGuard implements CanActivate {
       throw new UnauthorizedException('Authentication required');
     }
 
-    const validated = await this.adminSessionsService.validateAndTouch(
+    const validated = await this.clientSessionsService.validateAndTouch(
       rawToken,
     );
     if (validated === null) {
       throw new UnauthorizedException('Authentication required');
     }
 
-    request.adminUser = {
-      adminUserId: validated.admin.id,
+    request.clientUser = {
+      userId: validated.user.id,
+      clientId: validated.user.clientId.toString(),
       sessionId: validated.session.id,
-      email: validated.admin.email,
-      status: validated.admin.status,
+      email: validated.user.email,
+      status: validated.user.status,
     };
     return true;
   }
@@ -66,7 +67,7 @@ export class AdminAuthGuard implements CanActivate {
     if (cookies === undefined || cookies === null) {
       return null;
     }
-    const raw = cookies[ADMIN_SESSION_COOKIE_NAME];
+    const raw = cookies[CLIENT_SESSION_COOKIE_NAME];
     if (typeof raw !== 'string' || raw.length === 0) {
       return null;
     }

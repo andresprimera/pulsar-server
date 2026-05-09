@@ -62,6 +62,12 @@ import {
 } from './schemas/admin-session.schema';
 import { AdminUserRepository } from './repositories/admin-user.repository';
 import { AdminSessionRepository } from './repositories/admin-session.repository';
+import {
+  ClientUserSession,
+  ClientUserSessionSchema,
+} from './schemas/client-user-session.schema';
+import { ClientUserSessionRepository } from './repositories/client-user-session.repository';
+import { UsersEmailCollationMigration } from './migrations/users-email-collation.migration';
 
 const repositories = [
   ClientRepository,
@@ -82,6 +88,7 @@ const repositories = [
   LlmUsageLogRepository,
   AdminUserRepository,
   AdminSessionRepository,
+  ClientUserSessionRepository,
 ];
 
 @Global()
@@ -116,12 +123,14 @@ const repositories = [
       { name: BillingRecord.name, schema: BillingRecordSchema },
       { name: AdminUser.name, schema: AdminUserSchema },
       { name: AdminSession.name, schema: AdminSessionSchema },
+      { name: ClientUserSession.name, schema: ClientUserSessionSchema },
     ]),
     forwardRef(() => OnboardingModule),
   ],
   providers: [
     ...repositories,
     SeederService,
+    UsersEmailCollationMigration,
     EventIdempotencyService,
     HireChannelLifecycleAdapter,
     {

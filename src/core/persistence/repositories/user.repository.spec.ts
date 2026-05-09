@@ -23,6 +23,7 @@ describe('UserRepository', () => {
       findById: jest.fn(),
       findOne: jest.fn(),
       findByIdAndUpdate: jest.fn(),
+      updateOne: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -92,33 +93,80 @@ describe('UserRepository', () => {
   });
 
   describe('findByEmail', () => {
-    it('should return user when exists', async () => {
-      mockModel.findOne.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(mockUser),
-        session: jest.fn().mockReturnValue({
-          exec: jest.fn().mockResolvedValue(mockUser),
-        }),
-      });
+    it('lowercases and trims the input and applies a case-insensitive collation', async () => {
+      const exec = jest.fn().mockResolvedValue(mockUser);
+      const collation = jest.fn().mockReturnValue({ exec });
+      mockModel.findOne.mockReturnValue({ collation });
 
-      const result = await repository.findByEmail('test@example.com');
+      const result = await repository.findByEmail('  Test@Example.COM  ');
 
       expect(mockModel.findOne).toHaveBeenCalledWith({
         email: 'test@example.com',
       });
+      expect(collation).toHaveBeenCalledWith({ locale: 'en', strength: 2 });
       expect(result).toEqual(mockUser);
     });
 
-    it('should return null when not exists', async () => {
+    it('returns null when not found', async () => {
+      const exec = jest.fn().mockResolvedValue(null);
       mockModel.findOne.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(null),
-        session: jest.fn().mockReturnValue({
-          exec: jest.fn().mockResolvedValue(null),
-        }),
+        collation: jest.fn().mockReturnValue({ exec }),
       });
 
       const result = await repository.findByEmail('unknown@example.com');
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('findByEmailWithPasswordHash', () => {
+    it('lowercases, applies collation, and selects +passwordHash', async () => {
+      const exec = jest.fn().mockResolvedValue(mockUser);
+      const select = jest.fn().mockReturnValue({ exec });
+      const collation = jest.fn().mockReturnValue({ select });
+      mockModel.findOne.mockReturnValue({ collation });
+
+      const result = await repository.findByEmailWithPasswordHash(
+        '  Test@Example.COM  ',
+      );
+
+      expect(mockModel.findOne).toHaveBeenCalledWith({
+        email: 'test@example.com',
+      });
+      expect(collation).toHaveBeenCalledWith({ locale: 'en', strength: 2 });
+      expect(select).toHaveBeenCalledWith('+passwordHash');
+      expect(result).toEqual(mockUser);
+    });
+  });
+
+  describe('setPasswordHash', () => {
+    it('updates only the passwordHash field', async () => {
+      mockModel.updateOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(undefined),
+      });
+
+      await repository.setPasswordHash('user-id', 'hashed-pw');
+
+      expect(mockModel.updateOne).toHaveBeenCalledWith(
+        { _id: 'user-id' },
+        { passwordHash: 'hashed-pw' },
+      );
+    });
+  });
+
+  describe('setLastLoginAt', () => {
+    it('updates only the lastLoginAt field', async () => {
+      mockModel.updateOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(undefined),
+      });
+
+      const when = new Date();
+      await repository.setLastLoginAt('user-id', when);
+
+      expect(mockModel.updateOne).toHaveBeenCalledWith(
+        { _id: 'user-id' },
+        { lastLoginAt: when },
+      );
     });
   });
 

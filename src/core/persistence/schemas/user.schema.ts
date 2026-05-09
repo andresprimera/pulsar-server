@@ -3,7 +3,10 @@ import { Document, Types } from 'mongoose';
 
 @Schema({ collection: 'users', timestamps: true })
 export class User extends Document {
-  @Prop({ required: true, unique: true, index: true })
+  @Prop({
+    required: true,
+    set: (v: string) => String(v).trim().toLowerCase(),
+  })
   email: string;
 
   @Prop({ required: true })
@@ -24,6 +27,21 @@ export class User extends Document {
     index: true,
   })
   status: 'active' | 'inactive' | 'archived';
+
+  @Prop({ required: false, select: false })
+  passwordHash?: string;
+
+  @Prop({ type: Date, default: null })
+  lastLoginAt: Date | null;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
+
+UserSchema.index(
+  { email: 1 },
+  {
+    unique: true,
+    collation: { locale: 'en', strength: 2 },
+    name: 'email_1_ci',
+  },
+);
