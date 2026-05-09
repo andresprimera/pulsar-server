@@ -19,6 +19,7 @@ import { OnboardingModule } from './features/onboarding/onboarding.module';
 import { PersonalitiesModule } from './features/personalities/personalities.module';
 import { ClientContextSuggestionsModule } from './features/client-context-suggestions/client-context-suggestions.module';
 import { ClientCatalogItemsModule } from './features/client-catalog-items/client-catalog-items.module';
+import { AdminAuthModule } from './features/admin-auth/admin-auth.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { ClientCatalogItemsModule } from './features/client-catalog-items/client
     ClientContextSuggestionsModule,
     ClientCatalogItemsModule,
     OnboardingModule,
+    AdminAuthModule,
   ],
 
   controllers: [AppController],

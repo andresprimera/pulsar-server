@@ -1,6 +1,8 @@
 import { Controller, Post, Body, HttpCode, Logger } from '@nestjs/common';
 import { TiktokService } from './tiktok.service';
+import { Public } from '@shared/decorators/public.decorator';
 
+@Public()
 @Controller('tiktok')
 export class TiktokController {
   private readonly logger = new Logger(TiktokController.name);

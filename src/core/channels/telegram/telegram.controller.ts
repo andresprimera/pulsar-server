@@ -8,7 +8,9 @@ import {
   Post,
 } from '@nestjs/common';
 import { TelegramService } from './telegram.service';
+import { Public } from '@shared/decorators/public.decorator';
 
+@Public()
 @Controller('telegram')
 export class TelegramController {
   private readonly logger = new Logger(TelegramController.name);

@@ -27,7 +27,8 @@
         "src/features/client-context-suggestions/*"
       ],
       "@personalities/*": ["src/features/personalities/*"],
-      "@client-catalog-items/*": ["src/features/client-catalog-items/*"]
+      "@client-catalog-items/*": ["src/features/client-catalog-items/*"],
+      "@admin-auth/*": ["src/features/admin-auth/*"]
     },
     "incremental": true,
     "preserveWatchOutput": true,

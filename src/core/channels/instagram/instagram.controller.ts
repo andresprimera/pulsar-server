@@ -11,7 +11,9 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { InstagramService } from './instagram.service';
+import { Public } from '@shared/decorators/public.decorator';
 
+@Public()
 @Controller('instagram')
 export class InstagramController {
   private readonly logger = new Logger(InstagramController.name);

@@ -13,7 +13,9 @@ import { RegisterAndHireDto } from './dto/register-and-hire.dto';
 import { ClientContextSuggestionService } from '@client-context-suggestions/client-context-suggestion.service';
 import { SuggestCompanyBriefDto } from '@client-context-suggestions/dto/suggest-company-brief.dto';
 import { SuggestPromptSupplementDto } from '@client-context-suggestions/dto/suggest-prompt-supplement.dto';
+import { Public } from '@shared/decorators/public.decorator';
 
+@Public()
 @Controller('onboarding')
 export class OnboardingController {
   constructor(

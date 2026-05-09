@@ -30,6 +30,7 @@
     "test:integration": "jest --config ./test/jest-integration.json",
     "prepare": "husky",
     "seed": "ts-node src/core/persistence/seed.ts",
+    "seed:admin": "ts-node -r tsconfig-paths/register scripts/seed-admin-user.ts",
     "db:reset": "ts-node -r tsconfig-paths/register scripts/drop-db-and-seed.ts",
     "test:architecture": "jest --config ./test/jest-architecture.json",
     "check:cycles": "madge --circular src --extensions ts --ts-config ./tsconfig.json",
@@ -50,9 +51,11 @@
     "@nestjs/platform-express": "^9.0.0",
     "@nestjs/schedule": "^4.0.0",
     "ai": "^6.0.66",
+    "argon2": "^0.44.0",
     "bullmq": "^5.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
+    "cookie-parser": "^1.4.7",
     "csv-parse": "^6.2.1",
     "imapflow": "^1.2.9",
     "ioredis": "^5.3.2",
@@ -69,6 +72,7 @@
     "@nestjs/cli": "^9.0.0",
     "@nestjs/schematics": "^9.0.0",
     "@nestjs/testing": "^9.0.0",
+    "@types/cookie-parser": "^1.4.10",
     "@types/express": "^4.17.13",
     "@types/jest": "29.5.1",
     "@types/multer": "^2.1.0",
@@ -121,12 +125,18 @@
       "^@users/(.*)$": "<rootDir>/features/users/$1",
       "^@onboarding/(.*)$": "<rootDir>/features/onboarding/$1",
       "^@client-context-suggestions/(.*)$": "<rootDir>/features/client-context-suggestions/$1",
-      "^@client-catalog-items/(.*)$": "<rootDir>/features/client-catalog-items/$1"
+      "^@client-catalog-items/(.*)$": "<rootDir>/features/client-catalog-items/$1",
+      "^@admin-auth/(.*)$": "<rootDir>/features/admin-auth/$1"
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "argon2"
+    ]
   }
 }

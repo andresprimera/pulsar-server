@@ -12,7 +12,9 @@ import {
 import { ChannelProvider } from '@domain/channels/channel-provider.enum';
 import { WhatsAppChannelService } from './whatsapp-channel.service';
 import { WhatsAppProviderRouter } from './provider-router';
+import { Public } from '@shared/decorators/public.decorator';
 
+@Public()
 @Controller('whatsapp')
 export class WhatsappController {
   private readonly logger = new Logger(WhatsappController.name);

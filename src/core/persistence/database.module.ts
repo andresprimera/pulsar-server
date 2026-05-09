@@ -55,6 +55,13 @@ import { EventIdempotencyService } from './event-idempotency.service';
 import { OnboardingModule } from '@onboarding/onboarding.module';
 import { HireChannelLifecycleAdapter } from './ports/hire-channel-lifecycle.adapter';
 import { HIRE_CHANNEL_LIFECYCLE_PORT } from '@shared/ports/hire-channel-lifecycle.port';
+import { AdminUser, AdminUserSchema } from './schemas/admin-user.schema';
+import {
+  AdminSession,
+  AdminSessionSchema,
+} from './schemas/admin-session.schema';
+import { AdminUserRepository } from './repositories/admin-user.repository';
+import { AdminSessionRepository } from './repositories/admin-session.repository';
 
 const repositories = [
   ClientRepository,
@@ -73,6 +80,8 @@ const repositories = [
   ConversationRepository,
   ProcessedEventRepository,
   LlmUsageLogRepository,
+  AdminUserRepository,
+  AdminSessionRepository,
 ];
 
 @Global()
@@ -105,6 +114,8 @@ const repositories = [
       { name: AgentPrice.name, schema: AgentPriceSchema },
       { name: ChannelPrice.name, schema: ChannelPriceSchema },
       { name: BillingRecord.name, schema: BillingRecordSchema },
+      { name: AdminUser.name, schema: AdminUserSchema },
+      { name: AdminSession.name, schema: AdminSessionSchema },
     ]),
     forwardRef(() => OnboardingModule),
   ],
