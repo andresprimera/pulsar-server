@@ -1,13 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
+import * as cookieParser from 'cookie-parser';
 import { AppModule } from '../src/app.module';
 import { Connection, Types } from 'mongoose';
 import { getConnectionToken } from '@nestjs/mongoose';
+import { loginAsTestAdmin, AdminTestAuth } from './helpers/admin-test-auth';
 
 describe('ClientAgents admin list (e2e)', () => {
   let app: INestApplication;
   let connection: Connection;
+  let adminAuth: AdminTestAuth;
 
   let testPersonalityId: Types.ObjectId;
   const createdPersonalityIds: Types.ObjectId[] = [];
@@ -127,6 +130,7 @@ describe('ClientAgents admin list (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.use(cookieParser());
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -137,6 +141,8 @@ describe('ClientAgents admin list (e2e)', () => {
     await app.init();
 
     connection = moduleFixture.get<Connection>(getConnectionToken());
+
+    adminAuth = await loginAsTestAdmin(app, connection);
 
     const personalityDoc = await connection
       .collection('personalities')
@@ -166,6 +172,7 @@ describe('ClientAgents admin list (e2e)', () => {
 
   afterAll(async () => {
     await cleanup();
+    await adminAuth.cleanup();
     await app.close();
   });
 
@@ -193,6 +200,7 @@ describe('ClientAgents admin list (e2e)', () => {
 
     const response = await request(app.getHttpServer())
       .get('/client-agents')
+      .set('Cookie', adminAuth.cookie)
       .expect(200);
 
     expect(response.body).toEqual(
@@ -240,6 +248,7 @@ describe('ClientAgents admin list (e2e)', () => {
       .get(
         `/client-agents?status=active&limit=2&page=1&clientId=${clientA.toString()}`,
       )
+      .set('Cookie', adminAuth.cookie)
       .expect(200);
 
     expect(response.body.page).toBe(1);
@@ -254,18 +263,22 @@ describe('ClientAgents admin list (e2e)', () => {
   it('rejects invalid query params with 400', async () => {
     await request(app.getHttpServer())
       .get('/client-agents?limit=101')
+      .set('Cookie', adminAuth.cookie)
       .expect(400);
 
     await request(app.getHttpServer())
       .get('/client-agents?sort=foo')
+      .set('Cookie', adminAuth.cookie)
       .expect(400);
 
     await request(app.getHttpServer())
       .get('/client-agents?personalityId=not-a-mongo-id')
+      .set('Cookie', adminAuth.cookie)
       .expect(400);
 
     await request(app.getHttpServer())
       .get('/client-agents?pageSize=20')
+      .set('Cookie', adminAuth.cookie)
       .expect(400);
   });
 
@@ -280,6 +293,7 @@ describe('ClientAgents admin list (e2e)', () => {
 
     const response = await request(app.getHttpServer())
       .get(`/client-agents?clientId=${clientA.toString()}`)
+      .set('Cookie', adminAuth.cookie)
       .expect(200);
 
     const json = JSON.stringify(response.body);
@@ -311,6 +325,7 @@ describe('ClientAgents admin list (e2e)', () => {
       .get(
         '/client-agents?createdAfter=2024-12-01T00:00:00.000Z&createdBefore=2024-01-01T00:00:00.000Z',
       )
+      .set('Cookie', adminAuth.cookie)
       .expect(400);
   });
 });

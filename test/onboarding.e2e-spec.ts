@@ -1,15 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
+import * as cookieParser from 'cookie-parser';
 import { AppModule } from '../src/app.module';
 import { Connection, Types } from 'mongoose';
 import { getConnectionToken } from '@nestjs/mongoose';
+import { loginAsTestAdmin, AdminTestAuth } from './helpers/admin-test-auth';
 
 describe('Onboarding (e2e)', () => {
   let app: INestApplication;
   let connection: Connection;
   let testAgentId: string;
   let testPersonalityId: string;
+  let adminAuth: AdminTestAuth;
 
   const cleanup = async () => {
     if (connection) {
@@ -43,10 +46,13 @@ describe('Onboarding (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.use(cookieParser());
     app.useGlobalPipes(new ValidationPipe());
     await app.init();
 
     connection = moduleFixture.get<Connection>(getConnectionToken());
+
+    adminAuth = await loginAsTestAdmin(app, connection);
 
     try {
       // Remove potential zombie index from previous schema versions
@@ -62,6 +68,7 @@ describe('Onboarding (e2e)', () => {
     // Create a test agent for hiring
     const agentResponse = await request(app.getHttpServer())
       .post('/agents')
+      .set('Cookie', adminAuth.cookie)
       .send({
         name: 'E2E Onboarding Test Agent',
         systemPrompt: 'You are a test assistant for onboarding.',
@@ -72,6 +79,7 @@ describe('Onboarding (e2e)', () => {
     // Ensure catalog price exists for onboarding (USD)
     await request(app.getHttpServer())
       .put(`/agents/${testAgentId}/prices/USD`)
+      .set('Cookie', adminAuth.cookie)
       .send({ amount: 0 })
       .expect(200);
 
@@ -97,6 +105,7 @@ describe('Onboarding (e2e)', () => {
 
   afterAll(async () => {
     await cleanup();
+    await adminAuth.cleanup();
     await app.close();
   });
 
@@ -125,6 +134,7 @@ describe('Onboarding (e2e)', () => {
     // Ensure catalog price exists for onboarding (USD)
     await request(app.getHttpServer())
       .put(`/channels/${channelId}/prices/USD`)
+      .set('Cookie', adminAuth.cookie)
       .send({ amount: 0 })
       .expect(200);
 
@@ -166,6 +176,7 @@ describe('Onboarding (e2e)', () => {
 
       await request(app.getHttpServer())
         .post('/clients/context-suggestions/company-brief/suggest')
+        .set('Cookie', adminAuth.cookie)
         .field('instructions', 'Hello')
         .expect(400);
 
@@ -180,6 +191,7 @@ describe('Onboarding (e2e)', () => {
 
       await request(app.getHttpServer())
         .post('/clients/context-suggestions/prompt-supplement/suggest')
+        .set('Cookie', adminAuth.cookie)
         .field('instructions', 'Hello')
         .expect(400);
 
@@ -284,6 +296,7 @@ describe('Onboarding (e2e)', () => {
       // EDGE-3: Verify that GET /client-agents excludes credentials (select: false)
       const listResponse = await request(app.getHttpServer())
         .get(`/client-agents/client/${response.body.client._id}`)
+        .set('Cookie', adminAuth.cookie)
         .expect(200);
 
       expect(listResponse.body).toHaveLength(1);
@@ -538,6 +551,7 @@ describe('Onboarding (e2e)', () => {
       // Create and deactivate an agent
       const inactiveAgentResponse = await request(app.getHttpServer())
         .post('/agents')
+        .set('Cookie', adminAuth.cookie)
         .send({
           name: 'E2E Onboarding Inactive Agent',
           systemPrompt: 'Test',
@@ -545,6 +559,7 @@ describe('Onboarding (e2e)', () => {
 
       await request(app.getHttpServer())
         .patch(`/agents/${inactiveAgentResponse.body._id}/status`)
+        .set('Cookie', adminAuth.cookie)
         .send({ status: 'inactive' });
 
       const channelName = `e2e-test-channel-inactive-${Date.now()}`;

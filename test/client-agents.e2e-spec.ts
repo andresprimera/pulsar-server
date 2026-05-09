@@ -1,14 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
+import * as cookieParser from 'cookie-parser';
 import { AppModule } from '../src/app.module';
 import { Connection, Types } from 'mongoose';
 import { getConnectionToken } from '@nestjs/mongoose';
+import { loginAsTestAdmin, AdminTestAuth } from './helpers/admin-test-auth';
 
 describe('ClientAgents (e2e)', () => {
   let app: INestApplication;
   let connection: Connection;
   let testPersonalityId: string;
+  let adminAuth: AdminTestAuth;
 
   const createdClientIds: Types.ObjectId[] = [];
   const createdAgentIds: string[] = [];
@@ -79,6 +82,7 @@ describe('ClientAgents (e2e)', () => {
   const createActiveAgent = async (name: string): Promise<string> => {
     const response = await request(app.getHttpServer())
       .post('/agents')
+      .set('Cookie', adminAuth.cookie)
       .send({
         name,
         systemPrompt: 'You are a test assistant.',
@@ -90,6 +94,7 @@ describe('ClientAgents (e2e)', () => {
 
     await request(app.getHttpServer())
       .put(`/agents/${agentId}/prices/USD`)
+      .set('Cookie', adminAuth.cookie)
       .send({ amount: 0 })
       .expect(200);
 
@@ -114,6 +119,7 @@ describe('ClientAgents (e2e)', () => {
     const channelIdStr = channelId.toString();
     await request(app.getHttpServer())
       .put(`/channels/${channelIdStr}/prices/USD`)
+      .set('Cookie', adminAuth.cookie)
       .send({ amount: 0 })
       .expect(200);
 
@@ -126,10 +132,13 @@ describe('ClientAgents (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.use(cookieParser());
     app.useGlobalPipes(new ValidationPipe());
     await app.init();
 
     connection = moduleFixture.get<Connection>(getConnectionToken());
+
+    adminAuth = await loginAsTestAdmin(app, connection);
 
     // Get or create a personality for client-agent creation (required)
     const personality = await connection
@@ -157,6 +166,7 @@ describe('ClientAgents (e2e)', () => {
 
   afterAll(async () => {
     await cleanup();
+    await adminAuth.cleanup();
     await app.close();
   });
 
@@ -172,6 +182,7 @@ describe('ClientAgents (e2e)', () => {
 
     const response = await request(app.getHttpServer())
       .post('/client-agents')
+      .set('Cookie', adminAuth.cookie)
       .send({
         clientId,
         agentId,
@@ -217,6 +228,7 @@ describe('ClientAgents (e2e)', () => {
 
     const response = await request(app.getHttpServer())
       .post('/client-agents')
+      .set('Cookie', adminAuth.cookie)
       .send({
         clientId,
         agentId,
@@ -243,6 +255,7 @@ describe('ClientAgents (e2e)', () => {
 
     const response = await request(app.getHttpServer())
       .post('/client-agents')
+      .set('Cookie', adminAuth.cookie)
       .send({
         clientId,
         agentId,
@@ -288,6 +301,7 @@ describe('ClientAgents (e2e)', () => {
 
     const response = await request(app.getHttpServer())
       .post('/client-agents')
+      .set('Cookie', adminAuth.cookie)
       .send({
         clientId,
         agentId,
@@ -328,6 +342,7 @@ describe('ClientAgents (e2e)', () => {
 
     const firstResponse = await request(app.getHttpServer())
       .post('/client-agents')
+      .set('Cookie', adminAuth.cookie)
       .send({
         clientId: clientAId,
         agentId,
@@ -355,6 +370,7 @@ describe('ClientAgents (e2e)', () => {
 
     const secondResponse = await request(app.getHttpServer())
       .post('/client-agents')
+      .set('Cookie', adminAuth.cookie)
       .send({
         clientId: clientBId,
         agentId,

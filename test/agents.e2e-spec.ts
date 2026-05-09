@@ -1,14 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
+import * as cookieParser from 'cookie-parser';
 import { AppModule } from '../src/app.module';
 import { Connection } from 'mongoose';
 import { getConnectionToken } from '@nestjs/mongoose';
+import { loginAsTestAdmin, AdminTestAuth } from './helpers/admin-test-auth';
 
 describe('Agents CRUD (e2e)', () => {
   let app: INestApplication;
   let connection: Connection;
   let createdAgentId: string;
+  let adminAuth: AdminTestAuth;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -16,10 +19,13 @@ describe('Agents CRUD (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.use(cookieParser());
     app.useGlobalPipes(new ValidationPipe());
     await app.init();
 
     connection = moduleFixture.get<Connection>(getConnectionToken());
+
+    adminAuth = await loginAsTestAdmin(app, connection);
   });
 
   afterAll(async () => {
@@ -29,6 +35,7 @@ describe('Agents CRUD (e2e)', () => {
         name: { $regex: /^E2E Test/ },
       });
     }
+    await adminAuth.cleanup();
     await app.close();
   });
 
@@ -36,6 +43,7 @@ describe('Agents CRUD (e2e)', () => {
     it('should create a new agent with status=active', async () => {
       const response = await request(app.getHttpServer())
         .post('/agents')
+        .set('Cookie', adminAuth.cookie)
         .send({
           name: 'E2E Test Agent',
           systemPrompt: 'You are a test assistant.',
@@ -53,6 +61,7 @@ describe('Agents CRUD (e2e)', () => {
     it('should reject invalid payload (missing name)', async () => {
       const response = await request(app.getHttpServer())
         .post('/agents')
+        .set('Cookie', adminAuth.cookie)
         .send({
           systemPrompt: 'You are a test assistant.',
         })
@@ -64,6 +73,7 @@ describe('Agents CRUD (e2e)', () => {
     it('should reject invalid payload (missing systemPrompt)', async () => {
       const response = await request(app.getHttpServer())
         .post('/agents')
+        .set('Cookie', adminAuth.cookie)
         .send({
           name: 'Test',
         })
@@ -77,6 +87,7 @@ describe('Agents CRUD (e2e)', () => {
     it('should return all agents', async () => {
       const response = await request(app.getHttpServer())
         .get('/agents')
+        .set('Cookie', adminAuth.cookie)
         .expect(200);
 
       expect(Array.isArray(response.body)).toBe(true);
@@ -86,6 +97,7 @@ describe('Agents CRUD (e2e)', () => {
     it('should filter agents by status', async () => {
       const response = await request(app.getHttpServer())
         .get('/agents')
+        .set('Cookie', adminAuth.cookie)
         .query({ status: 'active' })
         .expect(200);
 
@@ -100,6 +112,7 @@ describe('Agents CRUD (e2e)', () => {
     it('should return only active agents', async () => {
       const response = await request(app.getHttpServer())
         .get('/agents/available')
+        .set('Cookie', adminAuth.cookie)
         .expect(200);
 
       expect(Array.isArray(response.body)).toBe(true);
@@ -113,6 +126,7 @@ describe('Agents CRUD (e2e)', () => {
     it('should return agent by ID', async () => {
       const response = await request(app.getHttpServer())
         .get(`/agents/${createdAgentId}`)
+        .set('Cookie', adminAuth.cookie)
         .expect(200);
 
       expect(response.body._id).toBe(createdAgentId);
@@ -122,6 +136,7 @@ describe('Agents CRUD (e2e)', () => {
     it('should return 404 for non-existent ID', async () => {
       await request(app.getHttpServer())
         .get('/agents/507f1f77bcf86cd799439011')
+        .set('Cookie', adminAuth.cookie)
         .expect(404);
     });
   });
@@ -130,6 +145,7 @@ describe('Agents CRUD (e2e)', () => {
     it('should update agent fields', async () => {
       const response = await request(app.getHttpServer())
         .patch(`/agents/${createdAgentId}`)
+        .set('Cookie', adminAuth.cookie)
         .send({
           name: 'E2E Test Agent Updated',
         })
@@ -142,6 +158,7 @@ describe('Agents CRUD (e2e)', () => {
     it('should return 404 for non-existent ID', async () => {
       await request(app.getHttpServer())
         .patch('/agents/507f1f77bcf86cd799439011')
+        .set('Cookie', adminAuth.cookie)
         .send({ name: 'Updated' })
         .expect(404);
     });
@@ -151,6 +168,7 @@ describe('Agents CRUD (e2e)', () => {
     it('should update agent status to inactive', async () => {
       const response = await request(app.getHttpServer())
         .patch(`/agents/${createdAgentId}/status`)
+        .set('Cookie', adminAuth.cookie)
         .send({ status: 'inactive' })
         .expect(200);
 
@@ -160,6 +178,7 @@ describe('Agents CRUD (e2e)', () => {
     it('should update agent status back to active', async () => {
       const response = await request(app.getHttpServer())
         .patch(`/agents/${createdAgentId}/status`)
+        .set('Cookie', adminAuth.cookie)
         .send({ status: 'active' })
         .expect(200);
 
@@ -169,6 +188,7 @@ describe('Agents CRUD (e2e)', () => {
     it('should reject invalid status value', async () => {
       const response = await request(app.getHttpServer())
         .patch(`/agents/${createdAgentId}/status`)
+        .set('Cookie', adminAuth.cookie)
         .send({ status: 'deleted' })
         .expect(400);
 
@@ -182,6 +202,7 @@ describe('Agents CRUD (e2e)', () => {
     it('should return 404 for non-existent ID', async () => {
       await request(app.getHttpServer())
         .patch('/agents/507f1f77bcf86cd799439011/status')
+        .set('Cookie', adminAuth.cookie)
         .send({ status: 'inactive' })
         .expect(404);
     });
@@ -194,6 +215,7 @@ describe('Agents CRUD (e2e)', () => {
       // Create a new agent specifically for archive tests
       const createResponse = await request(app.getHttpServer())
         .post('/agents')
+        .set('Cookie', adminAuth.cookie)
         .send({
           name: 'E2E Test Agent To Archive',
           systemPrompt: 'Will be archived.',
@@ -204,12 +226,14 @@ describe('Agents CRUD (e2e)', () => {
       // Archive it
       await request(app.getHttpServer())
         .patch(`/agents/${archivedAgentId}/status`)
+        .set('Cookie', adminAuth.cookie)
         .send({ status: 'archived' });
     });
 
     it('should not allow updating archived agent fields', async () => {
       const response = await request(app.getHttpServer())
         .patch(`/agents/${archivedAgentId}`)
+        .set('Cookie', adminAuth.cookie)
         .send({ name: 'Should Not Update' })
         .expect(400);
 
@@ -219,6 +243,7 @@ describe('Agents CRUD (e2e)', () => {
     it('should not allow changing archived agent status', async () => {
       const response = await request(app.getHttpServer())
         .patch(`/agents/${archivedAgentId}/status`)
+        .set('Cookie', adminAuth.cookie)
         .send({ status: 'active' })
         .expect(400);
 
@@ -228,6 +253,7 @@ describe('Agents CRUD (e2e)', () => {
     it('archived agent should still be readable', async () => {
       const response = await request(app.getHttpServer())
         .get(`/agents/${archivedAgentId}`)
+        .set('Cookie', adminAuth.cookie)
         .expect(200);
 
       expect(response.body.status).toBe('archived');
@@ -236,6 +262,7 @@ describe('Agents CRUD (e2e)', () => {
     it('archived agent should not appear in available list', async () => {
       const response = await request(app.getHttpServer())
         .get('/agents/available')
+        .set('Cookie', adminAuth.cookie)
         .expect(200);
 
       const archivedAgent = response.body.find(
