@@ -2,9 +2,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Types } from 'mongoose';
-import { AdminAuthGuard } from './admin-auth.guard';
-import { AdminSessionsService } from './admin-sessions.service';
-import { ADMIN_SESSION_COOKIE_NAME } from './session-cookie-options';
+import { ClientAuthGuard } from './client-auth.guard';
+import { ClientSessionsService } from './client-sessions.service';
+import { CLIENT_SESSION_COOKIE_NAME } from './client-session-cookie-options';
 import { IS_PUBLIC_KEY } from '@shared/decorators/public.decorator';
 import { IS_CLIENT_AUTH_KEY } from '@shared/decorators/client-auth.decorator';
 
@@ -22,10 +22,10 @@ const buildContext = (request: Record<string, unknown>): ExecutionContext => {
   } as unknown as ExecutionContext;
 };
 
-describe('AdminAuthGuard', () => {
-  let guard: AdminAuthGuard;
+describe('ClientAuthGuard', () => {
+  let guard: ClientAuthGuard;
   let reflector: jest.Mocked<Reflector>;
-  let sessionsService: jest.Mocked<AdminSessionsService>;
+  let sessionsService: jest.Mocked<ClientSessionsService>;
 
   beforeEach(async () => {
     reflector = {
@@ -33,31 +33,32 @@ describe('AdminAuthGuard', () => {
     } as unknown as jest.Mocked<Reflector>;
     sessionsService = {
       validateAndTouch: jest.fn(),
-    } as unknown as jest.Mocked<AdminSessionsService>;
+    } as unknown as jest.Mocked<ClientSessionsService>;
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
-        AdminAuthGuard,
+        ClientAuthGuard,
         { provide: Reflector, useValue: reflector },
-        { provide: AdminSessionsService, useValue: sessionsService },
+        { provide: ClientSessionsService, useValue: sessionsService },
       ],
     }).compile();
 
-    guard = moduleRef.get(AdminAuthGuard);
+    guard = moduleRef.get(ClientAuthGuard);
   });
 
   it('short-circuits and allows when @Public() is set', async () => {
-    reflector.getAllAndOverride.mockReturnValue(true);
+    reflector.getAllAndOverride.mockImplementation((key) =>
+      key === IS_PUBLIC_KEY ? true : undefined,
+    );
     const ctx = buildContext({ cookies: {} });
 
     expect(await guard.canActivate(ctx)).toBe(true);
     expect(sessionsService.validateAndTouch).not.toHaveBeenCalled();
   });
 
-  it('short-circuits and allows when route is tagged @ClientAuth()', async () => {
+  it('short-circuits and allows when @ClientAuth() is NOT set', async () => {
     reflector.getAllAndOverride.mockImplementation((key) => {
-      if (key === IS_PUBLIC_KEY) return undefined;
-      if (key === IS_CLIENT_AUTH_KEY) return true;
+      void key;
       return undefined;
     });
     const ctx = buildContext({ cookies: {} });
@@ -66,8 +67,10 @@ describe('AdminAuthGuard', () => {
     expect(sessionsService.validateAndTouch).not.toHaveBeenCalled();
   });
 
-  it('rejects with 401 when no cookie is present', async () => {
-    reflector.getAllAndOverride.mockReturnValue(undefined);
+  it('rejects with 401 when @ClientAuth() is set but no cookie is present', async () => {
+    reflector.getAllAndOverride.mockImplementation((key) =>
+      key === IS_CLIENT_AUTH_KEY ? true : undefined,
+    );
     const ctx = buildContext({ cookies: {} });
 
     await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(
@@ -76,7 +79,9 @@ describe('AdminAuthGuard', () => {
   });
 
   it('rejects with 401 when cookies object is missing entirely', async () => {
-    reflector.getAllAndOverride.mockReturnValue(undefined);
+    reflector.getAllAndOverride.mockImplementation((key) =>
+      key === IS_CLIENT_AUTH_KEY ? true : undefined,
+    );
     const ctx = buildContext({});
 
     await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(
@@ -85,10 +90,12 @@ describe('AdminAuthGuard', () => {
   });
 
   it('rejects with 401 when validateAndTouch returns null', async () => {
-    reflector.getAllAndOverride.mockReturnValue(undefined);
+    reflector.getAllAndOverride.mockImplementation((key) =>
+      key === IS_CLIENT_AUTH_KEY ? true : undefined,
+    );
     sessionsService.validateAndTouch.mockResolvedValue(null);
     const ctx = buildContext({
-      cookies: { [ADMIN_SESSION_COOKIE_NAME]: 'token-value' },
+      cookies: { [CLIENT_SESSION_COOKIE_NAME]: 'token-value' },
     });
 
     await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(
@@ -99,28 +106,33 @@ describe('AdminAuthGuard', () => {
     );
   });
 
-  it('attaches the admin principal to the request on success', async () => {
-    reflector.getAllAndOverride.mockReturnValue(undefined);
-    const adminId = new Types.ObjectId();
+  it('attaches the client user principal (with clientId) to the request on success', async () => {
+    reflector.getAllAndOverride.mockImplementation((key) =>
+      key === IS_CLIENT_AUTH_KEY ? true : undefined,
+    );
+    const userId = new Types.ObjectId();
+    const clientId = new Types.ObjectId();
     const sessionId = new Types.ObjectId();
     sessionsService.validateAndTouch.mockResolvedValue({
       session: { id: sessionId.toHexString() } as never,
-      admin: {
-        id: adminId.toHexString(),
-        email: 'admin@example.com',
+      user: {
+        id: userId.toHexString(),
+        clientId,
+        email: 'user@example.com',
         status: 'active',
       } as never,
     });
     const request: Record<string, unknown> = {
-      cookies: { [ADMIN_SESSION_COOKIE_NAME]: 'token-value' },
+      cookies: { [CLIENT_SESSION_COOKIE_NAME]: 'token-value' },
     };
     const ctx = buildContext(request);
 
     expect(await guard.canActivate(ctx)).toBe(true);
-    expect(request.adminUser).toEqual({
-      adminUserId: adminId.toHexString(),
+    expect(request.clientUser).toEqual({
+      userId: userId.toHexString(),
+      clientId: clientId.toString(),
       sessionId: sessionId.toHexString(),
-      email: 'admin@example.com',
+      email: 'user@example.com',
       status: 'active',
     });
   });
