@@ -20,6 +20,7 @@ import { AgentPriceRepository } from './repositories/agent-price.repository';
 import { ChannelPriceRepository } from './repositories/channel-price.repository';
 import { PersonalityRepository } from './repositories/personality.repository';
 import { Personality } from './schemas/personality.schema';
+import * as argon2 from 'argon2';
 import { encryptRecord, encrypt } from '@shared/crypto.util';
 import {
   deriveTelegramWebhookSecret,
@@ -351,6 +352,18 @@ export class SeederService implements OnApplicationBootstrap {
           `  - Client: ${result.client._id} (${result.client.name})`,
         );
         this.logger.log(`  - ClientAgent: ${result.clientAgent._id}`);
+
+        const seedPassword = (userSeed as { password?: string }).password;
+        if (typeof seedPassword === 'string' && seedPassword.length > 0) {
+          const passwordHash = await argon2.hash(seedPassword, {
+            type: argon2.argon2id,
+          });
+          await this.userRepository.setPasswordHash(
+            result.user._id.toString(),
+            passwordHash,
+          );
+          this.logger.log(`  - Set seed password for ${result.user.email}`);
+        }
 
         // Process additional agent hirings if any
         if (userSeed.agentHirings.length > 1) {
