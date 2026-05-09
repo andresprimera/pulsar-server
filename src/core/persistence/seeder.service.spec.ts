@@ -79,6 +79,7 @@ describe('SeederService', () => {
 
     mockUserRepository = {
       findByEmail: jest.fn(),
+      setPasswordHash: jest.fn().mockResolvedValue(undefined),
     };
 
     mockOnboardingService = {
@@ -383,6 +384,38 @@ describe('SeederService', () => {
         expect.stringContaining('already exists. Skipping seeding'),
       );
       expect(mockOnboardingService.registerAndHire).not.toHaveBeenCalled();
+    });
+
+    it('should hash and set password on seeded users that include a password', async () => {
+      process.env.NODE_ENV = 'development';
+
+      mockUserRepository.findByEmail.mockResolvedValue(null);
+      mockAgentModel.findOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
+      });
+      mockAgentModel.create.mockResolvedValue({
+        _id: mockAgentId,
+        name: SEED_DATA.agents[0].name,
+      });
+      mockChannelRepository.findOrCreateByName.mockResolvedValue({
+        _id: 'channel-id',
+        name: 'WhatsApp',
+        supportedProviders: ['meta', 'twilio'],
+      });
+
+      await service.onApplicationBootstrap();
+
+      const seedHasPassword = SEED_DATA.users.some(
+        (u: { password?: string }) =>
+          typeof u.password === 'string' && u.password.length > 0,
+      );
+      expect(seedHasPassword).toBe(true);
+
+      expect(mockUserRepository.setPasswordHash).toHaveBeenCalled();
+      const [, hash] = mockUserRepository.setPasswordHash.mock.calls[0];
+      // argon2id PHC string starts with "$argon2id$"
+      expect(typeof hash).toBe('string');
+      expect(hash).toMatch(/^\$argon2id\$/);
     });
 
     it('should reuse existing agent if found', async () => {

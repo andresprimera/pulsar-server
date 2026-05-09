@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { AdminAuthController } from './admin-auth.controller';
 import { AdminAuthService } from './admin-auth.service';
 import { AdminUsersService } from './admin-users.service';
+import { AdminUserSeederService } from './admin-user-seeder.service';
 import { AdminSessionsService } from './admin-sessions.service';
 import { AdminAuthGuard } from './admin-auth.guard';
 
@@ -13,6 +14,7 @@ import { AdminAuthGuard } from './admin-auth.guard';
     AdminSessionsService,
     AdminAuthService,
     AdminAuthGuard,
+    AdminUserSeederService,
     { provide: APP_GUARD, useExisting: AdminAuthGuard },
   ],
   exports: [AdminAuthService, AdminUsersService],

@@ -151,6 +151,7 @@
     {
       "email": "admin@homegroupd.com",
       "name": "Home Group User",
+      "password": "password1234",
       "client": {
         "type": "individual",
         "llmConfig": {
@@ -190,6 +191,7 @@
     {
       "email": "andresprimera@gmail.com.app",
       "name": "Andrés Primera",
+      "password": "password1234",
       "client": {
         "type": "organization",
         "name": "Andres Company Inc."
@@ -224,6 +226,7 @@
     {
       "email": "admin@codingbox.app",
       "name": "CodingBox User",
+      "password": "password1234",
       "client": {
         "type": "organization",
         "name": "Coding Box LLC"
