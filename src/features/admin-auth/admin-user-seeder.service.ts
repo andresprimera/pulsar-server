@@ -32,6 +32,7 @@ export class AdminUserSeederService implements OnApplicationBootstrap {
         email,
         password,
         displayName,
+        role: 'super_admin',
       });
       this.logger.log(`Seeded admin user "${created.email}" (${created._id})`);
     } catch (error) {

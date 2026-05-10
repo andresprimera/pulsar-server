@@ -120,6 +120,7 @@ describe('ClientAuthGuard', () => {
         clientId,
         email: 'user@example.com',
         status: 'active',
+        clientRole: 'owner',
       } as never,
     });
     const request: Record<string, unknown> = {
@@ -134,6 +135,7 @@ describe('ClientAuthGuard', () => {
       sessionId: sessionId.toHexString(),
       email: 'user@example.com',
       status: 'active',
+      clientRole: 'owner',
     });
   });
 });

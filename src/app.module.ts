@@ -21,6 +21,7 @@ import { ClientContextSuggestionsModule } from './features/client-context-sugges
 import { ClientCatalogItemsModule } from './features/client-catalog-items/client-catalog-items.module';
 import { AdminAuthModule } from './features/admin-auth/admin-auth.module';
 import { ClientAuthModule } from './features/client-auth/client-auth.module';
+import { AuthorizationModule } from './features/authorization/authorization.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { ClientAuthModule } from './features/client-auth/client-auth.module';
     OnboardingModule,
     AdminAuthModule,
     ClientAuthModule,
+    AuthorizationModule,
   ],
 
   controllers: [AppController],

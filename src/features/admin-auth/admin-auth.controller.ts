@@ -107,6 +107,7 @@ export class AdminAuthController {
       email: admin.email,
       displayName: admin.displayName,
       status: admin.status,
+      role: admin.role,
       lastLoginAt:
         admin.lastLoginAt === null || admin.lastLoginAt === undefined
           ? null

@@ -53,6 +53,7 @@ export class AdminAuthGuard implements CanActivate {
       sessionId: validated.session.id,
       email: validated.admin.email,
       status: validated.admin.status,
+      role: validated.admin.role,
     };
     return true;
   }

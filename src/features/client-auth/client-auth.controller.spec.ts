@@ -18,6 +18,7 @@ const buildUser = (overrides: Partial<User> = {}): User => {
     name: 'User',
     clientId: new Types.ObjectId(),
     status: 'active',
+    clientRole: 'owner',
     lastLoginAt: null,
     ...overrides,
   } as unknown as User;
@@ -114,6 +115,7 @@ describe('ClientAuthController', () => {
         sessionId: 'session-id',
         email: 'user@example.com',
         status: 'active',
+        clientRole: 'owner',
       };
       const response = buildResponse();
 
@@ -161,6 +163,7 @@ describe('ClientAuthController', () => {
           sessionId: 's',
           email: 'e',
           status: 'active',
+          clientRole: 'owner',
         }),
       ).rejects.toBeInstanceOf(UnauthorizedException);
     });
@@ -177,6 +180,7 @@ describe('ClientAuthController', () => {
           sessionId: 's',
           email: 'e',
           status: 'active',
+          clientRole: 'owner',
         }),
       ).rejects.toBeInstanceOf(UnauthorizedException);
     });
@@ -191,12 +195,14 @@ describe('ClientAuthController', () => {
         sessionId: 's',
         email: user.email,
         status: 'active',
+        clientRole: 'owner',
       });
 
       expect(clientAuthService.getMe).toHaveBeenCalledWith(user.id);
       expect(result.principal.kind).toBe('clientUser');
       expect(result.principal.email).toBe(user.email);
       expect(result.principal.status).toBe('active');
+      expect(result.principal.clientRole).toBe('owner');
       expect(result.principal.displayName).toBe(user.name);
     });
   });

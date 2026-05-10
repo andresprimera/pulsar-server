@@ -54,6 +54,7 @@ export class ClientAuthGuard implements CanActivate {
       sessionId: validated.session.id,
       email: validated.user.email,
       status: validated.user.status,
+      clientRole: validated.user.clientRole,
     };
     return true;
   }

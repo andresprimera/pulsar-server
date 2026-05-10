@@ -109,6 +109,7 @@ describe('AdminAuthGuard', () => {
         id: adminId.toHexString(),
         email: 'admin@example.com',
         status: 'active',
+        role: 'super_admin',
       } as never,
     });
     const request: Record<string, unknown> = {
@@ -122,6 +123,7 @@ describe('AdminAuthGuard', () => {
       sessionId: sessionId.toHexString(),
       email: 'admin@example.com',
       status: 'active',
+      role: 'super_admin',
     });
   });
 });
