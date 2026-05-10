@@ -16,18 +16,11 @@ import { LoginDto } from './dto/login.dto';
 import { Public } from '@shared/decorators/public.decorator';
 import { CurrentAdmin } from '@shared/decorators/current-admin.decorator';
 import { AdminPrincipal } from '@shared/types/express';
+import { AdminPrincipalDto, AuthEnvelopeDto } from '@shared/auth/principal.dto';
 import {
   ADMIN_SESSION_COOKIE_NAME,
   getSessionCookieOptions,
 } from './session-cookie-options';
-
-interface AdminResponseDto {
-  id: string;
-  email: string;
-  displayName: string;
-  status: 'active' | 'disabled';
-  lastLoginAt: string | null;
-}
 
 @Controller('admin-auth')
 export class AdminAuthController {
@@ -43,7 +36,7 @@ export class AdminAuthController {
     @Body() dto: LoginDto,
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
-  ): Promise<{ admin: AdminResponseDto }> {
+  ): Promise<AuthEnvelopeDto<AdminPrincipalDto>> {
     const result = await this.adminAuthService.login({
       email: dto.email,
       password: dto.password,
@@ -56,7 +49,7 @@ export class AdminAuthController {
       maxAge: this.adminSessionsService.getAbsoluteTtlMs(),
     });
 
-    return { admin: this.toAdminResponse(result.admin) };
+    return { principal: this.toAdminPrincipal(result.admin) };
   }
 
   @Post('logout')
@@ -74,7 +67,7 @@ export class AdminAuthController {
   @Get('me')
   async me(
     @CurrentAdmin() admin: AdminPrincipal | undefined,
-  ): Promise<{ admin: AdminResponseDto }> {
+  ): Promise<AuthEnvelopeDto<AdminPrincipalDto>> {
     if (admin === undefined) {
       throw new UnauthorizedException('Authentication required');
     }
@@ -82,7 +75,7 @@ export class AdminAuthController {
     if (fresh === null) {
       throw new UnauthorizedException('Authentication required');
     }
-    return { admin: this.toAdminResponse(fresh) };
+    return { principal: this.toAdminPrincipal(fresh) };
   }
 
   private clearSessionCookie(response: Response): void {
@@ -105,10 +98,11 @@ export class AdminAuthController {
     return header;
   }
 
-  private toAdminResponse(
+  private toAdminPrincipal(
     admin: import('@persistence/schemas/admin-user.schema').AdminUser,
-  ): AdminResponseDto {
+  ): AdminPrincipalDto {
     return {
+      kind: 'admin',
       id: admin.id,
       email: admin.email,
       displayName: admin.displayName,
