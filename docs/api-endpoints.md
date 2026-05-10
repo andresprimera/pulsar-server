@@ -16,6 +16,58 @@ Status filters where applicable: `active` | `inactive` | `archived`.
 
 ---
 
+## Auth
+
+Two separate auth contexts — `admin-auth` and `client-auth` — remain distinct
+bounded contexts (separate guards, sessions, cookies, schemas). Sessions are
+issued as HttpOnly cookies (`pulsar_admin_session` and `pulsar_client_session`)
+and are not exposed in response bodies.
+
+| Method | Path                  | Auth          | Body / Notes |
+|--------|-----------------------|---------------|--------------|
+| POST   | `/admin-auth/login`   | Public        | `email`, `password`. Returns the [Auth response envelope](#auth-response-envelope) with `kind: "admin"`. Sets `pulsar_admin_session`. |
+| POST   | `/admin-auth/logout`  | Admin session | No body. 204 No Content. Clears `pulsar_admin_session`. |
+| GET    | `/admin-auth/me`      | Admin session | Returns the [Auth response envelope](#auth-response-envelope) with `kind: "admin"`. 401 if unauthenticated. |
+| POST   | `/client-auth/login`  | Public        | `email`, `password`. Returns the [Auth response envelope](#auth-response-envelope) with `kind: "clientUser"`. Sets `pulsar_client_session`. |
+| POST   | `/client-auth/logout` | Client session| No body. 204 No Content. Clears `pulsar_client_session`. |
+| GET    | `/client-auth/me`     | Client session| Returns the [Auth response envelope](#auth-response-envelope) with `kind: "clientUser"`. 401 if unauthenticated or status not `active`. |
+
+Controllers: `AdminAuthController`, `ClientAuthController`.
+
+---
+
+## Auth response envelope
+
+`POST /admin-auth/login`, `GET /admin-auth/me`, `POST /client-auth/login`, and
+`GET /client-auth/me` all return the same envelope:
+
+```
+{
+  "principal": {
+    "kind":        "admin" | "clientUser",  // discriminator
+    "id":          <string>,                // ObjectId hex
+    "email":       <string>,
+    "displayName": <string>,
+    "status":      <string>,                // see per-kind enums below
+    "lastLoginAt": <string | null>,         // ISO 8601 or null
+    "clientId":    <string>                 // present iff kind === "clientUser"
+  }
+}
+```
+
+**Per-kind status enums:**
+
+- `kind: "admin"` → `status: "active" | "disabled"`.
+- `kind: "clientUser"` → `status: "active" | "inactive" | "archived"`.
+
+**`clientId` rule:** present **iff** `kind === "clientUser"`. Admin
+principals never carry a `clientId`.
+
+The `kind` field is a string-literal discriminator so a single client decoder
+can handle both responses via tagged-union narrowing.
+
+---
+
 ## Agents
 
 **Base path:** `/agents`

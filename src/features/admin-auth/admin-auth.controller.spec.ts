@@ -2,25 +2,24 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UnauthorizedException } from '@nestjs/common';
 import { Types } from 'mongoose';
 import type { Request, Response } from 'express';
-import { ClientAuthController } from './client-auth.controller';
-import { ClientAuthService } from './client-auth.service';
-import { ClientSessionsService } from './client-sessions.service';
-import { CLIENT_SESSION_COOKIE_NAME } from './client-session-cookie-options';
-import type { User } from '@persistence/schemas/user.schema';
-import type { ClientUserPrincipal } from '@shared/types/express';
+import { AdminAuthController } from './admin-auth.controller';
+import { AdminAuthService } from './admin-auth.service';
+import { AdminSessionsService } from './admin-sessions.service';
+import { ADMIN_SESSION_COOKIE_NAME } from './session-cookie-options';
+import type { AdminUser } from '@persistence/schemas/admin-user.schema';
+import type { AdminPrincipal } from '@shared/types/express';
 
-const buildUser = (overrides: Partial<User> = {}): User => {
+const buildAdmin = (overrides: Partial<AdminUser> = {}): AdminUser => {
   const id = new Types.ObjectId();
   return {
     _id: id,
     id: id.toHexString(),
-    email: 'user@example.com',
-    name: 'User',
-    clientId: new Types.ObjectId(),
+    email: 'admin@example.com',
+    displayName: 'Admin',
     status: 'active',
     lastLoginAt: null,
     ...overrides,
-  } as unknown as User;
+  } as unknown as AdminUser;
 };
 
 const buildResponse = (): jest.Mocked<Response> => {
@@ -38,39 +37,39 @@ const buildRequest = (overrides: Partial<Request> = {}): Request =>
     ...overrides,
   } as unknown as Request);
 
-describe('ClientAuthController', () => {
-  let controller: ClientAuthController;
-  let clientAuthService: jest.Mocked<ClientAuthService>;
-  let clientSessionsService: jest.Mocked<ClientSessionsService>;
+describe('AdminAuthController', () => {
+  let controller: AdminAuthController;
+  let adminAuthService: jest.Mocked<AdminAuthService>;
+  let adminSessionsService: jest.Mocked<AdminSessionsService>;
 
   beforeEach(async () => {
-    clientAuthService = {
+    adminAuthService = {
       login: jest.fn(),
       logout: jest.fn(),
       getMe: jest.fn(),
-    } as unknown as jest.Mocked<ClientAuthService>;
-    clientSessionsService = {
+    } as unknown as jest.Mocked<AdminAuthService>;
+    adminSessionsService = {
       getAbsoluteTtlMs: jest.fn().mockReturnValue(12 * 60 * 60 * 1000),
-    } as unknown as jest.Mocked<ClientSessionsService>;
+    } as unknown as jest.Mocked<AdminSessionsService>;
 
     const moduleRef: TestingModule = await Test.createTestingModule({
-      controllers: [ClientAuthController],
+      controllers: [AdminAuthController],
       providers: [
-        { provide: ClientAuthService, useValue: clientAuthService },
-        { provide: ClientSessionsService, useValue: clientSessionsService },
+        { provide: AdminAuthService, useValue: adminAuthService },
+        { provide: AdminSessionsService, useValue: adminSessionsService },
       ],
     }).compile();
 
-    controller = moduleRef.get(ClientAuthController);
+    controller = moduleRef.get(AdminAuthController);
   });
 
   describe('login', () => {
     it('forwards user-agent + ip and sets the session cookie with maxAge from the service', async () => {
-      const user = buildUser();
-      clientAuthService.login.mockResolvedValue({
+      const admin = buildAdmin();
+      adminAuthService.login.mockResolvedValue({
         rawToken: 'raw-token',
         expiresAt: new Date(),
-        user,
+        admin,
       });
       const request = buildRequest({
         headers: { 'user-agent': 'Mozilla/5.0' } as never,
@@ -78,19 +77,19 @@ describe('ClientAuthController', () => {
       const response = buildResponse();
 
       const result = await controller.login(
-        { email: 'user@example.com', password: 'pw' },
+        { email: 'admin@example.com', password: 'pw' },
         request,
         response,
       );
 
-      expect(clientAuthService.login).toHaveBeenCalledWith({
-        email: 'user@example.com',
+      expect(adminAuthService.login).toHaveBeenCalledWith({
+        email: 'admin@example.com',
         password: 'pw',
         userAgent: 'Mozilla/5.0',
         ip: '1.2.3.4',
       });
       expect(response.cookie).toHaveBeenCalledWith(
-        CLIENT_SESSION_COOKIE_NAME,
+        ADMIN_SESSION_COOKIE_NAME,
         'raw-token',
         expect.objectContaining({
           httpOnly: true,
@@ -99,33 +98,35 @@ describe('ClientAuthController', () => {
           maxAge: 12 * 60 * 60 * 1000,
         }),
       );
-      expect(result.principal.kind).toBe('clientUser');
-      expect(result.principal.email).toBe(user.email);
-      expect(result.principal.clientId).toBe(user.clientId.toString());
-      expect(result.principal.displayName).toBe(user.name);
+      expect(result.principal.kind).toBe('admin');
+      expect(result.principal.id).toBe(admin.id);
+      expect(result.principal.email).toBe(admin.email);
+      expect(result.principal.displayName).toBe(admin.displayName);
+      expect(result.principal.status).toBe('active');
+      expect(result.principal.lastLoginAt).toBeNull();
+      expect('clientId' in result.principal).toBe(false);
     });
   });
 
   describe('logout', () => {
     it('revokes the session and defensively clears the cookie', async () => {
-      const principal: ClientUserPrincipal = {
-        userId: 'u',
-        clientId: 'c',
+      const principal: AdminPrincipal = {
+        adminUserId: 'a',
         sessionId: 'session-id',
-        email: 'user@example.com',
+        email: 'admin@example.com',
         status: 'active',
       };
       const response = buildResponse();
 
       await controller.logout(principal, response);
 
-      expect(clientAuthService.logout).toHaveBeenCalledWith('session-id');
+      expect(adminAuthService.logout).toHaveBeenCalledWith('session-id');
       expect(response.clearCookie).toHaveBeenCalledWith(
-        CLIENT_SESSION_COOKIE_NAME,
+        ADMIN_SESSION_COOKIE_NAME,
         expect.objectContaining({ httpOnly: true, path: '/' }),
       );
       expect(response.cookie).toHaveBeenCalledWith(
-        CLIENT_SESSION_COOKIE_NAME,
+        ADMIN_SESSION_COOKIE_NAME,
         '',
         expect.objectContaining({
           expires: new Date(0),
@@ -139,7 +140,7 @@ describe('ClientAuthController', () => {
 
       await controller.logout(undefined, response);
 
-      expect(clientAuthService.logout).not.toHaveBeenCalled();
+      expect(adminAuthService.logout).not.toHaveBeenCalled();
       expect(response.clearCookie).toHaveBeenCalled();
     });
   });
@@ -151,53 +152,38 @@ describe('ClientAuthController', () => {
       );
     });
 
-    it('throws 401 when fresh user is null', async () => {
-      clientAuthService.getMe.mockResolvedValue(null);
+    it('throws 401 when fresh admin is null', async () => {
+      adminAuthService.getMe.mockResolvedValue(null);
 
       await expect(
         controller.me({
-          userId: 'u',
-          clientId: 'c',
+          adminUserId: 'a',
           sessionId: 's',
-          email: 'e',
+          email: 'admin@example.com',
           status: 'active',
         }),
       ).rejects.toBeInstanceOf(UnauthorizedException);
     });
 
-    it('throws 401 when fresh user status is not active', async () => {
-      clientAuthService.getMe.mockResolvedValue(
-        buildUser({ status: 'inactive' }),
-      );
-
-      await expect(
-        controller.me({
-          userId: 'u',
-          clientId: 'c',
-          sessionId: 's',
-          email: 'e',
-          status: 'active',
-        }),
-      ).rejects.toBeInstanceOf(UnauthorizedException);
-    });
-
-    it('returns the fresh user response when active', async () => {
-      const user = buildUser();
-      clientAuthService.getMe.mockResolvedValue(user);
+    it('returns the fresh admin response', async () => {
+      const admin = buildAdmin();
+      adminAuthService.getMe.mockResolvedValue(admin);
 
       const result = await controller.me({
-        userId: user.id,
-        clientId: user.clientId.toString(),
+        adminUserId: admin.id,
         sessionId: 's',
-        email: user.email,
+        email: admin.email,
         status: 'active',
       });
 
-      expect(clientAuthService.getMe).toHaveBeenCalledWith(user.id);
-      expect(result.principal.kind).toBe('clientUser');
-      expect(result.principal.email).toBe(user.email);
+      expect(adminAuthService.getMe).toHaveBeenCalledWith(admin.id);
+      expect(result.principal.kind).toBe('admin');
+      expect(result.principal.id).toBe(admin.id);
+      expect(result.principal.email).toBe(admin.email);
+      expect(result.principal.displayName).toBe(admin.displayName);
       expect(result.principal.status).toBe('active');
-      expect(result.principal.displayName).toBe(user.name);
+      expect(result.principal.lastLoginAt).toBeNull();
+      expect('clientId' in result.principal).toBe(false);
     });
   });
 });

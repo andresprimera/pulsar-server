@@ -18,19 +18,14 @@ import { ClientAuth } from '@shared/decorators/client-auth.decorator';
 import { CurrentClientUser } from '@shared/decorators/current-client-user.decorator';
 import { ClientUserPrincipal } from '@shared/types/express';
 import {
+  AuthEnvelopeDto,
+  ClientUserPrincipalDto,
+} from '@shared/auth/principal.dto';
+import {
   CLIENT_SESSION_COOKIE_NAME,
   getClientSessionCookieOptions,
 } from './client-session-cookie-options';
 import { User } from '@persistence/schemas/user.schema';
-
-interface ClientUserResponseDto {
-  id: string;
-  email: string;
-  name: string;
-  clientId: string;
-  status: 'active' | 'inactive' | 'archived';
-  lastLoginAt: string | null;
-}
 
 @Controller('client-auth')
 export class ClientAuthController {
@@ -46,7 +41,7 @@ export class ClientAuthController {
     @Body() dto: LoginDto,
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
-  ): Promise<{ user: ClientUserResponseDto }> {
+  ): Promise<AuthEnvelopeDto<ClientUserPrincipalDto>> {
     const result = await this.clientAuthService.login({
       email: dto.email,
       password: dto.password,
@@ -59,7 +54,7 @@ export class ClientAuthController {
       maxAge: this.clientSessionsService.getAbsoluteTtlMs(),
     });
 
-    return { user: this.toClientUserResponse(result.user) };
+    return { principal: this.toClientPrincipal(result.user) };
   }
 
   @ClientAuth()
@@ -79,7 +74,7 @@ export class ClientAuthController {
   @Get('me')
   async me(
     @CurrentClientUser() principal: ClientUserPrincipal | undefined,
-  ): Promise<{ user: ClientUserResponseDto }> {
+  ): Promise<AuthEnvelopeDto<ClientUserPrincipalDto>> {
     if (principal === undefined) {
       throw new UnauthorizedException('Authentication required');
     }
@@ -87,7 +82,7 @@ export class ClientAuthController {
     if (fresh === null || fresh.status !== 'active') {
       throw new UnauthorizedException('Authentication required');
     }
-    return { user: this.toClientUserResponse(fresh) };
+    return { principal: this.toClientPrincipal(fresh) };
   }
 
   private clearSessionCookie(response: Response): void {
@@ -110,11 +105,12 @@ export class ClientAuthController {
     return header;
   }
 
-  private toClientUserResponse(user: User): ClientUserResponseDto {
+  private toClientPrincipal(user: User): ClientUserPrincipalDto {
     return {
+      kind: 'clientUser',
       id: user.id,
       email: user.email,
-      name: user.name,
+      displayName: user.name,
       clientId: user.clientId.toString(),
       status: user.status,
       lastLoginAt:
