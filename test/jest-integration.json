@@ -21,7 +21,8 @@
     "^@onboarding/(.*)$": "<rootDir>/../src/features/onboarding/$1",
     "^@client-context-suggestions/(.*)$": "<rootDir>/../src/features/client-context-suggestions/$1",
     "^@client-catalog-items/(.*)$": "<rootDir>/../src/features/client-catalog-items/$1",
-    "^@admin-auth/(.*)$": "<rootDir>/../src/features/admin-auth/$1"
+    "^@admin-auth/(.*)$": "<rootDir>/../src/features/admin-auth/$1",
+    "^@client-auth/(.*)$": "<rootDir>/../src/features/client-auth/$1"
   },
   "testTimeout": 30000,
   "maxWorkers": 1
