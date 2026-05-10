@@ -13,6 +13,8 @@ import { Agent } from './schemas/agent.schema';
 import { ClientPhone } from './schemas/client-phone.schema';
 import { ClientAgent } from './schemas/client-agent.schema';
 import { OnboardingService } from '@onboarding/onboarding.service';
+import { AdminUsersService } from '@admin-auth/admin-users.service';
+import type { AdminRole } from '@shared/auth/admin-roles';
 import { ChannelRepository } from './repositories/channel.repository';
 import { ClientAgentRepository } from './repositories/client-agent.repository';
 import { ClientPhoneRepository } from './repositories/client-phone.repository';
@@ -29,6 +31,19 @@ import {
 } from '@shared/telegram-webhook-secret.util';
 import * as SEED_DATA from './data/seed-data.json';
 import { ClientRepository } from './repositories/client.repository';
+
+interface SeedAdminUser {
+  email: string;
+  password: string;
+  displayName: string;
+  role: AdminRole;
+}
+
+interface SeedTeamMember {
+  email: string;
+  name: string;
+  password: string;
+}
 
 @Injectable()
 export class SeederService implements OnApplicationBootstrap {
@@ -50,6 +65,7 @@ export class SeederService implements OnApplicationBootstrap {
     private readonly agentPriceRepository: AgentPriceRepository,
     private readonly channelPriceRepository: ChannelPriceRepository,
     private readonly personalityRepository: PersonalityRepository,
+    private readonly adminUsersService: AdminUsersService,
     @InjectModel(ClientAgent.name)
     private readonly clientAgentModel: Model<ClientAgent>,
   ) {}
@@ -83,6 +99,11 @@ export class SeederService implements OnApplicationBootstrap {
     this.logger.log('Starting database seed...');
 
     try {
+      // 0. Seed admin users from JSON (super_admin + support for the demo).
+      //    Independent of the client/agent pipeline; safe to run on every
+      //    boot — `seedAdminUsers` is idempotent on email.
+      await this.seedAdminUsers();
+
       // Idempotency check: if first seed user exists, skip entire seeding
       const existingUser = await this.userRepository.findByEmail(
         SEED_DATA.users[0].email,
@@ -364,6 +385,15 @@ export class SeederService implements OnApplicationBootstrap {
           );
           this.logger.log(`  - Set seed password for ${result.user.email}`);
         }
+
+        // Seed additional `operator` team members for the same client.
+        // The owner was created by `OnboardingService.registerAndHire`
+        // above; these subsequent users are direct repository inserts
+        // because there's no team-management endpoint yet.
+        await this.seedTeamMembers(
+          (userSeed as { teamMembers?: SeedTeamMember[] }).teamMembers ?? [],
+          result.client._id.toString(),
+        );
 
         // Process additional agent hirings if any
         if (userSeed.agentHirings.length > 1) {
@@ -662,6 +692,73 @@ export class SeederService implements OnApplicationBootstrap {
       throw new Error('Failed to create or find a default personality.');
     }
     return (defaultPersonality._id as Types.ObjectId).toString();
+  }
+
+  /**
+   * Seeds admin users from `seed-data.json#adminUsers`. Idempotent on
+   * email — existing rows are not touched. Use this for dev/demo
+   * accounts; the production bootstrap super_admin still flows through
+   * the env-driven `AdminUserSeederService`.
+   */
+  private async seedAdminUsers(): Promise<void> {
+    const adminUsers = (SEED_DATA as { adminUsers?: SeedAdminUser[] })
+      .adminUsers;
+    if (!adminUsers || adminUsers.length === 0) {
+      return;
+    }
+    for (const seed of adminUsers) {
+      const existing = await this.adminUsersService.findByEmail(seed.email);
+      if (existing !== null) {
+        this.logger.log(`Admin user "${seed.email}" already exists. Skipping.`);
+        continue;
+      }
+      await this.adminUsersService.create({
+        email: seed.email,
+        password: seed.password,
+        displayName: seed.displayName,
+        role: seed.role,
+      });
+      this.logger.log(`Seeded admin user "${seed.email}" (${seed.role})`);
+    }
+  }
+
+  /**
+   * Seeds additional `operator` users for an existing client. The owner
+   * is created by `OnboardingService.registerAndHire`; this writes the
+   * subsequent team members directly via `UserRepository.create` since
+   * there's no team-management endpoint yet. Idempotent on email.
+   */
+  private async seedTeamMembers(
+    teamMembers: SeedTeamMember[],
+    clientId: string,
+  ): Promise<void> {
+    if (teamMembers.length === 0) {
+      return;
+    }
+    const clientObjectId = new Types.ObjectId(clientId);
+    for (const member of teamMembers) {
+      const existing = await this.userRepository.findByEmail(member.email);
+      if (existing !== null) {
+        this.logger.log(
+          `Team member "${member.email}" already exists. Skipping.`,
+        );
+        continue;
+      }
+      const passwordHash = await argon2.hash(member.password, {
+        type: argon2.argon2id,
+      });
+      const created = await this.userRepository.create({
+        email: member.email,
+        name: member.name,
+        clientId: clientObjectId,
+        status: 'active',
+        clientRole: 'operator',
+        passwordHash,
+      });
+      this.logger.log(
+        `  - Seeded team member "${created.email}" (operator) for client ${clientId}`,
+      );
+    }
   }
 
   /**

@@ -1,5 +1,19 @@
 {
   "billingCurrency": "USD",
+  "adminUsers": [
+    {
+      "email": "super-admin@demo.local",
+      "password": "password1234",
+      "displayName": "Demo Super Admin",
+      "role": "super_admin"
+    },
+    {
+      "email": "support@demo.local",
+      "password": "password1234",
+      "displayName": "Demo Support",
+      "role": "support"
+    }
+  ],
   "personalities": [
     {
       "name": "Friendly",
@@ -160,6 +174,13 @@
           "model": "gpt-4o"
         }
       },
+      "teamMembers": [
+        {
+          "email": "operator@homegroupd.com",
+          "name": "Home Group Operator",
+          "password": "password1234"
+        }
+      ],
       "agentHirings": [
         {
           "agentName": "Customer Service Agent",
@@ -196,6 +217,13 @@
         "type": "organization",
         "name": "Andres Company Inc."
       },
+      "teamMembers": [
+        {
+          "email": "operator@andrescompany.com",
+          "name": "Andres Company Operator",
+          "password": "password1234"
+        }
+      ],
       "agentHirings": [
         {
           "agentName": "Lead Qualifier & Sales Agent",
@@ -231,6 +259,13 @@
         "type": "organization",
         "name": "Coding Box LLC"
       },
+      "teamMembers": [
+        {
+          "email": "operator@codingbox.app",
+          "name": "CodingBox Operator",
+          "password": "password1234"
+        }
+      ],
       "agentHirings": [
         {
           "agentName": "Customer Service Agent",

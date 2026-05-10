@@ -14,6 +14,7 @@ import { ClientPhoneRepository } from './repositories/client-phone.repository';
 import { AgentPriceRepository } from './repositories/agent-price.repository';
 import { ChannelPriceRepository } from './repositories/channel-price.repository';
 import { OnboardingService } from '@onboarding/onboarding.service';
+import { AdminUsersService } from '@admin-auth/admin-users.service';
 import { BadRequestException, Logger } from '@nestjs/common';
 import * as SEED_DATA from './data/seed-data.json';
 
@@ -31,30 +32,34 @@ describe('SeederService', () => {
   let mockClientPhoneRepository: any;
   let mockAgentPriceRepository: any;
   let mockChannelPriceRepository: any;
+  let mockAdminUsersService: any;
   let loggerSpy: jest.SpyInstance;
   let loggerWarnSpy: jest.SpyInstance;
   let loggerErrorSpy: jest.SpyInstance;
 
   const mockAgentId = new Types.ObjectId('aaaaaaaaaaaaaaaaaaaaaaaa');
+  const mockUserId = new Types.ObjectId().toHexString();
+  const mockClientId = new Types.ObjectId().toHexString();
+  const mockClientAgentId = new Types.ObjectId().toHexString();
 
   const mockOnboardingResult = {
     user: {
-      _id: 'user-id',
+      _id: mockUserId,
       email: SEED_DATA.users[0].email,
       name: SEED_DATA.users[0].name,
-      clientId: 'client-id',
+      clientId: mockClientId,
       status: 'active',
     },
     client: {
-      _id: 'client-id',
+      _id: mockClientId,
       type: SEED_DATA.users[0].client.type,
       name: SEED_DATA.users[0].name,
-      ownerUserId: 'user-id',
+      ownerUserId: mockUserId,
       status: 'active',
     },
     clientAgent: {
-      _id: 'client-agent-id',
-      clientId: 'client-id',
+      _id: mockClientAgentId,
+      clientId: mockClientId,
       agentId: mockAgentId.toString(),
       agentPricing: {
         amount: SEED_DATA.users[0].agentHirings[0].price,
@@ -80,6 +85,19 @@ describe('SeederService', () => {
     mockUserRepository = {
       findByEmail: jest.fn(),
       setPasswordHash: jest.fn().mockResolvedValue(undefined),
+      create: jest.fn().mockImplementation(async (data: any) => ({
+        _id: new Types.ObjectId(),
+        email: data.email,
+        name: data.name,
+        clientId: data.clientId,
+        status: data.status,
+        clientRole: data.clientRole,
+      })),
+    };
+
+    mockAdminUsersService = {
+      findByEmail: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockResolvedValue({ _id: new Types.ObjectId() }),
     };
 
     mockOnboardingService = {
@@ -176,6 +194,7 @@ describe('SeederService', () => {
           provide: ChannelPriceRepository,
           useValue: mockChannelPriceRepository,
         },
+        { provide: AdminUsersService, useValue: mockAdminUsersService },
       ],
     }).compile();
 
