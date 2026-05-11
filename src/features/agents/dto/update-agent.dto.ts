@@ -1,5 +1,6 @@
-import { IsString, IsOptional, IsInt, Min } from 'class-validator';
+import { IsString, IsOptional, IsInt, IsEnum, Min } from 'class-validator';
 import { Type } from 'class-transformer';
+import { AGENT_KINDS, type AgentKind } from '@shared/agent-kind.constants';
 
 export class UpdateAgentDto {
   @IsOptional()
@@ -9,6 +10,9 @@ export class UpdateAgentDto {
   @IsOptional()
   @IsString()
   systemPrompt?: string;
+
+  @IsEnum(AGENT_KINDS)
+  kind: AgentKind;
 
   @IsOptional()
   @Type(() => Number)

@@ -446,16 +446,90 @@ describe('ClientAgentsService', () => {
   });
 
   describe('findByClient', () => {
-    it('should return client agents', async () => {
+    it('returns hydrated, redacted summaries with agent.kind populated', async () => {
       mockClientAgentRepository.findByClient.mockResolvedValue([
-        mockClientAgent,
+        {
+          ...mockClientAgent,
+          _id: 'ca-1',
+          channels: [],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ]);
+      mockClientsService.findManyByIds.mockResolvedValue([
+        {
+          _id: 'client-1',
+          name: 'Acme',
+          status: 'active',
+          billingCurrency: 'USD',
+        },
+      ]);
+      mockAgentsService.findManyByIds.mockResolvedValue([
+        {
+          _id: 'agent-1',
+          name: 'Sales Bot',
+          status: 'active',
+          kind: 'sales',
+        },
+      ]);
+      mockPersonalityRepository.findManyByIds.mockResolvedValue([
+        mockPersonality,
       ]);
 
       const result = await service.findByClient('client-1');
+
       expect(mockClientAgentRepository.findByClient).toHaveBeenCalledWith(
         'client-1',
       );
-      expect(result).toEqual([mockClientAgent]);
+      expect(result).toHaveLength(1);
+      expect(result[0].agent).toEqual({
+        _id: 'agent-1',
+        name: 'Sales Bot',
+        status: 'active',
+        kind: 'sales',
+      });
+      // Whitelist redaction stays intact: no credentials/secret/fingerprint/promptSupplement on the row.
+      const row = result[0] as unknown as Record<string, unknown>;
+      expect(row.credentials).toBeUndefined();
+      expect(row.telegramWebhookSecretHex).toBeUndefined();
+      expect(row.promptSupplement).toBeUndefined();
+    });
+
+    it('returns an empty array when the client has no hires', async () => {
+      mockClientAgentRepository.findByClient.mockResolvedValue([]);
+
+      const result = await service.findByClient('client-1');
+
+      expect(result).toEqual([]);
+      expect(mockAgentsService.findManyByIds).not.toHaveBeenCalled();
+    });
+
+    it('handles missing agent hydration gracefully (agent: null)', async () => {
+      mockClientAgentRepository.findByClient.mockResolvedValue([
+        {
+          ...mockClientAgent,
+          _id: 'ca-1',
+          channels: [],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ]);
+      mockClientsService.findManyByIds.mockResolvedValue([
+        {
+          _id: 'client-1',
+          name: 'Acme',
+          status: 'active',
+          billingCurrency: 'USD',
+        },
+      ]);
+      mockAgentsService.findManyByIds.mockResolvedValue([]);
+      mockPersonalityRepository.findManyByIds.mockResolvedValue([
+        mockPersonality,
+      ]);
+
+      const result = await service.findByClient('client-1');
+
+      expect(result[0].agent).toBeNull();
     });
   });
 

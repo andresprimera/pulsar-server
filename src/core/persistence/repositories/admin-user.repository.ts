@@ -5,12 +5,14 @@ import {
   AdminUser,
   AdminUserStatus,
 } from '@persistence/schemas/admin-user.schema';
+import type { AdminRole } from '@shared/auth/admin-roles';
 
 export interface CreateAdminUserInput {
   email: string;
   passwordHash: string;
   displayName: string;
   status?: AdminUserStatus;
+  role?: AdminRole;
 }
 
 @Injectable()
@@ -50,6 +52,10 @@ export class AdminUserRepository {
 
   async setStatus(id: string, status: AdminUserStatus): Promise<void> {
     await this.model.updateOne({ _id: id }, { status }).exec();
+  }
+
+  async setRole(id: string, role: AdminRole): Promise<void> {
+    await this.model.updateOne({ _id: id }, { role }).exec();
   }
 
   async count(): Promise<number> {

@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import { CLIENT_ROLES, type ClientRole } from '@shared/auth/client-roles';
 
 @Schema({ collection: 'users', timestamps: true })
 export class User extends Document {
@@ -27,6 +28,14 @@ export class User extends Document {
     index: true,
   })
   status: 'active' | 'inactive' | 'archived';
+
+  @Prop({
+    required: true,
+    enum: CLIENT_ROLES,
+    default: 'operator',
+    index: true,
+  })
+  clientRole: ClientRole;
 
   @Prop({ required: false, select: false })
   passwordHash?: string;

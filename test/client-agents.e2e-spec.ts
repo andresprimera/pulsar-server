@@ -86,6 +86,7 @@ describe('ClientAgents (e2e)', () => {
       .send({
         name,
         systemPrompt: 'You are a test assistant.',
+        kind: 'customer_service',
       })
       .expect(201);
 

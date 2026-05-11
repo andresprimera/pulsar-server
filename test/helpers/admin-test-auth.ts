@@ -34,6 +34,7 @@ export async function loginAsTestAdmin(
     email,
     password: TEST_ADMIN_PASSWORD,
     displayName: 'E2E Admin',
+    role: 'super_admin',
   });
 
   const loginResponse = await request(app.getHttpServer())

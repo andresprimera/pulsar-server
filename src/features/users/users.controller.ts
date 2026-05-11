@@ -7,13 +7,15 @@ import {
   Body,
   Query,
 } from '@nestjs/common';
+import { Roles } from '@shared/decorators/roles.decorator';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 
 /**
- * Internal/admin Users API
+ * Internal/admin Users API. Default-deny via `RolesGuard`: routes without an
+ * explicit `@Roles(...)` decorator are super-admin-only.
  */
 @Controller('users')
 export class UsersController {
@@ -24,16 +26,19 @@ export class UsersController {
     return this.usersService.create(dto);
   }
 
+  @Roles('super_admin', 'support')
   @Get()
   findAll(@Query('status') status?: 'active' | 'inactive' | 'archived') {
     return this.usersService.findAll(status);
   }
 
+  @Roles('super_admin', 'support')
   @Get('available')
   findAvailable() {
     return this.usersService.findAll('active');
   }
 
+  @Roles('super_admin', 'support')
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);

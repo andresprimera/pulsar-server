@@ -97,6 +97,7 @@ describe('AdminUserSeederService', () => {
       email: 'admin@local.dev',
       password: 'changeme1234',
       displayName: 'Admin',
+      role: 'super_admin',
     });
   });
 
@@ -116,6 +117,7 @@ describe('AdminUserSeederService', () => {
       email: 'ops@local.dev',
       password: 'changeme1234',
       displayName: 'Ops Admin',
+      role: 'super_admin',
     });
   });
 

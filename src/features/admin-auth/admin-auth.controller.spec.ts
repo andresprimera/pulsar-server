@@ -17,6 +17,7 @@ const buildAdmin = (overrides: Partial<AdminUser> = {}): AdminUser => {
     email: 'admin@example.com',
     displayName: 'Admin',
     status: 'active',
+    role: 'super_admin',
     lastLoginAt: null,
     ...overrides,
   } as unknown as AdminUser;
@@ -115,6 +116,7 @@ describe('AdminAuthController', () => {
         sessionId: 'session-id',
         email: 'admin@example.com',
         status: 'active',
+        role: 'super_admin',
       };
       const response = buildResponse();
 
@@ -161,6 +163,7 @@ describe('AdminAuthController', () => {
           sessionId: 's',
           email: 'admin@example.com',
           status: 'active',
+          role: 'super_admin',
         }),
       ).rejects.toBeInstanceOf(UnauthorizedException);
     });
@@ -174,6 +177,7 @@ describe('AdminAuthController', () => {
         sessionId: 's',
         email: admin.email,
         status: 'active',
+        role: 'super_admin',
       });
 
       expect(adminAuthService.getMe).toHaveBeenCalledWith(admin.id);
@@ -182,6 +186,7 @@ describe('AdminAuthController', () => {
       expect(result.principal.email).toBe(admin.email);
       expect(result.principal.displayName).toBe(admin.displayName);
       expect(result.principal.status).toBe('active');
+      expect(result.principal.role).toBe('super_admin');
       expect(result.principal.lastLoginAt).toBeNull();
       expect('clientId' in result.principal).toBe(false);
     });

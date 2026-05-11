@@ -7,13 +7,15 @@ import {
   Body,
   Query,
 } from '@nestjs/common';
+import { Roles } from '@shared/decorators/roles.decorator';
 import { ClientsService } from './clients.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 import { UpdateClientStatusDto } from './dto/update-client-status.dto';
 
 /**
- * Internal/admin Clients API
+ * Internal/admin Clients API. Default-deny via `RolesGuard`: routes without
+ * an explicit `@Roles(...)` decorator are super-admin-only.
  */
 @Controller('clients')
 export class ClientsController {
@@ -24,11 +26,13 @@ export class ClientsController {
     return this.clientsService.create(dto);
   }
 
+  @Roles('super_admin', 'support')
   @Get()
   findAll(@Query('status') status?: 'active' | 'inactive' | 'archived') {
     return this.clientsService.findAll(status);
   }
 
+  @Roles('super_admin', 'support')
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.clientsService.findById(id);

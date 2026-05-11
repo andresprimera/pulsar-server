@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
+import { ADMIN_ROLES, type AdminRole } from '@shared/auth/admin-roles';
 
 export type AdminUserStatus = 'active' | 'disabled';
 
@@ -25,6 +26,14 @@ export class AdminUser extends Document {
     index: true,
   })
   status: AdminUserStatus;
+
+  @Prop({
+    required: true,
+    enum: ADMIN_ROLES,
+    default: 'support',
+    index: true,
+  })
+  role: AdminRole;
 
   @Prop({ type: Date, default: null })
   lastLoginAt: Date | null;

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model, Types } from 'mongoose';
 import { User } from '@persistence/schemas/user.schema';
+import type { ClientRole } from '@shared/auth/client-roles';
 
 @Injectable()
 export class UserRepository {
@@ -53,6 +54,10 @@ export class UserRepository {
 
   async setLastLoginAt(id: string, when: Date): Promise<void> {
     await this.model.updateOne({ _id: id }, { lastLoginAt: when }).exec();
+  }
+
+  async setClientRole(id: string, clientRole: ClientRole): Promise<void> {
+    await this.model.updateOne({ _id: id }, { clientRole }).exec();
   }
 
   async findByStatus(

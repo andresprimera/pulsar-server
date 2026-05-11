@@ -113,6 +113,7 @@ export class ClientAuthController {
       displayName: user.name,
       clientId: user.clientId.toString(),
       status: user.status,
+      clientRole: user.clientRole,
       lastLoginAt:
         user.lastLoginAt === null || user.lastLoginAt === undefined
           ? null

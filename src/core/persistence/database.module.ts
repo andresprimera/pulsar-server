@@ -53,6 +53,7 @@ import {
 import { ClientCatalogItemRepository } from './repositories/client-catalog-item.repository';
 import { EventIdempotencyService } from './event-idempotency.service';
 import { OnboardingModule } from '@onboarding/onboarding.module';
+import { AdminAuthModule } from '@admin-auth/admin-auth.module';
 import { HireChannelLifecycleAdapter } from './ports/hire-channel-lifecycle.adapter';
 import { HIRE_CHANNEL_LIFECYCLE_PORT } from '@shared/ports/hire-channel-lifecycle.port';
 import { AdminUser, AdminUserSchema } from './schemas/admin-user.schema';
@@ -126,6 +127,7 @@ const repositories = [
       { name: ClientUserSession.name, schema: ClientUserSessionSchema },
     ]),
     forwardRef(() => OnboardingModule),
+    forwardRef(() => AdminAuthModule),
   ],
   providers: [
     ...repositories,

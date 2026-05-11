@@ -1,4 +1,5 @@
 import type { AgentPricingSnapshot } from '@persistence/schemas/client-agent.schema';
+import type { AgentKind } from '@shared/agent-kind.constants';
 
 export interface ClientSummary {
   _id: string;
@@ -11,6 +12,7 @@ export interface AgentSummary {
   _id: string;
   name: string;
   status: 'active' | 'inactive' | 'archived';
+  kind: AgentKind;
 }
 
 export interface PersonalitySummary {

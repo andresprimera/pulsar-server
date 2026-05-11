@@ -157,13 +157,16 @@ export class OnboardingService {
       }
       client = await this.clientRepository.create(clientPayload, session);
 
-      // 7. Create User
+      // 7. Create User (first user of a fresh client → owner role).
+      // Subsequent users created by future team-management endpoints will
+      // inherit the schema default `clientRole: 'operator'`.
       user = await this.userRepository.create(
         {
           email: normalizedEmail,
           name: dto.user.name,
           clientId: client._id as Types.ObjectId,
           status: 'active',
+          clientRole: 'owner',
         },
         session,
       );

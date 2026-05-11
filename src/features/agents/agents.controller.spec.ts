@@ -42,7 +42,11 @@ describe('AgentsController', () => {
 
   describe('POST /agents', () => {
     it('should call service.create', async () => {
-      const dto = { name: 'New Agent', systemPrompt: 'Be helpful.' };
+      const dto = {
+        name: 'New Agent',
+        systemPrompt: 'Be helpful.',
+        kind: 'customer_service' as const,
+      };
       mockAgentsService.create.mockResolvedValue({ ...dto, _id: 'new-id' });
 
       const result = await controller.create(dto);
@@ -96,7 +100,7 @@ describe('AgentsController', () => {
 
   describe('PATCH /agents/:id', () => {
     it('should call service.update', async () => {
-      const dto = { name: 'Updated' };
+      const dto = { name: 'Updated', kind: 'customer_service' as const };
       mockAgentsService.update.mockResolvedValue({ ...mockAgent, ...dto });
 
       const result = await controller.update('agent-1', dto);
