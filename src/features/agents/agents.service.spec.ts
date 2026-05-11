@@ -57,7 +57,11 @@ describe('AgentsService', () => {
 
   describe('create', () => {
     it('should create agent with status=active', async () => {
-      const dto = { name: 'New Agent', systemPrompt: 'Be helpful.' };
+      const dto = {
+        name: 'New Agent',
+        systemPrompt: 'Be helpful.',
+        kind: 'customer_service' as const,
+      };
       mockAgentRepository.create.mockResolvedValue({
         ...dto,
         status: 'active',
@@ -72,6 +76,25 @@ describe('AgentsService', () => {
       });
       expect(result.status).toBe('active');
       expect(result.prices).toEqual([]);
+    });
+
+    it('should forward kind to the repository', async () => {
+      const dto = {
+        name: 'Sales Bot',
+        systemPrompt: 'Sell well.',
+        kind: 'sales' as const,
+      };
+      mockAgentRepository.create.mockResolvedValue({
+        ...dto,
+        status: 'active',
+        _id: 'sales-id',
+      });
+
+      await service.create(dto);
+
+      expect(mockAgentRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'sales' }),
+      );
     });
   });
 
@@ -151,10 +174,14 @@ describe('AgentsService', () => {
         name: 'Updated',
       });
 
-      const result = await service.update('agent-1', { name: 'Updated' });
+      const result = await service.update('agent-1', {
+        name: 'Updated',
+        kind: 'customer_service',
+      });
 
       expect(mockAgentRepository.update).toHaveBeenCalledWith('agent-1', {
         name: 'Updated',
+        kind: 'customer_service',
       });
       expect(result.name).toBe('Updated');
       expect(result.prices).toEqual([]);
@@ -164,7 +191,10 @@ describe('AgentsService', () => {
       mockAgentRepository.findById.mockResolvedValue(null);
 
       await expect(
-        service.update('unknown', { name: 'Updated' }),
+        service.update('unknown', {
+          name: 'Updated',
+          kind: 'customer_service',
+        }),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -173,10 +203,16 @@ describe('AgentsService', () => {
       mockAgentRepository.findById.mockResolvedValue(archivedAgent);
 
       await expect(
-        service.update('agent-1', { name: 'Updated' }),
+        service.update('agent-1', {
+          name: 'Updated',
+          kind: 'customer_service',
+        }),
       ).rejects.toThrow(BadRequestException);
       await expect(
-        service.update('agent-1', { name: 'Updated' }),
+        service.update('agent-1', {
+          name: 'Updated',
+          kind: 'customer_service',
+        }),
       ).rejects.toThrow('Archived agents cannot be modified');
     });
   });

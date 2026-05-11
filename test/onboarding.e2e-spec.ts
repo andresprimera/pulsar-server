@@ -72,6 +72,7 @@ describe('Onboarding (e2e)', () => {
       .send({
         name: 'E2E Onboarding Test Agent',
         systemPrompt: 'You are a test assistant for onboarding.',
+        kind: 'customer_service',
       });
 
     testAgentId = agentResponse.body._id;
@@ -555,6 +556,7 @@ describe('Onboarding (e2e)', () => {
         .send({
           name: 'E2E Onboarding Inactive Agent',
           systemPrompt: 'Test',
+          kind: 'customer_service',
         });
 
       await request(app.getHttpServer())

@@ -47,6 +47,7 @@ describe('Agents CRUD (e2e)', () => {
         .send({
           name: 'E2E Test Agent',
           systemPrompt: 'You are a test assistant.',
+          kind: 'customer_service',
         })
         .expect(201);
 
@@ -54,6 +55,7 @@ describe('Agents CRUD (e2e)', () => {
       expect(response.body.name).toBe('E2E Test Agent');
       expect(response.body.systemPrompt).toBe('You are a test assistant.');
       expect(response.body.status).toBe('active');
+      expect(response.body.kind).toBe('customer_service');
 
       createdAgentId = response.body._id;
     });
@@ -64,6 +66,7 @@ describe('Agents CRUD (e2e)', () => {
         .set('Cookie', adminAuth.cookie)
         .send({
           systemPrompt: 'You are a test assistant.',
+          kind: 'customer_service',
         })
         .expect(400);
 
@@ -76,10 +79,38 @@ describe('Agents CRUD (e2e)', () => {
         .set('Cookie', adminAuth.cookie)
         .send({
           name: 'Test',
+          kind: 'customer_service',
         })
         .expect(400);
 
       expect(response.body.message).toContain('systemPrompt must be a string');
+    });
+
+    it('should reject invalid payload (missing kind)', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/agents')
+        .set('Cookie', adminAuth.cookie)
+        .send({
+          name: 'NoKind',
+          systemPrompt: 'Should be rejected.',
+        })
+        .expect(400);
+
+      expect(response.body.message.join(' ')).toContain('kind');
+    });
+
+    it('should reject invalid kind value', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/agents')
+        .set('Cookie', adminAuth.cookie)
+        .send({
+          name: 'BadKind',
+          systemPrompt: 'Should be rejected.',
+          kind: 'marketing',
+        })
+        .expect(400);
+
+      expect(response.body.message.join(' ')).toContain('kind');
     });
   });
 
@@ -148,6 +179,7 @@ describe('Agents CRUD (e2e)', () => {
         .set('Cookie', adminAuth.cookie)
         .send({
           name: 'E2E Test Agent Updated',
+          kind: 'customer_service',
         })
         .expect(200);
 
@@ -155,11 +187,19 @@ describe('Agents CRUD (e2e)', () => {
       expect(response.body.systemPrompt).toBe('You are a test assistant.');
     });
 
+    it('should reject PATCH that omits kind (kind is REQUIRED on update)', async () => {
+      await request(app.getHttpServer())
+        .patch(`/agents/${createdAgentId}`)
+        .set('Cookie', adminAuth.cookie)
+        .send({ name: 'Updated Without Kind' })
+        .expect(400);
+    });
+
     it('should return 404 for non-existent ID', async () => {
       await request(app.getHttpServer())
         .patch('/agents/507f1f77bcf86cd799439011')
         .set('Cookie', adminAuth.cookie)
-        .send({ name: 'Updated' })
+        .send({ name: 'Updated', kind: 'customer_service' })
         .expect(404);
     });
   });
@@ -219,6 +259,7 @@ describe('Agents CRUD (e2e)', () => {
         .send({
           name: 'E2E Test Agent To Archive',
           systemPrompt: 'Will be archived.',
+          kind: 'customer_service',
         });
 
       archivedAgentId = createResponse.body._id;
@@ -234,7 +275,7 @@ describe('Agents CRUD (e2e)', () => {
       const response = await request(app.getHttpServer())
         .patch(`/agents/${archivedAgentId}`)
         .set('Cookie', adminAuth.cookie)
-        .send({ name: 'Should Not Update' })
+        .send({ name: 'Should Not Update', kind: 'customer_service' })
         .expect(400);
 
       expect(response.body.message).toBe('Archived agents cannot be modified');

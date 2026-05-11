@@ -150,6 +150,7 @@ export class SeederService implements OnApplicationBootstrap {
             name: agentSeed.name,
             systemPrompt: agentSeed.systemPrompt,
             status: agentSeed.status,
+            kind: (agentSeed as any).kind,
             createdBySeeder: true,
             ...((agentSeed as any).monthlyTokenQuota != null
               ? { monthlyTokenQuota: (agentSeed as any).monthlyTokenQuota }

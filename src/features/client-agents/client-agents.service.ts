@@ -333,8 +333,15 @@ export class ClientAgentsService {
     return created;
   }
 
-  async findByClient(clientId: string): Promise<ClientAgent[]> {
-    return this.clientAgentRepository.findByClient(clientId);
+  /**
+   * Returns hydrated, credential-redacted client-agent summaries for a
+   * single client. Reuses the same hydration pipeline as `findAllHydrated`
+   * so credentials, telegramWebhookSecretHex, fingerprint, and
+   * promptSupplement are stripped at the mapper boundary.
+   */
+  async findByClient(clientId: string): Promise<ClientAgentSummaryDto[]> {
+    const rows = await this.clientAgentRepository.findByClient(clientId);
+    return this.hydrateRows(rows);
   }
 
   async findAllHydrated(
@@ -374,20 +381,34 @@ export class ClientAgentsService {
       }),
     ]);
 
-    if (pageRows.length === 0) {
-      return {
-        items: [],
-        page,
-        limit,
-        total,
-        totalPages: Math.max(1, Math.ceil(total / limit)),
-      };
+    const items = await this.hydrateRows(pageRows);
+
+    return {
+      items,
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    };
+  }
+
+  /**
+   * Dedup-fan-out hydration shared by `findAllHydrated` and `findByClient`.
+   * Loads the referenced client/agent/personality docs in parallel, then
+   * runs every row through `toSummary` so the credential-redaction policy
+   * is enforced uniformly.
+   */
+  private async hydrateRows(
+    rows: Pick<ClientAgent, ClientAgentListProjectedField>[],
+  ): Promise<ClientAgentSummaryDto[]> {
+    if (rows.length === 0) {
+      return [];
     }
 
-    const clientIds = Array.from(new Set(pageRows.map((r) => r.clientId)));
-    const agentIds = Array.from(new Set(pageRows.map((r) => r.agentId)));
+    const clientIds = Array.from(new Set(rows.map((r) => r.clientId)));
+    const agentIds = Array.from(new Set(rows.map((r) => r.agentId)));
     const personalityIds = Array.from(
-      new Set(pageRows.map((r) => String(r.personalityId))),
+      new Set(rows.map((r) => String(r.personalityId))),
     );
 
     const [clients, agents, personalities] = await Promise.all([
@@ -402,17 +423,9 @@ export class ClientAgentsService {
       personalities.map((p) => [String(p._id), p]),
     );
 
-    const items = pageRows.map((row) =>
+    return rows.map((row) =>
       this.toSummary(row, clientById, agentById, personalityById),
     );
-
-    return {
-      items,
-      page,
-      limit,
-      total,
-      totalPages: Math.max(1, Math.ceil(total / limit)),
-    };
   }
 
   /**
@@ -479,6 +492,7 @@ export class ClientAgentsService {
             _id: String(agent._id),
             name: agent.name,
             status: agent.status,
+            kind: agent.kind,
           }
         : null,
       personality: personality

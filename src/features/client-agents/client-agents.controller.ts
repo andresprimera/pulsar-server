@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { Roles } from '@shared/decorators/roles.decorator';
 import { ClientAgentsService } from './client-agents.service';
+import { ClientAgentSummaryDto } from './dto/client-agent-summary.dto';
 import { CreateClientAgentDto } from './dto/create-client-agent.dto';
 import { UpdateClientAgentDto } from './dto/update-client-agent.dto';
 import { UpdateClientAgentStatusDto } from './dto/update-client-agent-status.dto';
@@ -53,7 +54,9 @@ export class ClientAgentsController {
 
   @Roles('super_admin', 'support')
   @Get('client/:clientId')
-  findByClient(@Param('clientId') clientId: string) {
+  findByClient(
+    @Param('clientId') clientId: string,
+  ): Promise<ClientAgentSummaryDto[]> {
     return this.clientAgentsService.findByClient(clientId);
   }
 

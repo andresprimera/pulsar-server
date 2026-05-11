@@ -4,6 +4,7 @@ import {
   AGENT_TOOLING_PROFILE_IDS,
   type AgentToolingProfileId,
 } from '@shared/agent-tooling-profile.constants';
+import { AGENT_KINDS, type AgentKind } from '@shared/agent-kind.constants';
 
 @Schema({ collection: 'agents', timestamps: true })
 export class Agent extends Document {
@@ -34,6 +35,9 @@ export class Agent extends Document {
     enum: [...AGENT_TOOLING_PROFILE_IDS],
   })
   toolingProfileId?: AgentToolingProfileId;
+
+  @Prop({ type: String, required: true, enum: [...AGENT_KINDS] })
+  kind: AgentKind;
 }
 
 export const AgentSchema = SchemaFactory.createForClass(Agent);

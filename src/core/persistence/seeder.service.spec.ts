@@ -323,6 +323,7 @@ describe('SeederService', () => {
           name: SEED_DATA.agents[0].name,
           systemPrompt: SEED_DATA.agents[0].systemPrompt,
           status: 'active',
+          kind: 'customer_service',
           createdBySeeder: true,
           toolingProfileId: 'internal-debug',
         }),
@@ -332,6 +333,7 @@ describe('SeederService', () => {
           name: SEED_DATA.agents[1].name,
           systemPrompt: SEED_DATA.agents[1].systemPrompt,
           status: 'active',
+          kind: 'sales',
           createdBySeeder: true,
         }),
       );
@@ -340,6 +342,7 @@ describe('SeederService', () => {
           name: SEED_DATA.agents[2].name,
           systemPrompt: SEED_DATA.agents[2].systemPrompt,
           status: 'active',
+          kind: 'sales',
           createdBySeeder: true,
         }),
       );

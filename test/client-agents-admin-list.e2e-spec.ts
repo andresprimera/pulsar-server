@@ -73,6 +73,7 @@ describe('ClientAgents admin list (e2e)', () => {
       name,
       systemPrompt: 'You are a test assistant.',
       status: 'active',
+      kind: 'customer_service',
       createdBySeeder: false,
       monthlyTokenQuota: null,
       createdAt: new Date(),
