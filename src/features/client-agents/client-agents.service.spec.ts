@@ -70,6 +70,7 @@ describe('ClientAgentsService', () => {
       updateWithQuery: jest.fn(),
       countByFilter: jest.fn(),
       findPageWithProjection: jest.fn(),
+      findProjectedByClientForClientList: jest.fn(),
     };
 
     mockClientsService = {
@@ -1222,6 +1223,191 @@ describe('ClientAgentsService', () => {
       const result = await service.create(baseDto as any);
       expect(result).toBeDefined();
       expect(mockLifecyclePublisher.publishHappyPath).toHaveBeenCalled();
+    });
+  });
+
+  describe('findByClientForClient', () => {
+    const rowAlpha = {
+      _id: 'ca-1',
+      status: 'active' as const,
+      agentId: 'agent-1',
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+    };
+    const rowBeta = {
+      _id: 'ca-2',
+      status: 'archived' as const,
+      agentId: 'agent-2',
+      createdAt: new Date('2026-02-01T00:00:00Z'),
+    };
+    const agentAlpha = {
+      _id: 'agent-1',
+      name: 'Agent Alpha',
+      status: 'active',
+      kind: 'customer_service',
+    };
+    const agentBeta = {
+      _id: 'agent-2',
+      name: 'Agent Beta',
+      status: 'inactive',
+      kind: 'sales',
+    };
+
+    it('returns [] when the repository returns no rows and skips agent hydration', async () => {
+      mockClientAgentRepository.findProjectedByClientForClientList.mockResolvedValue(
+        [],
+      );
+
+      const result = await service.findByClientForClient('client-1');
+
+      expect(result).toEqual([]);
+      expect(
+        mockClientAgentRepository.findProjectedByClientForClientList,
+      ).toHaveBeenCalledWith('client-1');
+      expect(mockAgentsService.findManyByIds).not.toHaveBeenCalled();
+    });
+
+    it('hydrates agents and maps each row to the slim DTO shape', async () => {
+      mockClientAgentRepository.findProjectedByClientForClientList.mockResolvedValue(
+        [rowAlpha, rowBeta],
+      );
+      mockAgentsService.findManyByIds.mockResolvedValue([
+        agentAlpha,
+        agentBeta,
+      ]);
+
+      const result = await service.findByClientForClient('client-1');
+
+      expect(result).toEqual([
+        {
+          id: 'ca-1',
+          status: 'active',
+          agent: {
+            id: 'agent-1',
+            name: 'Agent Alpha',
+            status: 'active',
+            kind: 'customer_service',
+          },
+        },
+        {
+          id: 'ca-2',
+          status: 'archived',
+          agent: {
+            id: 'agent-2',
+            name: 'Agent Beta',
+            status: 'inactive',
+            kind: 'sales',
+          },
+        },
+      ]);
+    });
+
+    it('top-level DTO key set is exactly { agent, id, status } (whitelist guard)', async () => {
+      mockClientAgentRepository.findProjectedByClientForClientList.mockResolvedValue(
+        [rowAlpha],
+      );
+      mockAgentsService.findManyByIds.mockResolvedValue([agentAlpha]);
+
+      const [dto] = await service.findByClientForClient('client-1');
+
+      expect(Object.keys(dto).sort()).toEqual(['agent', 'id', 'status']);
+    });
+
+    it('embedded agent key set is exactly { id, kind, name, status } (whitelist guard)', async () => {
+      mockClientAgentRepository.findProjectedByClientForClientList.mockResolvedValue(
+        [rowAlpha],
+      );
+      mockAgentsService.findManyByIds.mockResolvedValue([agentAlpha]);
+
+      const [dto] = await service.findByClientForClient('client-1');
+
+      const agent = dto.agent;
+      if (agent === null) {
+        throw new Error('expected dto.agent to be populated');
+      }
+      expect(Object.keys(agent).sort()).toEqual([
+        'id',
+        'kind',
+        'name',
+        'status',
+      ]);
+    });
+
+    it('returns agent: null when the referenced agent is missing from hydration', async () => {
+      mockClientAgentRepository.findProjectedByClientForClientList.mockResolvedValue(
+        [rowAlpha],
+      );
+      mockAgentsService.findManyByIds.mockResolvedValue([]);
+
+      const result = await service.findByClientForClient('client-1');
+
+      expect(result).toEqual([{ id: 'ca-1', status: 'active', agent: null }]);
+    });
+
+    it('preserves repository order (service does not reorder)', async () => {
+      mockClientAgentRepository.findProjectedByClientForClientList.mockResolvedValue(
+        [rowBeta, rowAlpha],
+      );
+      mockAgentsService.findManyByIds.mockResolvedValue([
+        agentAlpha,
+        agentBeta,
+      ]);
+
+      const result = await service.findByClientForClient('client-1');
+
+      expect(result.map((d) => d.id)).toEqual(['ca-2', 'ca-1']);
+    });
+
+    it('deduplicates agentId values before calling AgentsService.findManyByIds', async () => {
+      const rowAlphaDup = { ...rowAlpha, _id: 'ca-1-dup' };
+      mockClientAgentRepository.findProjectedByClientForClientList.mockResolvedValue(
+        [rowAlpha, rowAlphaDup, rowBeta],
+      );
+      mockAgentsService.findManyByIds.mockResolvedValue([
+        agentAlpha,
+        agentBeta,
+      ]);
+
+      await service.findByClientForClient('client-1');
+
+      const callArg = mockAgentsService.findManyByIds.mock.calls[0][0];
+      expect([...callArg].sort()).toEqual(['agent-1', 'agent-2']);
+    });
+
+    it('passes the exact clientId through to the repository', async () => {
+      mockClientAgentRepository.findProjectedByClientForClientList.mockResolvedValue(
+        [],
+      );
+
+      await service.findByClientForClient('tenant-xyz');
+
+      expect(
+        mockClientAgentRepository.findProjectedByClientForClientList,
+      ).toHaveBeenCalledWith('tenant-xyz');
+      expect(
+        mockClientAgentRepository.findProjectedByClientForClientList,
+      ).toHaveBeenCalledTimes(1);
+    });
+
+    it('whitelist mapper drops spurious row fields (regression guard)', async () => {
+      const rowWithLeakage = {
+        ...rowAlpha,
+        clientId: 'tenant-xyz',
+        personalityId: 'p-1',
+        channels: [{ secret: 'should-not-leak' }],
+        agentPricing: { amount: 999 },
+      } as any;
+      mockClientAgentRepository.findProjectedByClientForClientList.mockResolvedValue(
+        [rowWithLeakage],
+      );
+      mockAgentsService.findManyByIds.mockResolvedValue([agentAlpha]);
+
+      const [dto] = await service.findByClientForClient('client-1');
+
+      expect(Object.keys(dto).sort()).toEqual(['agent', 'id', 'status']);
+      expect((dto as any).clientId).toBeUndefined();
+      expect((dto as any).personalityId).toBeUndefined();
+      expect((dto as any).channels).toBeUndefined();
+      expect((dto as any).agentPricing).toBeUndefined();
     });
   });
 });

@@ -1,4 +1,5 @@
 // If you change CLIENT_AGENT_LIST_PROJECTION, update ClientAgentsService.toSummary and the mapper redaction tests.
+// If you change CLIENT_AGENT_CLIENT_LIST_PROJECTION, update ClientAgentsService.toClientSummary and the client-tier mapper redaction tests.
 import type { ClientAgent } from '@persistence/schemas/client-agent.schema';
 
 export const CLIENT_AGENT_LIST_PROJECTION = [
@@ -56,4 +57,33 @@ export type ClientAgentListProjectedField =
 export type ClientAgentListProjection = Pick<
   ClientAgent,
   ClientAgentListProjectedField
+>;
+
+/**
+ * Client-tier slim projection for `GET /client-agents/me` (agent picker).
+ * Strict allowlist — excludes `clientId` (the caller already knows their own
+ * tenant), `personalityId`, `agentPricing`, `billingAnchor`, `toolingProfileId`,
+ * `channels`, `updatedAt`, and any future sensitive field. Adding a field to
+ * `ClientAgent` cannot leak through this code path because the projection is
+ * server-side allowlist and the wire mapper is field-by-field whitelist.
+ */
+export const CLIENT_AGENT_CLIENT_LIST_PROJECTION = [
+  '_id',
+  'status',
+  'agentId',
+  'createdAt',
+] as const;
+
+export const CLIENT_AGENT_CLIENT_LIST_PROJECTION_STRING =
+  CLIENT_AGENT_CLIENT_LIST_PROJECTION.join(' ');
+
+export type ClientAgentClientListProjectedField =
+  | '_id'
+  | 'status'
+  | 'agentId'
+  | 'createdAt';
+
+export type ClientAgentClientListProjection = Pick<
+  ClientAgent,
+  ClientAgentClientListProjectedField
 >;

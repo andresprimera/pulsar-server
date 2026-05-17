@@ -9,7 +9,10 @@ import {
 } from '@nestjs/common';
 import { FilterQuery, Types } from 'mongoose';
 import { ClientAgentRepository } from '@persistence/repositories/client-agent.repository';
-import { type ClientAgentListProjectedField } from '@persistence/repositories/client-agent.repository.constants';
+import {
+  type ClientAgentClientListProjectedField,
+  type ClientAgentListProjectedField,
+} from '@persistence/repositories/client-agent.repository.constants';
 import { ChannelRepository } from '@persistence/repositories/channel.repository';
 import { ClientPhoneRepository } from '@persistence/repositories/client-phone.repository';
 import { AgentPriceRepository } from '@persistence/repositories/agent-price.repository';
@@ -35,6 +38,10 @@ import {
   ClientAgentSummaryDto,
   PaginatedClientAgentSummary,
 } from './dto/client-agent-summary.dto';
+import {
+  ClientAgentSummaryForClientAgentRef,
+  ClientAgentSummaryForClientDto,
+} from './dto/client-agent-summary-for-client.dto';
 import { ClientsService } from '@clients/clients.service';
 import { AgentsService } from '@agents/agents.service';
 import {
@@ -338,10 +345,72 @@ export class ClientAgentsService {
    * single client. Reuses the same hydration pipeline as `findAllHydrated`
    * so credentials, telegramWebhookSecretHex, fingerprint, and
    * promptSupplement are stripped at the mapper boundary.
+   *
+   * @see findByClientForClient — client-tier sibling returning the slim
+   *   {@link ClientAgentSummaryForClientDto}[] consumed by the frontend
+   *   agent picker.
    */
   async findByClient(clientId: string): Promise<ClientAgentSummaryDto[]> {
     const rows = await this.clientAgentRepository.findByClient(clientId);
     return this.hydrateRows(rows);
+  }
+
+  /**
+   * Client-tier slim listing for the agent picker (`GET /client-agents/me`).
+   * Sibling to the admin-tier {@link findByClient}.
+   *
+   * Uses the strict allowlist projection
+   * `CLIENT_AGENT_CLIENT_LIST_PROJECTION` — `channels`, `personalityId`,
+   * `agentPricing`, `billingAnchor`, `toolingProfileId`, `updatedAt` are
+   * never read from disk, so they cannot leak even if a future controller
+   * change forgets to strip them. Hydration uses a separate
+   * `AgentsService.findManyByIds` call (not `.populate()`) to keep the
+   * repository free of cross-collection knowledge. Rows whose referenced
+   * `Agent` is missing yield `agent: null` (the hire still surfaces so the
+   * picker can render an "Agent unavailable" entry if it chooses).
+   */
+  async findByClientForClient(
+    clientId: string,
+  ): Promise<ClientAgentSummaryForClientDto[]> {
+    const rows =
+      await this.clientAgentRepository.findProjectedByClientForClientList(
+        clientId,
+      );
+    if (rows.length === 0) return [];
+
+    const agentIds = Array.from(new Set(rows.map((r) => String(r.agentId))));
+    const agents = await this.agentsService.findManyByIds(agentIds);
+    const agentById = new Map(agents.map((a) => [String(a._id), a]));
+
+    return rows.map((row) =>
+      this.toClientSummary(row, agentById.get(String(row.agentId)) ?? null),
+    );
+  }
+
+  /**
+   * Whitelist field-by-field mapper for the client-tier slim shape.
+   * NEVER spread `row` or `agent` — adding fields to the schema must not
+   * silently leak onto the wire. Single editing point that pairs with
+   * `CLIENT_AGENT_CLIENT_LIST_PROJECTION` (see header comment in
+   * `client-agent.repository.constants.ts`).
+   */
+  private toClientSummary(
+    row: Pick<ClientAgent, ClientAgentClientListProjectedField>,
+    agent: Agent | null,
+  ): ClientAgentSummaryForClientDto {
+    const agentRef: ClientAgentSummaryForClientAgentRef | null = agent
+      ? {
+          id: String(agent._id),
+          name: agent.name,
+          status: agent.status,
+          kind: agent.kind,
+        }
+      : null;
+    return {
+      id: String(row._id),
+      status: row.status,
+      agent: agentRef,
+    };
   }
 
   async findAllHydrated(

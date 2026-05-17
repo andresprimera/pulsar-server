@@ -185,6 +185,7 @@ Note: `channelId` must reference an existing channel (use GET `/channels` or GET
 | POST   | `/client-agents`                      | `clientId`, `agentId`, `personalityId` (MongoIds); optional `pricingOverride` (`agentAmount`, `agentMonthlyTokenQuota`); `channels[]`: each with `channelId`, `provider` (`meta` \| `twilio` \| `tiktok` \| `instagram` \| `dialog360`), `credentials`, `llmConfig` (`provider`, `apiKey`, `model`), optional `amountOverride`, `monthlyMessageQuotaOverride` |
 | GET    | `/client-agents`                      | Admin list. Returns hydrated, redacted summaries. Query params: `page?`, `limit?`, `sort?`, `status?`, `clientId?`, `agentId?`, `personalityId?`, `createdAfter?`, `createdBefore?`. See [Pagination envelope](#pagination-envelope) |
 | GET    | `/client-agents/client/:clientId`     | - |
+| GET    | `/client-agents/me`                   | Client-tier (cookie session). Returns the authenticated client's hires. Access: `owner` \| `operator` via `@ClientAuth` + `@ClientRoles`. Response: `ClientAgentSummaryForClientDto[]` (slim shape: `{ id, status, agent: { id, name, status, kind } \| null }`) sorted by `createdAt` ascending. |
 | PATCH  | `/client-agents/:id`                  | Optional: `personalityId` only (pricing is snapshotted at hire) |
 | PATCH  | `/client-agents/:id/status`           | Body: `status` |
 | GET    | `/client-agents/billing/client/:clientId` | Returns total amount and currency for active client-agents |

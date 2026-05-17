@@ -3,7 +3,9 @@ import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, FilterQuery, Model, UpdateQuery } from 'mongoose';
 import { ClientAgent } from '@persistence/schemas/client-agent.schema';
 import {
+  CLIENT_AGENT_CLIENT_LIST_PROJECTION_STRING,
   CLIENT_AGENT_LIST_PROJECTION_STRING,
+  type ClientAgentClientListProjectedField,
   type ClientAgentListProjectedField,
 } from './client-agent.repository.constants';
 import { normalizeToE164 } from '@shared/e164.util';
@@ -72,6 +74,26 @@ export class ClientAgentRepository {
    */
   async findByClient(clientId: string): Promise<ClientAgent[]> {
     return this.model.find({ clientId }).exec();
+  }
+
+  /**
+   * Client-tier slim listing for the agent picker (GET /client-agents/me).
+   * Returns rows projected to {@link CLIENT_AGENT_CLIENT_LIST_PROJECTION_STRING}
+   * only — `channels`, `personalityId`, `agentPricing`, `billingAnchor`,
+   * `toolingProfileId`, `updatedAt` are never read from disk. Filter and sort
+   * are index-covered by `{ clientId: 1, createdAt: 1 }`.
+   */
+  async findProjectedByClientForClientList(
+    clientId: string,
+  ): Promise<Pick<ClientAgent, ClientAgentClientListProjectedField>[]> {
+    return this.model
+      .find({ clientId }, CLIENT_AGENT_CLIENT_LIST_PROJECTION_STRING)
+      .sort({ createdAt: 1, _id: 1 })
+      .lean()
+      .exec() as unknown as Pick<
+      ClientAgent,
+      ClientAgentClientListProjectedField
+    >[];
   }
 
   async findByClientAndAgent(

@@ -3,6 +3,7 @@ import type { Type } from '@nestjs/common';
 import { AdminAuthController } from '../../src/features/admin-auth/admin-auth.controller';
 import { ClientAuthController } from '../../src/features/client-auth/client-auth.controller';
 import { ClientAgentsController } from '../../src/features/client-agents/client-agents.controller';
+import { ClientAgentsClientController } from '../../src/features/client-agents/client-agents.client.controller';
 import { ClientCatalogItemsController } from '../../src/features/client-catalog-items/client-catalog-items.controller';
 import { ClientContextSuggestionsController } from '../../src/features/client-context-suggestions/client-context-suggestions.controller';
 import { ClientsController } from '../../src/features/clients/clients.controller';
@@ -34,6 +35,7 @@ export const CONTROLLER_REGISTRY: ReadonlyArray<Type<unknown>> = [
   AdminAuthController,
   ClientAuthController,
   ClientAgentsController,
+  ClientAgentsClientController,
   ClientCatalogItemsController,
   ClientContextSuggestionsController,
   ClientsController,

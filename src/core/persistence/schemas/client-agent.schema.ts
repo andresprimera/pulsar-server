@@ -155,6 +155,9 @@ export const ClientAgentSchema = SchemaFactory.createForClass(ClientAgent);
 // Prevent hiring the same agent twice for the same client
 ClientAgentSchema.index({ clientId: 1, agentId: 1 }, { unique: true });
 
+// Covers client-tier agent picker: GET /client-agents/me filter+sort.
+ClientAgentSchema.index({ clientId: 1, createdAt: 1 });
+
 // Critical indexes for routing and polling
 ClientAgentSchema.index({ status: 1, 'channels.phoneNumberId': 1 });
 ClientAgentSchema.index({ status: 1, 'channels.tiktokUserId': 1 });

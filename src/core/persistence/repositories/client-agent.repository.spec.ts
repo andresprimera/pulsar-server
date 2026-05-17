@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
 import { ClientAgentRepository } from './client-agent.repository';
 import {
+  CLIENT_AGENT_CLIENT_LIST_PROJECTION,
+  CLIENT_AGENT_CLIENT_LIST_PROJECTION_STRING,
   CLIENT_AGENT_LIST_PROJECTION,
   CLIENT_AGENT_LIST_PROJECTION_STRING,
 } from './client-agent.repository.constants';
@@ -381,6 +383,101 @@ describe('ClientAgentRepository telegram webhook methods', () => {
 
       expect(mockModel.countDocuments).toHaveBeenCalledWith(filter);
       expect(result).toBe(7);
+    });
+  });
+
+  describe('findProjectedByClientForClientList', () => {
+    function setupChain(resolved: unknown) {
+      const exec = jest.fn().mockResolvedValue(resolved);
+      const lean = jest.fn().mockReturnValue({ exec });
+      const sort = jest.fn().mockReturnValue({ lean });
+      mockModel.find.mockReturnValue({ sort });
+      return { exec, lean, sort };
+    }
+
+    it('filters by clientId with the client-tier projection string', async () => {
+      setupChain([]);
+
+      await repository.findProjectedByClientForClientList('client-1');
+
+      expect(mockModel.find).toHaveBeenCalledWith(
+        { clientId: 'client-1' },
+        CLIENT_AGENT_CLIENT_LIST_PROJECTION_STRING,
+      );
+    });
+
+    it('sorts ascending by createdAt then _id (stable tiebreaker)', async () => {
+      const chain = setupChain([]);
+
+      await repository.findProjectedByClientForClientList('client-1');
+
+      expect(chain.sort).toHaveBeenCalledWith({ createdAt: 1, _id: 1 });
+    });
+
+    it('applies .lean() before .exec()', async () => {
+      const chain = setupChain([]);
+
+      await repository.findProjectedByClientForClientList('client-1');
+
+      expect(chain.lean).toHaveBeenCalledTimes(1);
+      expect(chain.exec).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns the model result unchanged', async () => {
+      const rows = [
+        {
+          _id: 'ca-1',
+          status: 'active',
+          agentId: 'agent-1',
+          createdAt: new Date(),
+        },
+      ];
+      setupChain(rows);
+
+      const result = await repository.findProjectedByClientForClientList(
+        'client-1',
+      );
+
+      expect(result).toBe(rows);
+    });
+
+    it('uses a projection string that does not contain sensitive subpaths', () => {
+      // Defense in depth: even if a future contributor accidentally adds a
+      // sensitive top-level field to the client-tier projection, this guard
+      // catches the most common leak vectors before it ships.
+      expect(CLIENT_AGENT_CLIENT_LIST_PROJECTION_STRING).not.toContain(
+        'channels',
+      );
+      expect(CLIENT_AGENT_CLIENT_LIST_PROJECTION_STRING).not.toContain(
+        'credentials',
+      );
+      expect(CLIENT_AGENT_CLIENT_LIST_PROJECTION_STRING).not.toContain(
+        'apiKey',
+      );
+      expect(CLIENT_AGENT_CLIENT_LIST_PROJECTION_STRING).not.toContain(
+        'agentPricing',
+      );
+      expect(CLIENT_AGENT_CLIENT_LIST_PROJECTION_STRING).not.toContain(
+        'billingAnchor',
+      );
+      expect(CLIENT_AGENT_CLIENT_LIST_PROJECTION_STRING).not.toContain(
+        'personalityId',
+      );
+      expect(CLIENT_AGENT_CLIENT_LIST_PROJECTION_STRING).not.toContain(
+        'toolingProfileId',
+      );
+      expect(CLIENT_AGENT_CLIENT_LIST_PROJECTION_STRING).not.toContain(
+        'promptSupplement',
+      );
+    });
+
+    it('CLIENT_AGENT_CLIENT_LIST_PROJECTION is exactly the four allowlisted fields', () => {
+      expect([...CLIENT_AGENT_CLIENT_LIST_PROJECTION].sort()).toEqual([
+        '_id',
+        'agentId',
+        'createdAt',
+        'status',
+      ]);
     });
   });
 });
