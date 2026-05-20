@@ -315,7 +315,9 @@ describe('IncomingMessageOrchestrator', () => {
 
       expect(output).toBeUndefined();
       expect(agentService.run).not.toHaveBeenCalled();
-      // critical: touch is skipped so lastMessageAt does not advance
+      // critical: touch is skipped so both lastMessageAt AND the
+      // denormalized lastMessagePreview stay frozen at their prior
+      // (bot-handled) values.
       expect(conversationService.touch).not.toHaveBeenCalled();
     });
 

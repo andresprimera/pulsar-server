@@ -59,6 +59,39 @@ export class Conversation extends Document {
   })
   controlMode: ControlMode;
 
+  /**
+   * Denormalized reference to the responsible hired agent (`ClientAgent._id`)
+   * for the inbox list `agentId` filter. Backfilled by
+   * `InboxConversationEnrichmentBackfillMigration`; written on hire-routed
+   * conversations going forward. Optional because pre-migration rows may
+   * have no resolvable `(clientId, channelId)` → `ClientAgent` mapping.
+   *
+   * Not on the wire — see `ConversationSummaryDto`.
+   */
+  @Prop({
+    type: Types.ObjectId,
+    ref: 'ClientAgent',
+    required: false,
+  })
+  clientAgentId?: Types.ObjectId;
+
+  /**
+   * Lowercased + trimmed denormalized copy of `Contact.name` for case-
+   * insensitive substring search via the inbox list `q` filter. Maintained
+   * by the enrichment backfill (Phase 1) and by future contact-rename
+   * propagation (Phase 2+). No index — search rides `inbox_list_idx`.
+   */
+  @Prop({ type: String, required: false, maxlength: 256 })
+  contactNameLower?: string;
+
+  /**
+   * Server-truncated (≤ 280 chars) preview of the most recent
+   * non-suppressed message. Frozen alongside `lastMessageAt` while
+   * `controlMode === 'human'` — see `ConversationSummaryDto` JSDoc.
+   */
+  @Prop({ type: String, required: false })
+  lastMessagePreview?: string;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -95,4 +128,18 @@ ConversationSchema.index(
     _id: -1,
   },
   { name: 'inbox_list_idx' },
+);
+
+// Covering index for the inbox list query when filtered by `agentId`
+// (resolved to `clientAgentId`). Prefix matches the read pattern used by
+// `ConversationRepository.findInboxPageEnriched` via `.hint(...)`.
+ConversationSchema.index(
+  {
+    clientId: 1,
+    clientAgentId: 1,
+    status: 1,
+    lastMessageAt: -1,
+    _id: -1,
+  },
+  { name: 'inbox_list_agent_idx', background: true },
 );

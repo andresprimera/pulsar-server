@@ -1,8 +1,11 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Types } from 'mongoose';
-import { ConversationRepository } from '@persistence/repositories/conversation.repository';
+import { ClientAgentRepository } from '@persistence/repositories/client-agent.repository';
+import {
+  ConversationRepository,
+  EnrichedInboxRow,
+} from '@persistence/repositories/conversation.repository';
 import { MessageRepository } from '@persistence/repositories/message.repository';
-import { Conversation } from '@persistence/schemas/conversation.schema';
 import { Message } from '@persistence/schemas/message.schema';
 import { DEFAULT_CONTROL_MODE, ControlMode } from '@shared/inbox/control-mode';
 import { ConversationSummaryDto } from './dto/conversation-summary.dto';
@@ -25,6 +28,7 @@ export class InboxService {
   constructor(
     private readonly conversationRepository: ConversationRepository,
     private readonly messageRepository: MessageRepository,
+    private readonly clientAgentRepository: ClientAgentRepository,
   ) {}
 
   async listConversations(
@@ -35,9 +39,31 @@ export class InboxService {
     const limit = Math.min(query.limit ?? DEFAULT_LIST_LIMIT, MAX_LIMIT);
     const status = query.status ?? 'open';
 
-    const page = await this.conversationRepository.findInboxPage(
+    const channelId =
+      query.channelId !== undefined
+        ? new Types.ObjectId(query.channelId)
+        : undefined;
+
+    let clientAgentId: Types.ObjectId | undefined;
+    if (query.agentId !== undefined) {
+      const hire = await this.clientAgentRepository.findByClientAndAgent(
+        clientId,
+        query.agentId,
+      );
+      if (!hire) {
+        return { items: [], nextCursor: null };
+      }
+      clientAgentId = hire._id as Types.ObjectId;
+    }
+
+    const qLowered =
+      query.q !== undefined && query.q.length > 0
+        ? escapeRegex(query.q.trim().toLowerCase())
+        : undefined;
+
+    const page = await this.conversationRepository.findInboxPageEnriched(
       new Types.ObjectId(clientId),
-      { status, cursor, limit },
+      { status, cursor, limit, channelId, clientAgentId, qLowered },
     );
 
     return {
@@ -108,18 +134,51 @@ export class InboxService {
   }
 }
 
-function toConversationSummary(doc: Conversation): ConversationSummaryDto {
+function toConversationSummary(row: EnrichedInboxRow): ConversationSummaryDto {
+  const contactName = row.contact?.name ?? '';
+  const contactEmail =
+    row.contact?.identifier?.type === 'email'
+      ? row.contact.identifier.value
+      : null;
+  const provider = (row.channel?.type ?? '').toLowerCase();
+  const channelHandle = resolveChannelHandle(row);
+  const assistant = row.agent?.name ?? null;
+
   return {
-    _id: String(doc._id),
-    contactId: String(doc.contactId),
-    channelId: String(doc.channelId),
-    status: doc.status,
-    controlMode: (doc.controlMode ?? DEFAULT_CONTROL_MODE) as ControlMode,
-    lastMessageAt: doc.lastMessageAt,
-    summary: doc.summary,
-    createdAt: doc.createdAt,
-    updatedAt: doc.updatedAt,
+    _id: String(row._id),
+    contactId: String(row.contactId),
+    channelId: String(row.channelId),
+    status: row.status,
+    controlMode: (row.controlMode ?? DEFAULT_CONTROL_MODE) as ControlMode,
+    lastMessageAt: row.lastMessageAt,
+    summary: row.summary,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    contactName,
+    contactEmail,
+    provider,
+    channelHandle,
+    assistant,
+    assignedOperatorName: null,
+    lastMessagePreview: row.lastMessagePreview ?? '',
+    unreadCount: 0,
+    tags: [],
   };
+}
+
+function resolveChannelHandle(row: EnrichedInboxRow): string {
+  const hireChannels = row.clientAgent?.channels ?? [];
+  const matching = hireChannels.find(
+    (c) => c.channelId && String(c.channelId) === String(row.channelId),
+  );
+  if (!matching) return '';
+  return (
+    matching.phoneNumberId ??
+    matching.instagramAccountId ??
+    matching.tiktokUserId ??
+    matching.telegramBotId ??
+    ''
+  );
 }
 
 function toInboxMessage(doc: Message): InboxMessageDto {
@@ -132,6 +191,16 @@ function toInboxMessage(doc: Message): InboxMessageDto {
     agentId: doc.agentId ? String(doc.agentId) : null,
     createdAt: doc.createdAt as Date,
   };
+}
+
+/**
+ * Escapes the regex metacharacters that could let a free-text `q` value
+ * compose an unintended pattern. The escaped result is used unanchored
+ * (no `^`/`$`) and case-sensitively against the pre-lowercased
+ * `contactNameLower` column.
+ */
+function escapeRegex(value: string): string {
+  return value.replace(/[\\^$.|?*+()[\]{}]/g, '\\$&');
 }
 
 // `PageCursor` is re-exported for spec files that need to construct cursors

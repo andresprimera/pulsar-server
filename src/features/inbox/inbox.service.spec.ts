@@ -1,22 +1,16 @@
 import { NotFoundException } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { InboxService } from './inbox.service';
-import { ConversationRepository } from '@persistence/repositories/conversation.repository';
+import { ClientAgentRepository } from '@persistence/repositories/client-agent.repository';
+import {
+  ConversationRepository,
+  EnrichedInboxRow,
+} from '@persistence/repositories/conversation.repository';
 import { MessageRepository } from '@persistence/repositories/message.repository';
 import { Conversation } from '@persistence/schemas/conversation.schema';
 import { Message } from '@persistence/schemas/message.schema';
 
-type ConversationRow = Partial<Conversation> & {
-  _id: Types.ObjectId;
-  contactId: Types.ObjectId;
-  channelId: Types.ObjectId;
-  clientId: Types.ObjectId;
-  status: 'open' | 'closed' | 'archived';
-  controlMode?: 'bot' | 'human';
-  lastMessageAt: Date;
-  createdAt?: Date;
-  updatedAt?: Date;
-};
+type EnrichedInboxRowOverrides = Partial<EnrichedInboxRow>;
 
 type MessageRow = Partial<Message> & {
   _id: Types.ObjectId;
@@ -28,18 +22,25 @@ type MessageRow = Partial<Message> & {
   createdAt?: Date;
 };
 
-const buildConversationRow = (
-  overrides: Partial<ConversationRow> = {},
-): ConversationRow => ({
+const buildEnrichedRow = (
+  overrides: EnrichedInboxRowOverrides = {},
+): EnrichedInboxRow => ({
   _id: new Types.ObjectId(),
   clientId: new Types.ObjectId(),
   contactId: new Types.ObjectId(),
   channelId: new Types.ObjectId(),
+  clientAgentId: undefined,
   status: 'open',
   controlMode: 'bot',
   lastMessageAt: new Date('2026-05-19T10:00:00.000Z'),
+  lastMessagePreview: 'hello',
+  summary: undefined,
   createdAt: new Date('2026-05-18T00:00:00.000Z'),
   updatedAt: new Date('2026-05-19T10:00:00.000Z'),
+  contact: { name: 'Jane Doe', identifier: { type: 'phone', value: '+1' } },
+  channel: { type: 'whatsapp' },
+  clientAgent: null,
+  agent: null,
   ...overrides,
 });
 
@@ -53,14 +54,30 @@ const buildMessageRow = (overrides: Partial<MessageRow> = {}): MessageRow => ({
   ...overrides,
 });
 
+const buildConversationDoc = (
+  overrides: Partial<Conversation> = {},
+): Partial<Conversation> => ({
+  _id: new Types.ObjectId(),
+  clientId: new Types.ObjectId(),
+  contactId: new Types.ObjectId(),
+  channelId: new Types.ObjectId(),
+  status: 'open',
+  controlMode: 'bot',
+  lastMessageAt: new Date(),
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  ...overrides,
+});
+
 describe('InboxService', () => {
   let conversationRepository: jest.Mocked<ConversationRepository>;
   let messageRepository: jest.Mocked<MessageRepository>;
+  let clientAgentRepository: jest.Mocked<ClientAgentRepository>;
   let service: InboxService;
 
   beforeEach(() => {
     conversationRepository = {
-      findInboxPage: jest.fn(),
+      findInboxPageEnriched: jest.fn(),
       findByIdForClient: jest.fn(),
       updateControlMode: jest.fn(),
     } as unknown as jest.Mocked<ConversationRepository>;
@@ -69,15 +86,23 @@ describe('InboxService', () => {
       findByConversationPage: jest.fn(),
     } as unknown as jest.Mocked<MessageRepository>;
 
-    service = new InboxService(conversationRepository, messageRepository);
+    clientAgentRepository = {
+      findByClientAndAgent: jest.fn(),
+    } as unknown as jest.Mocked<ClientAgentRepository>;
+
+    service = new InboxService(
+      conversationRepository,
+      messageRepository,
+      clientAgentRepository,
+    );
   });
 
   describe('listConversations', () => {
     it('returns mapped DTOs with null cursor when fewer than limit items', async () => {
       const clientId = new Types.ObjectId();
-      const row = buildConversationRow({ clientId });
-      conversationRepository.findInboxPage.mockResolvedValue({
-        items: [row as Conversation],
+      const row = buildEnrichedRow({ clientId });
+      conversationRepository.findInboxPageEnriched.mockResolvedValue({
+        items: [row],
         nextCursor: null,
       });
 
@@ -86,9 +111,16 @@ describe('InboxService', () => {
         {},
       );
 
-      expect(conversationRepository.findInboxPage).toHaveBeenCalledWith(
+      expect(conversationRepository.findInboxPageEnriched).toHaveBeenCalledWith(
         expect.any(Types.ObjectId),
-        { status: 'open', cursor: null, limit: 20 },
+        {
+          status: 'open',
+          cursor: null,
+          limit: 20,
+          channelId: undefined,
+          clientAgentId: undefined,
+          qLowered: undefined,
+        },
       );
       expect(result.nextCursor).toBeNull();
       expect(result.items).toHaveLength(1);
@@ -97,9 +129,9 @@ describe('InboxService', () => {
     });
 
     it('encodes next cursor when repository returns one', async () => {
-      const row = buildConversationRow();
-      conversationRepository.findInboxPage.mockResolvedValue({
-        items: [row as Conversation],
+      const row = buildEnrichedRow();
+      conversationRepository.findInboxPageEnriched.mockResolvedValue({
+        items: [row],
         nextCursor: { t: row.lastMessageAt, i: row._id },
       });
 
@@ -113,7 +145,7 @@ describe('InboxService', () => {
     });
 
     it('clamps requested limit to MAX_LIMIT (100)', async () => {
-      conversationRepository.findInboxPage.mockResolvedValue({
+      conversationRepository.findInboxPageEnriched.mockResolvedValue({
         items: [],
         nextCursor: null,
       });
@@ -121,16 +153,16 @@ describe('InboxService', () => {
       const clientId = new Types.ObjectId().toHexString();
       await service.listConversations(clientId, { limit: 500 });
 
-      expect(conversationRepository.findInboxPage).toHaveBeenCalledWith(
+      expect(conversationRepository.findInboxPageEnriched).toHaveBeenCalledWith(
         expect.any(Types.ObjectId),
         expect.objectContaining({ limit: 100 }),
       );
     });
 
     it('coerces missing controlMode to "bot" (backfill-race safety)', async () => {
-      const row = buildConversationRow({ controlMode: undefined });
-      conversationRepository.findInboxPage.mockResolvedValue({
-        items: [row as Conversation],
+      const row = buildEnrichedRow({ controlMode: undefined });
+      conversationRepository.findInboxPageEnriched.mockResolvedValue({
+        items: [row],
         nextCursor: null,
       });
 
@@ -142,7 +174,7 @@ describe('InboxService', () => {
     });
 
     it('passes through explicit status filter', async () => {
-      conversationRepository.findInboxPage.mockResolvedValue({
+      conversationRepository.findInboxPageEnriched.mockResolvedValue({
         items: [],
         nextCursor: null,
       });
@@ -150,10 +182,207 @@ describe('InboxService', () => {
       await service.listConversations(new Types.ObjectId().toHexString(), {
         status: 'closed',
       });
-      expect(conversationRepository.findInboxPage).toHaveBeenCalledWith(
+      expect(conversationRepository.findInboxPageEnriched).toHaveBeenCalledWith(
         expect.any(Types.ObjectId),
         expect.objectContaining({ status: 'closed' }),
       );
+    });
+
+    it('forwards channelId as ObjectId', async () => {
+      conversationRepository.findInboxPageEnriched.mockResolvedValue({
+        items: [],
+        nextCursor: null,
+      });
+
+      const channelId = new Types.ObjectId().toHexString();
+      await service.listConversations(new Types.ObjectId().toHexString(), {
+        channelId,
+      });
+
+      const call = conversationRepository.findInboxPageEnriched.mock.calls[0];
+      expect(call[1].channelId).toBeInstanceOf(Types.ObjectId);
+      expect(String(call[1].channelId)).toBe(channelId);
+    });
+
+    it('resolves agentId to clientAgentId via the client-agent repository', async () => {
+      const clientId = new Types.ObjectId();
+      const agentId = new Types.ObjectId();
+      const clientAgentId = new Types.ObjectId();
+      clientAgentRepository.findByClientAndAgent.mockResolvedValue({
+        _id: clientAgentId,
+      } as any);
+      conversationRepository.findInboxPageEnriched.mockResolvedValue({
+        items: [],
+        nextCursor: null,
+      });
+
+      await service.listConversations(clientId.toHexString(), {
+        agentId: agentId.toHexString(),
+      });
+
+      expect(clientAgentRepository.findByClientAndAgent).toHaveBeenCalledWith(
+        clientId.toHexString(),
+        agentId.toHexString(),
+      );
+      const call = conversationRepository.findInboxPageEnriched.mock.calls[0];
+      expect(String(call[1].clientAgentId)).toBe(String(clientAgentId));
+    });
+
+    it('returns an empty page when agentId resolves to no hire', async () => {
+      clientAgentRepository.findByClientAndAgent.mockResolvedValue(null);
+
+      const result = await service.listConversations(
+        new Types.ObjectId().toHexString(),
+        { agentId: new Types.ObjectId().toHexString() },
+      );
+
+      expect(result).toEqual({ items: [], nextCursor: null });
+      expect(
+        conversationRepository.findInboxPageEnriched,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('trims, lowercases, and regex-escapes the q filter before forwarding', async () => {
+      conversationRepository.findInboxPageEnriched.mockResolvedValue({
+        items: [],
+        nextCursor: null,
+      });
+
+      await service.listConversations(new Types.ObjectId().toHexString(), {
+        q: '  Foo.Bar*+  ',
+      });
+
+      const call = conversationRepository.findInboxPageEnriched.mock.calls[0];
+      // class-validator's @Transform runs in the controller pipe in real use;
+      // the service additionally trims as defense-in-depth.
+      expect(call[1].qLowered).toBe('foo\\.bar\\*\\+');
+    });
+
+    it('maps DTO defaults for assignedOperatorName / unreadCount / tags', async () => {
+      const row = buildEnrichedRow();
+      conversationRepository.findInboxPageEnriched.mockResolvedValue({
+        items: [row],
+        nextCursor: null,
+      });
+
+      const result = await service.listConversations(
+        new Types.ObjectId().toHexString(),
+        {},
+      );
+
+      expect(result.items[0].assignedOperatorName).toBeNull();
+      expect(result.items[0].unreadCount).toBe(0);
+      expect(result.items[0].tags).toEqual([]);
+    });
+
+    it('projects contactEmail from email identifier and null otherwise', async () => {
+      const emailRow = buildEnrichedRow({
+        contact: { name: 'A', identifier: { type: 'email', value: 'a@b.c' } },
+      });
+      const phoneRow = buildEnrichedRow({
+        contact: { name: 'B', identifier: { type: 'phone', value: '+1' } },
+      });
+      conversationRepository.findInboxPageEnriched.mockResolvedValue({
+        items: [emailRow, phoneRow],
+        nextCursor: null,
+      });
+
+      const result = await service.listConversations(
+        new Types.ObjectId().toHexString(),
+        {},
+      );
+
+      expect(result.items[0].contactEmail).toBe('a@b.c');
+      expect(result.items[1].contactEmail).toBeNull();
+    });
+
+    it('lowercases provider', async () => {
+      const row = buildEnrichedRow({ channel: { type: 'WhatsApp' } });
+      conversationRepository.findInboxPageEnriched.mockResolvedValue({
+        items: [row],
+        nextCursor: null,
+      });
+
+      const result = await service.listConversations(
+        new Types.ObjectId().toHexString(),
+        {},
+      );
+
+      expect(result.items[0].provider).toBe('whatsapp');
+    });
+
+    it('resolves channelHandle by precedence (phone → instagram → tiktok → telegram)', async () => {
+      const channelId = new Types.ObjectId();
+
+      const phoneRow = buildEnrichedRow({
+        channelId,
+        clientAgent: {
+          agentId: 'a',
+          channels: [
+            {
+              channelId,
+              phoneNumberId: '+1',
+              instagramAccountId: 'ig',
+              tiktokUserId: 'tt',
+              telegramBotId: 'tg',
+            },
+          ],
+        },
+      });
+      const igRow = buildEnrichedRow({
+        channelId,
+        clientAgent: {
+          agentId: 'a',
+          channels: [
+            {
+              channelId,
+              instagramAccountId: 'ig',
+              tiktokUserId: 'tt',
+              telegramBotId: 'tg',
+            },
+          ],
+        },
+      });
+      const tgRow = buildEnrichedRow({
+        channelId,
+        clientAgent: {
+          agentId: 'a',
+          channels: [{ channelId, telegramBotId: 'tg' }],
+        },
+      });
+      const missingRow = buildEnrichedRow({
+        channelId,
+        clientAgent: null,
+      });
+
+      conversationRepository.findInboxPageEnriched.mockResolvedValue({
+        items: [phoneRow, igRow, tgRow, missingRow],
+        nextCursor: null,
+      });
+
+      const result = await service.listConversations(
+        new Types.ObjectId().toHexString(),
+        {},
+      );
+
+      expect(result.items[0].channelHandle).toBe('+1');
+      expect(result.items[1].channelHandle).toBe('ig');
+      expect(result.items[2].channelHandle).toBe('tg');
+      expect(result.items[3].channelHandle).toBe('');
+    });
+
+    it('defaults lastMessagePreview to "" when unset', async () => {
+      const row = buildEnrichedRow({ lastMessagePreview: undefined });
+      conversationRepository.findInboxPageEnriched.mockResolvedValue({
+        items: [row],
+        nextCursor: null,
+      });
+
+      const result = await service.listConversations(
+        new Types.ObjectId().toHexString(),
+        {},
+      );
+      expect(result.items[0].lastMessagePreview).toBe('');
     });
   });
 
@@ -171,13 +400,13 @@ describe('InboxService', () => {
     });
 
     it('returns mapped messages and a conversationId echo when owned', async () => {
-      const conv = buildConversationRow();
+      const conv = buildConversationDoc();
       conversationRepository.findByIdForClient.mockResolvedValue(
         conv as Conversation,
       );
       const agentId = new Types.ObjectId();
       const msg = buildMessageRow({
-        conversationId: conv._id,
+        conversationId: conv._id as Types.ObjectId,
         type: 'agent',
         agentId,
         contactId: undefined,
@@ -188,12 +417,14 @@ describe('InboxService', () => {
       });
 
       const result = await service.listConversationMessages(
-        conv.clientId.toHexString(),
-        conv._id.toHexString(),
+        (conv.clientId as Types.ObjectId).toHexString(),
+        (conv._id as Types.ObjectId).toHexString(),
         {},
       );
 
-      expect(result.conversationId).toBe(conv._id.toHexString());
+      expect(result.conversationId).toBe(
+        (conv._id as Types.ObjectId).toHexString(),
+      );
       expect(result.items).toHaveLength(1);
       expect(result.items[0].type).toBe('agent');
       expect(result.items[0].contactId).toBeNull();
@@ -216,14 +447,14 @@ describe('InboxService', () => {
     });
 
     it('returns minimal response and forwards the value to the repo', async () => {
-      const conv = buildConversationRow({ controlMode: 'human' });
+      const conv = buildConversationDoc({ controlMode: 'human' });
       conversationRepository.updateControlMode.mockResolvedValue(
         conv as Conversation,
       );
 
       const result = await service.updateControlMode(
-        conv.clientId.toHexString(),
-        conv._id.toHexString(),
+        (conv.clientId as Types.ObjectId).toHexString(),
+        (conv._id as Types.ObjectId).toHexString(),
         'human',
         new Types.ObjectId().toHexString(),
       );
@@ -233,7 +464,9 @@ describe('InboxService', () => {
         expect.any(Types.ObjectId),
         'human',
       );
-      expect(result.conversationId).toBe(conv._id.toHexString());
+      expect(result.conversationId).toBe(
+        (conv._id as Types.ObjectId).toHexString(),
+      );
       expect(result.controlMode).toBe('human');
     });
   });
