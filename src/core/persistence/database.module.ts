@@ -69,6 +69,7 @@ import {
 } from './schemas/client-user-session.schema';
 import { ClientUserSessionRepository } from './repositories/client-user-session.repository';
 import { UsersEmailCollationMigration } from './migrations/users-email-collation.migration';
+import { InboxControlModeBackfillMigration } from './migrations/inbox-control-mode-backfill.migration';
 
 const repositories = [
   ClientRepository,
@@ -133,6 +134,7 @@ const repositories = [
     ...repositories,
     SeederService,
     UsersEmailCollationMigration,
+    InboxControlModeBackfillMigration,
     EventIdempotencyService,
     HireChannelLifecycleAdapter,
     {

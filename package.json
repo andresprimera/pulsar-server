@@ -127,7 +127,8 @@
       "^@client-context-suggestions/(.*)$": "<rootDir>/features/client-context-suggestions/$1",
       "^@client-catalog-items/(.*)$": "<rootDir>/features/client-catalog-items/$1",
       "^@admin-auth/(.*)$": "<rootDir>/features/admin-auth/$1",
-      "^@client-auth/(.*)$": "<rootDir>/features/client-auth/$1"
+      "^@client-auth/(.*)$": "<rootDir>/features/client-auth/$1",
+      "^@inbox/(.*)$": "<rootDir>/features/inbox/$1"
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"

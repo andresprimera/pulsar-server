@@ -3,6 +3,16 @@ import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model, Types } from 'mongoose';
 import { Message } from '@persistence/schemas/message.schema';
 
+export interface InboxThreadCursor {
+  t: Date;
+  i: Types.ObjectId;
+}
+
+export interface InboxThreadPageResult {
+  items: Message[];
+  nextCursor: InboxThreadCursor | null;
+}
+
 @Injectable()
 export class MessageRepository {
   constructor(
@@ -132,6 +142,62 @@ export class MessageRepository {
         createdAt: { $gte: periodStart, $lt: periodEnd },
       })
       .exec();
+  }
+
+  /**
+   * Paginated chronological read of a conversation's message thread for
+   * the inbox UI. Filters out `summary` (operator view never sees
+   * compression markers) and inactive messages. Cursor pagination on
+   * `(createdAt, _id)` ascending. The caller MUST verify conversation
+   * ownership before invoking this method.
+   */
+  async findByConversationPage(
+    conversationId: Types.ObjectId,
+    opts: {
+      cursor: InboxThreadCursor | null;
+      limit: number;
+    },
+  ): Promise<InboxThreadPageResult> {
+    const filter: Record<string, unknown> = {
+      conversationId,
+      status: 'active',
+      type: { $in: ['user', 'agent'] },
+    };
+    if (opts.cursor) {
+      filter.$or = [
+        { createdAt: { $gt: opts.cursor.t } },
+        { createdAt: opts.cursor.t, _id: { $gt: opts.cursor.i } },
+      ];
+    }
+
+    const rows = (await this.model
+      .find(filter, {
+        _id: 1,
+        content: 1,
+        type: 1,
+        contactId: 1,
+        agentId: 1,
+        conversationId: 1,
+        createdAt: 1,
+      })
+      .sort({ createdAt: 1, _id: 1 })
+      .limit(opts.limit + 1)
+      .lean()
+      .exec()) as Message[];
+
+    if (rows.length <= opts.limit) {
+      return { items: rows, nextCursor: null };
+    }
+
+    const items = rows.slice(0, opts.limit);
+    const last = items[items.length - 1];
+    return {
+      items,
+      nextCursor: {
+        t: last.createdAt as Date,
+        i: last._id as Types.ObjectId,
+      },
+    };
   }
 
   async countTokensInConversation(

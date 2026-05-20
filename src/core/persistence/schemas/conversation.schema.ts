@@ -1,5 +1,10 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import {
+  CONTROL_MODES,
+  ControlMode,
+  DEFAULT_CONTROL_MODE,
+} from '@shared/inbox/control-mode';
 
 @Schema({ collection: 'conversations', timestamps: true })
 export class Conversation extends Document {
@@ -47,6 +52,13 @@ export class Conversation extends Document {
   @Prop({ type: Object })
   metadata?: Record<string, any>;
 
+  @Prop({
+    required: true,
+    enum: CONTROL_MODES,
+    default: DEFAULT_CONTROL_MODE,
+  })
+  controlMode: ControlMode;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -70,4 +82,17 @@ ConversationSchema.index(
     unique: true,
     partialFilterExpression: { status: 'open' },
   },
+);
+
+// Covering index for the inbox list query:
+//   filter { clientId, status }, sort { lastMessageAt: -1, _id: -1 } for stable
+//   cursor pagination. Distinct from the routing-prefixed compound above.
+ConversationSchema.index(
+  {
+    clientId: 1,
+    status: 1,
+    lastMessageAt: -1,
+    _id: -1,
+  },
+  { name: 'inbox_list_idx' },
 );

@@ -75,6 +75,20 @@ MessageSchema.index({
   createdAt: 1,
 });
 
+// Covers `MessageRepository.findByConversationPage` (inbox thread reads):
+// filter `{ conversationId, status: 'active', type: { $in: ['user','agent'] } }`,
+// sort `{ createdAt: 1, _id: 1 }` with `(createdAt, _id)` keyset cursor.
+MessageSchema.index(
+  {
+    conversationId: 1,
+    status: 1,
+    type: 1,
+    createdAt: 1,
+    _id: 1,
+  },
+  { name: 'inbox_thread_idx' },
+);
+
 // Validation: user messages must have contactId, agent/summary messages must have agentId
 MessageSchema.pre('validate', function (next) {
   if (this.type === 'user' && !this.contactId) {

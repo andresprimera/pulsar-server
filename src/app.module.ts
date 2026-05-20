@@ -22,6 +22,7 @@ import { ClientCatalogItemsModule } from './features/client-catalog-items/client
 import { AdminAuthModule } from './features/admin-auth/admin-auth.module';
 import { ClientAuthModule } from './features/client-auth/client-auth.module';
 import { AuthorizationModule } from './features/authorization/authorization.module';
+import { InboxModule } from './features/inbox/inbox.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { AuthorizationModule } from './features/authorization/authorization.modu
     AdminAuthModule,
     ClientAuthModule,
     AuthorizationModule,
+    InboxModule,
   ],
 
   controllers: [AppController],

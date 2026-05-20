@@ -141,6 +141,21 @@ export class IncomingMessageOrchestrator {
       now: new Date(),
     });
 
+    // Inbox gate: suppress the autopilot when a human operator has taken over.
+    // Placed BEFORE the try/finally below so `agentService.run` AND
+    // `conversationService.touch` are both skipped — `lastMessageAt` does not
+    // advance for inbound messages received while controlMode === 'human'.
+    // Backfill-race safe via `?? 'bot'` for documents that pre-date the
+    // InboxControlModeBackfillMigration.
+    if ((conversation.controlMode ?? 'bot') === 'human') {
+      this.logger.log(
+        `[${logPrefix}] event=inbox.controlMode.suppressed conversationId=${String(
+          conversation._id,
+        )} clientId=${String(clientAgent.clientId)} controlMode=human`,
+      );
+      return undefined;
+    }
+
     const input: AgentInput = {
       channel: event.channelId as ChannelType,
       contactId: contact._id.toString(),

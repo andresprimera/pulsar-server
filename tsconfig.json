@@ -29,7 +29,8 @@
       "@personalities/*": ["src/features/personalities/*"],
       "@client-catalog-items/*": ["src/features/client-catalog-items/*"],
       "@admin-auth/*": ["src/features/admin-auth/*"],
-      "@client-auth/*": ["src/features/client-auth/*"]
+      "@client-auth/*": ["src/features/client-auth/*"],
+      "@inbox/*": ["src/features/inbox/*"]
     },
     "incremental": true,
     "preserveWatchOutput": true,
