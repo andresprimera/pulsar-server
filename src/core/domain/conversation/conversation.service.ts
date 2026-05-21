@@ -1,9 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { Types } from 'mongoose';
 // eslint-disable-next-line boundaries/element-types -- TODO: domain→persistence violation, tracked for refactor
 import { Conversation } from '@persistence/schemas/conversation.schema';
 // eslint-disable-next-line boundaries/element-types -- TODO: domain→persistence violation, tracked for refactor
 import { ConversationRepository } from '@persistence/repositories/conversation.repository';
+import {
+  INBOX_CONVERSATION_WRITE_PORT,
+  InboxConversationWritePort,
+} from '@shared/ports/inbox-conversation-write.port';
 import { WHATSAPP_CONVERSATION_TIMEOUT_MS } from './conversation.constants';
 
 interface MongoDuplicateKeyError {
@@ -14,6 +18,8 @@ interface MongoDuplicateKeyError {
 export class ConversationService {
   constructor(
     private readonly conversationRepository: ConversationRepository,
+    @Inject(INBOX_CONVERSATION_WRITE_PORT)
+    private readonly inboxWritePort: InboxConversationWritePort,
   ) {}
 
   async resolveOrCreate(params: {
@@ -65,8 +71,13 @@ export class ConversationService {
   async touch(
     conversationId: Types.ObjectId,
     now: Date = new Date(),
+    lastMessagePreview?: string,
   ): Promise<void> {
-    await this.conversationRepository.updateLastMessageAt(conversationId, now);
+    await this.inboxWritePort.updateLastMessageAt(
+      conversationId,
+      now,
+      lastMessagePreview,
+    );
   }
 
   private async createOpenConversation(params: {

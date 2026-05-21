@@ -1,5 +1,10 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import {
+  CONTROL_MODES,
+  ControlMode,
+  DEFAULT_CONTROL_MODE,
+} from '@shared/inbox/control-mode';
 
 @Schema({ collection: 'conversations', timestamps: true })
 export class Conversation extends Document {
@@ -47,6 +52,77 @@ export class Conversation extends Document {
   @Prop({ type: Object })
   metadata?: Record<string, any>;
 
+  @Prop({
+    required: true,
+    enum: CONTROL_MODES,
+    default: DEFAULT_CONTROL_MODE,
+  })
+  controlMode: ControlMode;
+
+  /**
+   * Denormalized reference to the responsible hired agent (`ClientAgent._id`)
+   * for the inbox list `agentId` filter. Backfilled by
+   * `InboxConversationEnrichmentBackfillMigration`; written on hire-routed
+   * conversations going forward. Optional because pre-migration rows may
+   * have no resolvable `(clientId, channelId)` → `ClientAgent` mapping.
+   *
+   * Not on the wire — see `ConversationSummaryDto`.
+   */
+  @Prop({
+    type: Types.ObjectId,
+    ref: 'ClientAgent',
+    required: false,
+  })
+  clientAgentId?: Types.ObjectId;
+
+  /**
+   * Lowercased + trimmed denormalized copy of `Contact.name` for case-
+   * insensitive substring search via the inbox list `q` filter. Maintained
+   * by the enrichment backfill (Phase 1) and by future contact-rename
+   * propagation (Phase 2+). No index — search rides `inbox_list_idx`.
+   */
+  @Prop({ type: String, required: false, maxlength: 256 })
+  contactNameLower?: string;
+
+  /**
+   * Server-truncated (≤ 280 chars) preview of the most recent
+   * non-suppressed message. Frozen alongside `lastMessageAt` while
+   * `controlMode === 'human'` — see `ConversationSummaryDto` JSDoc.
+   */
+  @Prop({ type: String, required: false })
+  lastMessagePreview?: string;
+
+  /**
+   * Optional reference to the `User` (tenant operator) currently
+   * responsible for this conversation. Written by the Phase-3
+   * `PATCH /inbox/conversations/:id/assignment` endpoint. `undefined`
+   * (or absent) means the conversation is unassigned. The single-field
+   * index supports a future "my assigned conversations" filter.
+   */
+  @Prop({
+    type: Types.ObjectId,
+    ref: 'User',
+    required: false,
+    index: true,
+  })
+  assignedOperatorId?: Types.ObjectId;
+
+  /**
+   * Operator-facing free-form tag list. Server-normalized
+   * (trimmed + lowercased + deduped, max 16 entries) on write by
+   * `InboxConversationMutationService.replaceTags`. Defaults to `[]`
+   * so pre-Phase-3 documents read with an empty array without
+   * backfill. Single-field index forward-compatible with the Phase-5
+   * filter-by-tag work (which will add a `tagsLower` denorm).
+   */
+  @Prop({
+    type: [String],
+    required: true,
+    default: [],
+    index: true,
+  })
+  tags: string[];
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -70,4 +146,31 @@ ConversationSchema.index(
     unique: true,
     partialFilterExpression: { status: 'open' },
   },
+);
+
+// Covering index for the inbox list query:
+//   filter { clientId, status }, sort { lastMessageAt: -1, _id: -1 } for stable
+//   cursor pagination. Distinct from the routing-prefixed compound above.
+ConversationSchema.index(
+  {
+    clientId: 1,
+    status: 1,
+    lastMessageAt: -1,
+    _id: -1,
+  },
+  { name: 'inbox_list_idx' },
+);
+
+// Covering index for the inbox list query when filtered by `agentId`
+// (resolved to `clientAgentId`). Prefix matches the read pattern used by
+// `ConversationRepository.findInboxPageEnriched` via `.hint(...)`.
+ConversationSchema.index(
+  {
+    clientId: 1,
+    clientAgentId: 1,
+    status: 1,
+    lastMessageAt: -1,
+    _id: -1,
+  },
+  { name: 'inbox_list_agent_idx', background: true },
 );

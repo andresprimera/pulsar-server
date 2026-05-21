@@ -145,4 +145,40 @@ describe('TiktokService', () => {
       );
     });
   });
+
+  describe('ChannelAdapter sendMessage (Phase 2)', () => {
+    it('declares channel = tiktok', () => {
+      expect(service.channel).toBe('tiktok');
+    });
+
+    it('POSTs to the TikTok messages endpoint with passthrough recipient', async () => {
+      const accessToken = 'tt-token-3';
+
+      await service.sendMessage({
+        to: 'tiktok_recipient_user',
+        message: 'operator outbound',
+        credentials: { accessToken: encrypt(accessToken) },
+      });
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchSpy.mock.calls[0];
+      expect(url).toContain('/message/send/');
+      const headers = (init as RequestInit).headers as Record<string, string>;
+      expect(headers.Authorization).toBe(`Bearer ${accessToken}`);
+      const body = JSON.parse((init as RequestInit).body as string);
+      expect(body.recipient_id).toBe('tiktok_recipient_user');
+      expect(body.text.content).toBe('operator outbound');
+    });
+
+    it('throws when no credentials and no env fallback', async () => {
+      await expect(
+        service.sendMessage({
+          to: 'tiktok_recipient_user',
+          message: 'x',
+          credentials: undefined,
+        }),
+      ).rejects.toThrow(/No credentials/);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -26,6 +26,11 @@ import {
 } from './schemas/conversation.schema';
 import { ConversationRepository } from './repositories/conversation.repository';
 import {
+  ConversationRead,
+  ConversationReadSchema,
+} from './schemas/conversation-read.schema';
+import { ConversationReadRepository } from './repositories/conversation-read.repository';
+import {
   ProcessedEvent,
   ProcessedEventSchema,
 } from './schemas/processed-event.schema';
@@ -56,6 +61,8 @@ import { OnboardingModule } from '@onboarding/onboarding.module';
 import { AdminAuthModule } from '@admin-auth/admin-auth.module';
 import { HireChannelLifecycleAdapter } from './ports/hire-channel-lifecycle.adapter';
 import { HIRE_CHANNEL_LIFECYCLE_PORT } from '@shared/ports/hire-channel-lifecycle.port';
+import { InboxConversationWriteAdapter } from './ports/inbox-conversation-write.adapter';
+import { INBOX_CONVERSATION_WRITE_PORT } from '@shared/ports/inbox-conversation-write.port';
 import { AdminUser, AdminUserSchema } from './schemas/admin-user.schema';
 import {
   AdminSession,
@@ -69,6 +76,8 @@ import {
 } from './schemas/client-user-session.schema';
 import { ClientUserSessionRepository } from './repositories/client-user-session.repository';
 import { UsersEmailCollationMigration } from './migrations/users-email-collation.migration';
+import { InboxControlModeBackfillMigration } from './migrations/inbox-control-mode-backfill.migration';
+import { InboxConversationEnrichmentBackfillMigration } from './migrations/inbox-conversation-enrichment-backfill.migration';
 
 const repositories = [
   ClientRepository,
@@ -85,6 +94,7 @@ const repositories = [
   UserRepository,
   MessageRepository,
   ConversationRepository,
+  ConversationReadRepository,
   ProcessedEventRepository,
   LlmUsageLogRepository,
   AdminUserRepository,
@@ -117,6 +127,7 @@ const repositories = [
       { name: User.name, schema: UserSchema },
       { name: Message.name, schema: MessageSchema },
       { name: Conversation.name, schema: ConversationSchema },
+      { name: ConversationRead.name, schema: ConversationReadSchema },
       { name: ProcessedEvent.name, schema: ProcessedEventSchema },
       { name: LlmUsageLog.name, schema: LlmUsageLogSchema },
       { name: AgentPrice.name, schema: AgentPriceSchema },
@@ -133,17 +144,25 @@ const repositories = [
     ...repositories,
     SeederService,
     UsersEmailCollationMigration,
+    InboxControlModeBackfillMigration,
+    InboxConversationEnrichmentBackfillMigration,
     EventIdempotencyService,
     HireChannelLifecycleAdapter,
     {
       provide: HIRE_CHANNEL_LIFECYCLE_PORT,
       useClass: HireChannelLifecycleAdapter,
     },
+    InboxConversationWriteAdapter,
+    {
+      provide: INBOX_CONVERSATION_WRITE_PORT,
+      useClass: InboxConversationWriteAdapter,
+    },
   ],
   exports: [
     ...repositories,
     EventIdempotencyService,
     HIRE_CHANNEL_LIFECYCLE_PORT,
+    INBOX_CONVERSATION_WRITE_PORT,
   ],
 })
 export class DatabaseModule {}

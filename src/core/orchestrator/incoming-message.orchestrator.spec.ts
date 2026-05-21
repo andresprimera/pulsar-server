@@ -276,6 +276,139 @@ describe('IncomingMessageOrchestrator', () => {
       expect(conversationService.touch).not.toHaveBeenCalled();
     });
 
+    it('short-circuits when conversation.controlMode is "human"', async () => {
+      agentRoutingService.resolveRoute.mockResolvedValue(
+        mockResolvedRoute as any,
+      );
+      const mockContext = {
+        agentId: 'agent-1',
+        agentName: 'Support Bot',
+        clientId: mockClientAgent.clientId,
+        channelId: mockClientAgent.channels[0].channelId,
+        systemPrompt: mockAgent.systemPrompt,
+        toolingProfileId: 'standard' as const,
+        llmConfig: {
+          provider: LlmProvider.OpenAI,
+          apiKey: 'sk-mock',
+          model: 'gpt-4',
+        },
+        channelConfig: {},
+      };
+      agentContextService.buildContextFromRoute.mockResolvedValue({
+        context: mockContext,
+        client: {
+          _id: mockClientAgent.clientId,
+          name: 'Test Client',
+          type: 'organization',
+          status: 'active',
+        } as any,
+      });
+      contactIdentityResolver.resolveContact.mockResolvedValue(
+        mockContact as any,
+      );
+      conversationService.resolveOrCreate.mockResolvedValue({
+        ...mockConversation,
+        controlMode: 'human',
+      } as any);
+
+      const output = await service.handle(createEvent());
+
+      expect(output).toBeUndefined();
+      expect(agentService.run).not.toHaveBeenCalled();
+      // critical: touch is skipped so both lastMessageAt AND the
+      // denormalized lastMessagePreview stay frozen at their prior
+      // (bot-handled) values.
+      expect(conversationService.touch).not.toHaveBeenCalled();
+    });
+
+    it('proceeds when conversation.controlMode is "bot"', async () => {
+      agentRoutingService.resolveRoute.mockResolvedValue(
+        mockResolvedRoute as any,
+      );
+      const mockContext = {
+        agentId: 'agent-1',
+        agentName: 'Support Bot',
+        clientId: mockClientAgent.clientId,
+        channelId: mockClientAgent.channels[0].channelId,
+        systemPrompt: mockAgent.systemPrompt,
+        toolingProfileId: 'standard' as const,
+        llmConfig: {
+          provider: LlmProvider.OpenAI,
+          apiKey: 'sk-mock',
+          model: 'gpt-4',
+        },
+        channelConfig: {},
+      };
+      agentContextService.buildContextFromRoute.mockResolvedValue({
+        context: mockContext,
+        client: {
+          _id: mockClientAgent.clientId,
+          name: 'Test Client',
+          type: 'organization',
+          status: 'active',
+        } as any,
+      });
+      contactIdentityResolver.resolveContact.mockResolvedValue(
+        mockContact as any,
+      );
+      conversationService.resolveOrCreate.mockResolvedValue({
+        ...mockConversation,
+        controlMode: 'bot',
+      } as any);
+      agentService.run.mockResolvedValue({
+        reply: { type: 'text', text: 'Hi' },
+      });
+
+      await service.handle(createEvent());
+
+      expect(agentService.run).toHaveBeenCalledTimes(1);
+      expect(conversationService.touch).toHaveBeenCalledTimes(1);
+    });
+
+    it('proceeds (as bot) when conversation.controlMode is undefined (pre-backfill)', async () => {
+      agentRoutingService.resolveRoute.mockResolvedValue(
+        mockResolvedRoute as any,
+      );
+      const mockContext = {
+        agentId: 'agent-1',
+        agentName: 'Support Bot',
+        clientId: mockClientAgent.clientId,
+        channelId: mockClientAgent.channels[0].channelId,
+        systemPrompt: mockAgent.systemPrompt,
+        toolingProfileId: 'standard' as const,
+        llmConfig: {
+          provider: LlmProvider.OpenAI,
+          apiKey: 'sk-mock',
+          model: 'gpt-4',
+        },
+        channelConfig: {},
+      };
+      agentContextService.buildContextFromRoute.mockResolvedValue({
+        context: mockContext,
+        client: {
+          _id: mockClientAgent.clientId,
+          name: 'Test Client',
+          type: 'organization',
+          status: 'active',
+        } as any,
+      });
+      contactIdentityResolver.resolveContact.mockResolvedValue(
+        mockContact as any,
+      );
+      // legacy doc: controlMode field absent
+      conversationService.resolveOrCreate.mockResolvedValue(
+        mockConversation as any,
+      );
+      agentService.run.mockResolvedValue({
+        reply: { type: 'text', text: 'Hi' },
+      });
+
+      await service.handle(createEvent());
+
+      expect(agentService.run).toHaveBeenCalledTimes(1);
+      expect(conversationService.touch).toHaveBeenCalledTimes(1);
+    });
+
     it('touches conversation and rethrows when agent run fails', async () => {
       agentRoutingService.resolveRoute.mockResolvedValue(
         mockResolvedRoute as any,

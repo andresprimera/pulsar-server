@@ -116,6 +116,7 @@ describe('MessagePersistenceService', () => {
       expect(conversationService.touch).toHaveBeenCalledWith(
         mockConversationId,
         expect.any(Date),
+        'Hello!',
       );
 
       const resolveOrder =
@@ -125,6 +126,18 @@ describe('MessagePersistenceService', () => {
 
       expect(resolveOrder).toBeLessThan(createOrder);
       expect(createOrder).toBeLessThan(touchOrder);
+    });
+
+    it('forwards content.slice(0, 280) as the preview to conversationService.touch', async () => {
+      messageRepository.create.mockResolvedValue({} as any);
+      const longContent = 'x'.repeat(500);
+      await service.createUserMessage(
+        longContent,
+        mockContext,
+        mockContact._id as Types.ObjectId,
+      );
+      const args = conversationService.touch.mock.calls[0];
+      expect(args[2]).toHaveLength(280);
     });
 
     it('should not allow createUserMessage when resolved conversation has no id', async () => {
@@ -173,6 +186,7 @@ describe('MessagePersistenceService', () => {
       expect(conversationService.touch).toHaveBeenCalledWith(
         mockConversationId,
         expect.any(Date),
+        'Response!',
       );
 
       const resolveOrder =
@@ -182,6 +196,18 @@ describe('MessagePersistenceService', () => {
 
       expect(resolveOrder).toBeLessThan(createOrder);
       expect(createOrder).toBeLessThan(touchOrder);
+    });
+
+    it('forwards content.slice(0, 280) as the preview on agent writes', async () => {
+      messageRepository.create.mockResolvedValue({} as any);
+      const longContent = 'y'.repeat(500);
+      await service.saveAgentMessage(
+        longContent,
+        mockContext,
+        mockContact._id as Types.ObjectId,
+      );
+      const args = conversationService.touch.mock.calls[0];
+      expect(args[2]).toHaveLength(280);
     });
   });
 

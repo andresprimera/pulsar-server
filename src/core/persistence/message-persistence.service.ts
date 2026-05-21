@@ -83,6 +83,7 @@ export class MessagePersistenceService {
     await this.conversationService.touch(
       conversation._id as Types.ObjectId,
       now,
+      content.slice(0, 280),
     );
 
     this.logger.log(
@@ -124,6 +125,7 @@ export class MessagePersistenceService {
     await this.conversationService.touch(
       conversation._id as Types.ObjectId,
       now,
+      content.slice(0, 280),
     );
 
     this.logger.log(

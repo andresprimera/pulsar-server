@@ -67,4 +67,78 @@ describe('ConversationSchema', () => {
 
     expect(hasPartial).toBe(true);
   });
+
+  describe('Phase 3 fields', () => {
+    it('assignedOperatorId is optional', async () => {
+      const conversation = new ConversationValidationModel({
+        clientId: new Types.ObjectId('507f1f77bcf86cd799439011'),
+        contactId: new Types.ObjectId('507f1f77bcf86cd799439012'),
+        channelId: new Types.ObjectId('507f1f77bcf86cd799439013'),
+        status: 'open',
+        lastMessageAt: new Date(),
+      });
+
+      await expect(conversation.validate()).resolves.toBeUndefined();
+      expect(conversation.assignedOperatorId).toBeUndefined();
+    });
+
+    it('assignedOperatorId accepts a Types.ObjectId', async () => {
+      const operatorId = new Types.ObjectId();
+      const conversation = new ConversationValidationModel({
+        clientId: new Types.ObjectId('507f1f77bcf86cd799439011'),
+        contactId: new Types.ObjectId('507f1f77bcf86cd799439012'),
+        channelId: new Types.ObjectId('507f1f77bcf86cd799439013'),
+        status: 'open',
+        lastMessageAt: new Date(),
+        assignedOperatorId: operatorId,
+      });
+
+      await expect(conversation.validate()).resolves.toBeUndefined();
+      expect(String(conversation.assignedOperatorId)).toBe(String(operatorId));
+    });
+
+    it('declares a single-field index on assignedOperatorId', () => {
+      const indexes = ConversationSchema.indexes();
+      const hasIndex = indexes.some(
+        ([fields]) =>
+          (fields as Record<string, unknown>).assignedOperatorId === 1,
+      );
+      expect(hasIndex).toBe(true);
+    });
+
+    it('tags defaults to [] when omitted', async () => {
+      const conversation = new ConversationValidationModel({
+        clientId: new Types.ObjectId('507f1f77bcf86cd799439011'),
+        contactId: new Types.ObjectId('507f1f77bcf86cd799439012'),
+        channelId: new Types.ObjectId('507f1f77bcf86cd799439013'),
+        status: 'open',
+        lastMessageAt: new Date(),
+      });
+
+      await expect(conversation.validate()).resolves.toBeUndefined();
+      expect(conversation.tags).toEqual([]);
+    });
+
+    it('tags accepts a string array', async () => {
+      const conversation = new ConversationValidationModel({
+        clientId: new Types.ObjectId('507f1f77bcf86cd799439011'),
+        contactId: new Types.ObjectId('507f1f77bcf86cd799439012'),
+        channelId: new Types.ObjectId('507f1f77bcf86cd799439013'),
+        status: 'open',
+        lastMessageAt: new Date(),
+        tags: ['vip', 'urgent'],
+      });
+
+      await expect(conversation.validate()).resolves.toBeUndefined();
+      expect(conversation.tags).toEqual(['vip', 'urgent']);
+    });
+
+    it('declares a single-field index on tags', () => {
+      const indexes = ConversationSchema.indexes();
+      const hasIndex = indexes.some(
+        ([fields]) => (fields as Record<string, unknown>).tags === 1,
+      );
+      expect(hasIndex).toBe(true);
+    });
+  });
 });

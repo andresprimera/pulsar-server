@@ -3,11 +3,16 @@ import { Types } from 'mongoose';
 import { ConversationService } from './conversation.service';
 // eslint-disable-next-line boundaries/element-types -- TODO: domain→persistence violation, tracked for refactor
 import { ConversationRepository } from '@persistence/repositories/conversation.repository';
+import {
+  INBOX_CONVERSATION_WRITE_PORT,
+  InboxConversationWritePort,
+} from '@shared/ports/inbox-conversation-write.port';
 import { WHATSAPP_CONVERSATION_TIMEOUT_MS } from './conversation.constants';
 
 describe('ConversationService', () => {
   let service: ConversationService;
   let repository: jest.Mocked<ConversationRepository>;
+  let inboxWritePort: jest.Mocked<InboxConversationWritePort>;
 
   const now = new Date('2026-02-28T10:00:00.000Z');
   const clientId = new Types.ObjectId('507f1f77bcf86cd799439011');
@@ -29,11 +34,19 @@ describe('ConversationService', () => {
             updateLastMessageAt: jest.fn(),
           },
         },
+        {
+          provide: INBOX_CONVERSATION_WRITE_PORT,
+          useValue: {
+            updateLastMessageAt: jest.fn(),
+            setEnrichmentFields: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
     service = module.get(ConversationService);
     repository = module.get(ConversationRepository);
+    inboxWritePort = module.get(INBOX_CONVERSATION_WRITE_PORT);
   });
 
   it('reuses the open conversation when elapsed time is under 24h', async () => {
@@ -177,14 +190,28 @@ describe('ConversationService', () => {
     expect(repository.updateStatus).not.toHaveBeenCalled();
   });
 
-  it('touch updates lastMessageAt', async () => {
-    repository.updateLastMessageAt.mockResolvedValue({} as any);
+  it('touch routes through the inbox conversation write port', async () => {
+    inboxWritePort.updateLastMessageAt.mockResolvedValue(undefined as any);
 
     await service.touch(existingConversationId, now);
 
-    expect(repository.updateLastMessageAt).toHaveBeenCalledWith(
+    expect(inboxWritePort.updateLastMessageAt).toHaveBeenCalledWith(
       existingConversationId,
       now,
+      undefined,
+    );
+    expect(repository.updateLastMessageAt).not.toHaveBeenCalled();
+  });
+
+  it('touch forwards lastMessagePreview through the port when supplied', async () => {
+    inboxWritePort.updateLastMessageAt.mockResolvedValue(undefined as any);
+
+    await service.touch(existingConversationId, now, 'hello world');
+
+    expect(inboxWritePort.updateLastMessageAt).toHaveBeenCalledWith(
+      existingConversationId,
+      now,
+      'hello world',
     );
   });
 

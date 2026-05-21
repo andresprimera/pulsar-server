@@ -119,4 +119,41 @@ describe('InstagramService', () => {
 
     expect(fetchSpy).not.toHaveBeenCalled();
   });
+
+  describe('ChannelAdapter sendMessage (Phase 2)', () => {
+    it('declares channel = instagram', () => {
+      expect(service.channel).toBe('instagram');
+    });
+
+    it('POSTs to the Instagram messages endpoint with PSID passthrough', async () => {
+      const accessToken = 'ig-token-2';
+
+      await service.sendMessage({
+        to: 'recipient_psid_123',
+        message: 'operator outbound',
+        credentials: { accessToken: encrypt(accessToken) },
+      });
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchSpy.mock.calls[0];
+      expect(url).toContain('/me/messages');
+      expect((init as RequestInit).method).toBe('POST');
+      const headers = (init as RequestInit).headers as Record<string, string>;
+      expect(headers.Authorization).toBe(`Bearer ${accessToken}`);
+      const body = JSON.parse((init as RequestInit).body as string);
+      expect(body.recipient.id).toBe('recipient_psid_123');
+      expect(body.message.text).toBe('operator outbound');
+    });
+
+    it('throws when no credentials present and no env fallback', async () => {
+      await expect(
+        service.sendMessage({
+          to: 'recipient_psid_123',
+          message: 'x',
+          credentials: undefined,
+        }),
+      ).rejects.toThrow(/No credentials/);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
 });
