@@ -167,6 +167,131 @@ describe('Architecture Boundaries', () => {
     }
   });
 
+  describe('features/inbox import policy (Phase 2)', () => {
+    // The inbox feature is a thin composition layer over persistence,
+    // domain, and the outbound gateway. It MUST NOT reach across into
+    // orchestrator (which owns inbound lifecycle), agent (LLM execution),
+    // or into any provider-specific channel service. Conversation writes
+    // flow through the shared `INBOX_CONVERSATION_WRITE_PORT` via
+    // `ConversationService.touch`.
+    const INBOX_DIR = path.resolve(SRC_ROOT, 'features/inbox');
+    const inboxFiles = fs.existsSync(INBOX_DIR) ? getAllFiles(INBOX_DIR) : [];
+
+    it('discovers the inbox feature folder', () => {
+      expect(inboxFiles.length).toBeGreaterThan(0);
+    });
+
+    it('does not import @orchestrator/* or @agent/*', () => {
+      for (const file of inboxFiles) {
+        const content = fs.readFileSync(file, 'utf8');
+        expect(content).not.toMatch(/from\s+['"]@orchestrator\//);
+        expect(content).not.toMatch(/from\s+['"]@agent\//);
+      }
+    });
+
+    it('does not import provider-specific channel services directly', () => {
+      const FORBIDDEN_CHANNEL_PATHS = [
+        '@channels/whatsapp/',
+        '@channels/telegram/',
+        '@channels/instagram/',
+        '@channels/tiktok/',
+      ];
+      for (const file of inboxFiles) {
+        const content = fs.readFileSync(file, 'utf8');
+        for (const forbidden of FORBIDDEN_CHANNEL_PATHS) {
+          expect(content).not.toContain(`from '${forbidden}`);
+          expect(content).not.toContain(`from "${forbidden}`);
+        }
+      }
+    });
+
+    it('only imports channels via the gateway or the adapter interface', () => {
+      // Positive allow-list for @channels/* imports inside the inbox
+      // feature. Anything else is a layering violation.
+      const ALLOWED_CHANNEL_IMPORTS = new Set<string>([
+        '@channels/gateway/messaging-gateway.service',
+        '@channels/gateway/messaging-gateway.module',
+        '@channels/channel-adapter.interface',
+      ]);
+      const offenders: string[] = [];
+      for (const file of inboxFiles) {
+        const content = fs.readFileSync(file, 'utf8');
+        const regex = /from\s+['"](@channels\/[^'"]+)['"]/g;
+        let match: RegExpExecArray | null;
+        while ((match = regex.exec(content)) !== null) {
+          if (!ALLOWED_CHANNEL_IMPORTS.has(match[1])) {
+            offenders.push(`${toPosixPath(file)} → ${match[1]}`);
+          }
+        }
+      }
+      expect(offenders).toEqual([]);
+    });
+
+    it('only allowed first-party alias roots are imported', () => {
+      // Positive allow-list of internal alias roots the inbox feature
+      // MAY import from. Third-party packages (e.g. `@nestjs/*`,
+      // `@types/*`) and unprefixed imports (e.g. `mongoose`, relative
+      // siblings) are out of scope.
+      const FIRST_PARTY_PREFIXES = [
+        '@agent/',
+        '@orchestrator/',
+        '@channels/',
+        '@domain/',
+        '@persistence/',
+        '@shared/',
+      ];
+      const ALLOWED_FIRST_PARTY = new Set<string>([
+        '@persistence',
+        '@domain',
+        '@channels',
+        '@shared',
+      ]);
+      const offenders: string[] = [];
+      for (const file of inboxFiles) {
+        const content = fs.readFileSync(file, 'utf8');
+        const regex = /from\s+['"]([^'"]+)['"]/g;
+        let match: RegExpExecArray | null;
+        while ((match = regex.exec(content)) !== null) {
+          const source = match[1];
+          for (const prefix of FIRST_PARTY_PREFIXES) {
+            if (source.startsWith(prefix)) {
+              const root = prefix.replace(/\/$/, '');
+              if (!ALLOWED_FIRST_PARTY.has(root)) {
+                offenders.push(`${toPosixPath(file)} → ${source}`);
+              }
+              break;
+            }
+          }
+        }
+      }
+      expect(offenders).toEqual([]);
+    });
+
+    it('writes to conversation list columns go through ConversationService.touch', () => {
+      // The feature folder MAY import `ConversationRepository` for
+      // tenant-scoped reads (`findByIdForClient`) and the
+      // `updateControlMode` write (a discrete column, not list
+      // enrichment). It MUST NOT call the list-column writers
+      // `updateLastMessageAt` or `setEnrichmentFields` directly — those
+      // flow through `ConversationService.touch` /
+      // `INBOX_CONVERSATION_WRITE_PORT`.
+      const FORBIDDEN_REPO_METHODS = [
+        '.updateLastMessageAt(',
+        '.setEnrichmentFields(',
+      ];
+      const offenders: string[] = [];
+      for (const file of inboxFiles) {
+        const content = fs.readFileSync(file, 'utf8');
+        for (const sym of FORBIDDEN_REPO_METHODS) {
+          if (content.includes(sym)) {
+            offenders.push(`${toPosixPath(file)} uses ${sym}`);
+          }
+        }
+      }
+      expect(offenders).toEqual([]);
+    });
+  });
+
   it('No relative parent imports across layers', () => {
     for (const file of files) {
       const content = fs.readFileSync(file, 'utf8');

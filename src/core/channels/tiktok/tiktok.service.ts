@@ -9,9 +9,16 @@ import {
 import { CHANNEL_TYPES } from '@domain/channels/channel-type.constants';
 import { IncomingMessageOrchestrator } from '@orchestrator/incoming-message.orchestrator';
 import { IncomingChannelEvent } from '@domain/channels/incoming-channel-event.interface';
+import {
+  ChannelAdapter,
+  SendMessageInput,
+} from '@channels/channel-adapter.interface';
+import { ChannelAdapterProvider } from '@channels/channel-adapter.decorator';
 
+@ChannelAdapterProvider()
 @Injectable()
-export class TiktokService {
+export class TiktokService implements ChannelAdapter {
+  readonly channel: string = CHANNEL_TYPES.TIKTOK;
   private readonly logger = new Logger(TiktokService.name);
   private readonly config: TikTokServerConfig;
 
@@ -100,7 +107,7 @@ export class TiktokService {
     this.logger.log(`[TikTok] Sending reply to sender=${data.sender.user_id}`);
 
     try {
-      await this.sendMessage({
+      await this.dispatchToTiktok({
         recipientId: senderUserId,
         conversationId,
         text: output.reply.text,
@@ -150,7 +157,30 @@ export class TiktokService {
     return typeof token === 'string' && token.length > 0 ? token : undefined;
   }
 
-  private async sendMessage(params: {
+  /**
+   * `ChannelAdapter` surface used by `MessagingGatewayService` for
+   * tenant-driven outbound dispatch (e.g. operator-send). Decrypts the
+   * supplied encrypted credentials in-place and delegates to the
+   * existing private `dispatchToTiktok` helper. `input.to` is the
+   * recipient user identifier (sourced from `Contact.externalId`) and is
+   * passed through verbatim.
+   *
+   * Note: TikTok's `/messages` endpoint requires a `conversation_id`
+   * which is only available from the inbound webhook payload. For the
+   * gateway path it is left empty; downstream API failures bubble up as
+   * a single-bucket 502 (Phase-2 failure granularity contract).
+   */
+  async sendMessage(input: SendMessageInput): Promise<void> {
+    const accessToken = this.resolveAccessTokenOrThrow(input.credentials);
+    await this.dispatchToTiktok({
+      recipientId: input.to,
+      conversationId: '',
+      text: input.message,
+      accessToken,
+    });
+  }
+
+  private async dispatchToTiktok(params: {
     recipientId: string;
     conversationId: string;
     text: string;

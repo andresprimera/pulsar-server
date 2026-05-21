@@ -6,16 +6,17 @@ import {
   EnrichedInboxRow,
 } from '@persistence/repositories/conversation.repository';
 import { MessageRepository } from '@persistence/repositories/message.repository';
+import { UserRepository } from '@persistence/repositories/user.repository';
 import { Message } from '@persistence/schemas/message.schema';
 import { DEFAULT_CONTROL_MODE, ControlMode } from '@shared/inbox/control-mode';
 import { ConversationSummaryDto } from './dto/conversation-summary.dto';
-import { InboxMessageDto } from './dto/inbox-message.dto';
 import { ListConversationsQueryDto } from './dto/list-conversations-query.dto';
 import { ListConversationsResponseDto } from './dto/list-conversations-response.dto';
 import { ListMessagesQueryDto } from './dto/list-messages-query.dto';
 import { ListMessagesResponseDto } from './dto/list-messages-response.dto';
 import { UpdateControlModeResponseDto } from './dto/update-control-mode-response.dto';
 import { decodeCursor, encodeCursor, PageCursor } from './utils/cursor.util';
+import { toInboxMessageDto } from './utils/inbox-message.mapper';
 
 const DEFAULT_LIST_LIMIT = 20;
 const DEFAULT_MESSAGES_LIMIT = 50;
@@ -29,6 +30,7 @@ export class InboxService {
     private readonly conversationRepository: ConversationRepository,
     private readonly messageRepository: MessageRepository,
     private readonly clientAgentRepository: ClientAgentRepository,
+    private readonly userRepository: UserRepository,
   ) {}
 
   async listConversations(
@@ -96,11 +98,40 @@ export class InboxService {
       { cursor, limit },
     );
 
+    const authorNamesByUserId = await this.resolveAuthorNames(page.items);
+
     return {
-      items: page.items.map(toInboxMessage),
+      items: page.items.map((m) => toInboxMessageDto(m, authorNamesByUserId)),
       nextCursor: page.nextCursor ? encodeCursor(page.nextCursor) : null,
       conversationId,
     };
+  }
+
+  /**
+   * Batched `User._id → name` lookup for the operator-authored rows on a
+   * page. Mirrors Phase 1's enrichment pattern (single `find`, no N+1).
+   * Returns an empty map when no `'human'` rows are present.
+   */
+  private async resolveAuthorNames(
+    messages: Message[],
+  ): Promise<Map<string, string>> {
+    const ids = new Set<string>();
+    for (const m of messages) {
+      if (m.authorClientUserId) {
+        ids.add(String(m.authorClientUserId));
+      }
+    }
+    if (ids.size === 0) {
+      return new Map();
+    }
+    const users = await this.userRepository.findByIds(
+      Array.from(ids).map((id) => new Types.ObjectId(id)),
+    );
+    const out = new Map<string, string>();
+    for (const u of users) {
+      out.set(String(u._id), u.name);
+    }
+    return out;
   }
 
   async updateControlMode(
@@ -179,18 +210,6 @@ function resolveChannelHandle(row: EnrichedInboxRow): string {
     matching.telegramBotId ??
     ''
   );
-}
-
-function toInboxMessage(doc: Message): InboxMessageDto {
-  return {
-    _id: String(doc._id),
-    conversationId: String(doc.conversationId),
-    content: doc.content,
-    type: doc.type as 'user' | 'agent',
-    contactId: doc.contactId ? String(doc.contactId) : null,
-    agentId: doc.agentId ? String(doc.agentId) : null,
-    createdAt: doc.createdAt as Date,
-  };
 }
 
 /**

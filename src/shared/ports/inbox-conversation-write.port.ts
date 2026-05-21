@@ -7,8 +7,16 @@ export const INBOX_CONVERSATION_WRITE_PORT = Symbol(
 export interface InboxConversationWritePort {
   /**
    * Updates lastMessageAt and (when provided) lastMessagePreview atomically.
-   * Callers MUST NOT invoke this method on the orchestrator's human-mode skip path;
-   * orchestrator is the single suppression gate.
+   *
+   * Callers MUST NOT invoke this method **from the incoming-message
+   * orchestrator's human-mode skip branch** — orchestrator is the single
+   * inbound suppression gate.
+   *
+   * Operator-driven outbound writes from `features/inbox/` are a legitimate
+   * caller and DO advance these fields, by design — on BOTH successful and
+   * failed downstream channel dispatch. The conversation list bubbles up
+   * either way; operators open the thread to see the persisted attempt and
+   * its `deliveryStatus`.
    */
   updateLastMessageAt(
     conversationId: Types.ObjectId,

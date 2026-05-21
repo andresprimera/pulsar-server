@@ -84,4 +84,27 @@ describe('ChannelRouter', () => {
 
     expect(router.hasChannel('anything')).toBe(false);
   });
+
+  it('discovers all four Phase-2 channel types when registered', () => {
+    const whatsapp = createAdapter('whatsapp');
+    const telegram = createAdapter('telegram');
+    const instagram = createAdapter('instagram');
+    const tiktok = createAdapter('tiktok');
+
+    const router = buildRouter([
+      createMockWrapper(whatsapp),
+      createMockWrapper(telegram),
+      createMockWrapper(instagram),
+      createMockWrapper(tiktok),
+    ]);
+
+    expect(router.hasChannel('whatsapp')).toBe(true);
+    expect(router.hasChannel('telegram')).toBe(true);
+    expect(router.hasChannel('instagram')).toBe(true);
+    expect(router.hasChannel('tiktok')).toBe(true);
+    expect(router.resolve('whatsapp')).toBe(whatsapp);
+    expect(router.resolve('telegram')).toBe(telegram);
+    expect(router.resolve('instagram')).toBe(instagram);
+    expect(router.resolve('tiktok')).toBe(tiktok);
+  });
 });

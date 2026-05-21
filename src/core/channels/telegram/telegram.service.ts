@@ -14,6 +14,11 @@ import {
   RegisterWebhookInput,
   RegisterWebhookResult,
 } from '@channels/channel-lifecycle-adapter.interface';
+import {
+  ChannelAdapter,
+  SendMessageInput,
+} from '@channels/channel-adapter.interface';
+import { ChannelAdapterProvider } from '@channels/channel-adapter.decorator';
 
 const TELEGRAM_WEBHOOK_HTTP_TIMEOUT_MS = 5_000;
 
@@ -24,8 +29,10 @@ interface ParsedTelegramTextMessage {
   messageId: number;
 }
 
+@ChannelAdapterProvider()
 @Injectable()
-export class TelegramService {
+export class TelegramService implements ChannelAdapter {
+  readonly channel: string = CHANNEL_TYPES.TELEGRAM;
   private readonly logger = new Logger(TelegramService.name);
 
   readonly lifecycle: ChannelLifecycleAdapter = {
@@ -38,6 +45,27 @@ export class TelegramService {
     private readonly incomingMessageOrchestrator: IncomingMessageOrchestrator,
     private readonly telegramWebhookAuth: TelegramWebhookAuthService,
   ) {}
+
+  /**
+   * `ChannelAdapter` surface used by `MessagingGatewayService` for
+   * tenant-driven outbound dispatch (e.g. operator-send). Decrypts the
+   * supplied encrypted credentials in-place, parses the chat id from
+   * `input.to`, and delegates to the existing private send helper. No
+   * new HTTP code lives here; this is adapter-surface alignment only.
+   */
+  async sendMessage(input: SendMessageInput): Promise<void> {
+    const botToken = this.resolveBotTokenOrThrow(input.credentials);
+
+    const chatIdRaw = input.to;
+    const chatId = Number.parseInt(chatIdRaw, 10);
+    if (!Number.isFinite(chatId)) {
+      throw new Error(
+        `[Telegram] Invalid chatId in SendMessageInput.to="${chatIdRaw}"`,
+      );
+    }
+
+    await this.sendTextMessage(botToken, chatId, input.message);
+  }
 
   async handleIncoming(
     telegramBotId: string,

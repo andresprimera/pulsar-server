@@ -10,9 +10,16 @@ import {
 import { CHANNEL_TYPES } from '@domain/channels/channel-type.constants';
 import { IncomingMessageOrchestrator } from '@orchestrator/incoming-message.orchestrator';
 import { IncomingChannelEvent } from '@domain/channels/incoming-channel-event.interface';
+import {
+  ChannelAdapter,
+  SendMessageInput,
+} from '@channels/channel-adapter.interface';
+import { ChannelAdapterProvider } from '@channels/channel-adapter.decorator';
 
+@ChannelAdapterProvider()
 @Injectable()
-export class InstagramService {
+export class InstagramService implements ChannelAdapter {
+  readonly channel: string = CHANNEL_TYPES.INSTAGRAM;
   private readonly logger = new Logger(InstagramService.name);
   private readonly config: InstagramServerConfig;
   private readonly responseWindowMs = 24 * 60 * 60 * 1000;
@@ -85,7 +92,24 @@ export class InstagramService {
     };
   }
 
-  private async sendMessage(params: {
+  /**
+   * `ChannelAdapter` surface used by `MessagingGatewayService` for
+   * tenant-driven outbound dispatch (e.g. operator-send). Decrypts the
+   * supplied encrypted credentials in-place and delegates to the
+   * existing private `dispatchToInstagram` helper. `input.to` is the
+   * recipient PSID (sourced from `Contact.externalId`) and is passed
+   * through verbatim — Instagram does not require numeric parsing.
+   */
+  async sendMessage(input: SendMessageInput): Promise<void> {
+    const accessToken = this.resolveAccessTokenOrThrow(input.credentials);
+    await this.dispatchToInstagram({
+      recipientId: input.to,
+      text: input.message,
+      accessToken,
+    });
+  }
+
+  private async dispatchToInstagram(params: {
     recipientId: string;
     text: string;
     accessToken: string;
@@ -184,7 +208,7 @@ export class InstagramService {
           continue;
         }
 
-        await this.sendMessage({
+        await this.dispatchToInstagram({
           recipientId: senderId,
           text: output.reply.text,
           accessToken,

@@ -6,12 +6,21 @@ import type { ControlMode } from '@shared/inbox/control-mode';
  * Note on `lastMessageAt`: this timestamp does NOT advance for inbound
  * messages received while a conversation is in `'human'` control mode
  * (the orchestrator skips `conversationService.touch` on the suppression
- * path). Operators relying on order-by-recency see human-mode threads
- * pinned to their last bot-handled activity until Phase 2 ships
- * operator-side outbound writes.
+ * path). Phase 2 unfreezes this on operator-driven outbound writes from
+ * `features/inbox/`: the timestamp ADVANCES when an operator submits a
+ * reply via `POST /inbox/conversations/:id/messages`, regardless of
+ * whether the downstream channel dispatch succeeds or fails. The
+ * conversation list bubbles up either way so operators see the activity;
+ * the failed attempt is visible inside the thread itself, not on the
+ * list row.
  *
- * `lastMessagePreview` inherits the same suppression contract: it is
- * frozen while `controlMode === 'human'`.
+ * `lastMessagePreview` follows the same contract: frozen for inbound
+ * messages while `controlMode === 'human'`, but ADVANCES on operator
+ * outbound writes (success and failure).
+ *
+ * The DTO does NOT surface `deliveryStatus` directly. Operators open the
+ * thread to see whether an outbound row landed as `'sent'` or `'failed'`;
+ * the conversation list only reflects activity timing and preview text.
  *
  * `assignedOperatorName`, `unreadCount`, and `tags` are Phase-1
  * placeholders. They currently project the inert defaults `null`, `0`,

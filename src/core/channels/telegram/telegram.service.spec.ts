@@ -194,4 +194,61 @@ describe('TelegramService', () => {
       expect(a.fingerprint).toBe(b.fingerprint);
     });
   });
+
+  describe('ChannelAdapter sendMessage (Phase 2)', () => {
+    const BOT_TOKEN = '123456789:ABCDEFG_token-value';
+    const fetchSpy = jest.spyOn(global, 'fetch' as any);
+
+    beforeEach(() => {
+      fetchSpy.mockReset();
+    });
+
+    afterEach(() => {
+      fetchSpy.mockReset();
+    });
+
+    it('declares channel = telegram', () => {
+      expect(service.channel).toBe('telegram');
+    });
+
+    it('POSTs to the Telegram sendMessage endpoint with chatId parsed from input.to', async () => {
+      fetchSpy.mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), { status: 200 }),
+      );
+
+      await service.sendMessage({
+        to: '99',
+        message: 'hello operator',
+        credentials: { botToken: BOT_TOKEN },
+      });
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`);
+      const body = JSON.parse(init.body as string);
+      expect(body).toEqual({ chat_id: 99, text: 'hello operator' });
+    });
+
+    it('throws when input.to is not numeric', async () => {
+      await expect(
+        service.sendMessage({
+          to: 'not-a-number',
+          message: 'hi',
+          credentials: { botToken: BOT_TOKEN },
+        }),
+      ).rejects.toThrow(/Invalid chatId/);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('throws when credentials lack botToken', async () => {
+      await expect(
+        service.sendMessage({
+          to: '99',
+          message: 'hi',
+          credentials: { somethingElse: 'x' },
+        }),
+      ).rejects.toThrow(/Missing botToken/);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
 });

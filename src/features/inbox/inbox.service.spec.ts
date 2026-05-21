@@ -7,6 +7,7 @@ import {
   EnrichedInboxRow,
 } from '@persistence/repositories/conversation.repository';
 import { MessageRepository } from '@persistence/repositories/message.repository';
+import { UserRepository } from '@persistence/repositories/user.repository';
 import { Conversation } from '@persistence/schemas/conversation.schema';
 import { Message } from '@persistence/schemas/message.schema';
 
@@ -73,6 +74,7 @@ describe('InboxService', () => {
   let conversationRepository: jest.Mocked<ConversationRepository>;
   let messageRepository: jest.Mocked<MessageRepository>;
   let clientAgentRepository: jest.Mocked<ClientAgentRepository>;
+  let userRepository: jest.Mocked<UserRepository>;
   let service: InboxService;
 
   beforeEach(() => {
@@ -90,10 +92,15 @@ describe('InboxService', () => {
       findByClientAndAgent: jest.fn(),
     } as unknown as jest.Mocked<ClientAgentRepository>;
 
+    userRepository = {
+      findByIds: jest.fn().mockResolvedValue([]),
+    } as unknown as jest.Mocked<UserRepository>;
+
     service = new InboxService(
       conversationRepository,
       messageRepository,
       clientAgentRepository,
+      userRepository,
     );
   });
 

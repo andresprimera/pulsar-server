@@ -3,8 +3,11 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
+  HttpCode,
   Param,
   Patch,
+  Post,
   Query,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -14,12 +17,24 @@ import { ClientRoles } from '@shared/decorators/client-roles.decorator';
 import { CurrentClientUser } from '@shared/decorators/current-client-user.decorator';
 import { ClientUserPrincipal } from '@shared/types/express';
 import { InboxService } from './inbox.service';
+import { InboxOperatorMessageService } from './inbox-operator-message.service';
 import { ListConversationsQueryDto } from './dto/list-conversations-query.dto';
 import { ListConversationsResponseDto } from './dto/list-conversations-response.dto';
 import { ListMessagesQueryDto } from './dto/list-messages-query.dto';
 import { ListMessagesResponseDto } from './dto/list-messages-response.dto';
 import { UpdateControlModeDto } from './dto/update-control-mode.dto';
 import { UpdateControlModeResponseDto } from './dto/update-control-mode-response.dto';
+import { SendInboxMessageDto } from './dto/send-inbox-message.dto';
+import { InboxMessageDto } from './dto/inbox-message.dto';
+
+/**
+ * UUID v4 canonical form. The 13th nibble is `4`; the 17th nibble is one
+ * of `8`, `9`, `a`, `b` (case-insensitive). Length is 36 characters
+ * inclusive of hyphens; total ≤ 64 chars (Phase-2 ceiling).
+ */
+const UUID_V4_REGEX =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/;
+const IDEMPOTENCY_KEY_MAX_LENGTH = 64;
 
 /**
  * Client-tier Inbox controller.
@@ -37,7 +52,10 @@ import { UpdateControlModeResponseDto } from './dto/update-control-mode-response
  */
 @Controller('inbox')
 export class InboxController {
-  constructor(private readonly inboxService: InboxService) {}
+  constructor(
+    private readonly inboxService: InboxService,
+    private readonly inboxOperatorMessageService: InboxOperatorMessageService,
+  ) {}
 
   @ClientAuth()
   @ClientRoles('owner', 'operator')
@@ -84,6 +102,43 @@ export class InboxController {
       authenticated.userId,
     );
   }
+
+  /**
+   * Operator-driven outbound reply.
+   *
+   * - `Idempotency-Key: <uuid-v4>` header is REQUIRED. Replay safety is
+   *   provided by the partial-unique compound index on `Message`
+   *   `(conversationId, idempotencyKey)` — see the service for the
+   *   5-step monotone flow.
+   * - 409 `BOT_AUTOPILOT_ACTIVE` when the conversation is not in human
+   *   mode. The endpoint never auto-flips control mode.
+   * - 404 when the conversation is not owned by the caller's client.
+   * - 502 when the downstream channel adapter throws; the persisted row
+   *   remains with `deliveryStatus: 'failed'` so the thread shows the
+   *   attempt.
+   */
+  @ClientAuth()
+  @ClientRoles('owner', 'operator')
+  @Post('conversations/:conversationId/messages')
+  @HttpCode(201)
+  async sendMessage(
+    @CurrentClientUser() principal: ClientUserPrincipal | undefined,
+    @Param('conversationId') conversationId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() body: SendInboxMessageDto,
+  ): Promise<InboxMessageDto> {
+    const authenticated = requireAuthenticated(principal);
+    requireValidObjectId(conversationId);
+    const key = requireValidIdempotencyKey(idempotencyKey);
+
+    return this.inboxOperatorMessageService.sendOperatorMessage({
+      clientId: authenticated.clientId,
+      conversationId,
+      authorClientUserId: authenticated.userId,
+      text: body.text,
+      idempotencyKey: key,
+    });
+  }
 }
 
 function requireAuthenticated(
@@ -103,4 +158,21 @@ function requireValidObjectId(value: string): void {
   if (!Types.ObjectId.isValid(value)) {
     throw new BadRequestException('Invalid conversationId');
   }
+}
+
+function requireValidIdempotencyKey(value: string | undefined): string {
+  if (value === undefined || value === null || value.length === 0) {
+    throw new BadRequestException(
+      'Idempotency-Key header is required (UUID v4)',
+    );
+  }
+  if (value.length > IDEMPOTENCY_KEY_MAX_LENGTH) {
+    throw new BadRequestException(
+      `Idempotency-Key header must be ≤ ${IDEMPOTENCY_KEY_MAX_LENGTH} characters`,
+    );
+  }
+  if (!UUID_V4_REGEX.test(value)) {
+    throw new BadRequestException('Idempotency-Key header must be a UUID v4');
+  }
+  return value;
 }

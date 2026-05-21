@@ -25,6 +25,21 @@ export class UserRepository {
     return this.model.findById(id).exec();
   }
 
+  /**
+   * Batched id lookup projected to `{ _id, name }`. Used by inbox
+   * read-time enrichment to attach `authorName` for operator-authored
+   * (`Message.type === 'human'`) rows without N+1.
+   */
+  async findByIds(
+    ids: Types.ObjectId[],
+  ): Promise<Array<Pick<User, '_id' | 'name'>>> {
+    if (ids.length === 0) return [];
+    return this.model
+      .find({ _id: { $in: ids } }, { _id: 1, name: 1 })
+      .lean()
+      .exec() as unknown as Array<Pick<User, '_id' | 'name'>>;
+  }
+
   async findByEmail(
     email: string,
     session?: ClientSession,

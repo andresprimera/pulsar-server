@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
-import { MessageRepository } from './message.repository';
+import {
+  MessageIdempotencyConflictError,
+  MessageRepository,
+} from './message.repository';
 import { Message } from '@persistence/schemas/message.schema';
 import { Types } from 'mongoose';
 
@@ -361,6 +364,171 @@ describe('MessageRepository', () => {
       );
 
       expect(result).toEqual([mockUserMessage, mockAgentMessage]);
+    });
+  });
+
+  describe('Phase 2 operator outbound methods', () => {
+    const mockOperatorMessage = {
+      _id: new Types.ObjectId(),
+      content: 'Operator reply',
+      type: 'human' as const,
+      authorClientUserId: new Types.ObjectId('507f1f77bcf86cd799439020'),
+      clientId: mockClientId,
+      channelId: mockChannelId,
+      conversationId: mockConversationId,
+      status: 'active' as const,
+      deliveryStatus: 'pending' as const,
+      idempotencyKey: 'abcdef12-3456-4789-abcd-ef0123456789',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    describe('findByConversationPage', () => {
+      it("filters with type $in ['user','agent','human'] and includes new fields in the projection", async () => {
+        const sortMock = jest.fn().mockReturnValue({
+          limit: jest.fn().mockReturnValue({
+            lean: jest.fn().mockReturnValue({
+              exec: jest.fn().mockResolvedValue([mockUserMessage]),
+            }),
+          }),
+        });
+        mockModel.find.mockReturnValueOnce({ sort: sortMock });
+
+        await repository.findByConversationPage(mockConversationId, {
+          cursor: null,
+          limit: 10,
+        });
+
+        const [filter, projection] = mockModel.find.mock.calls[0];
+        expect(filter).toEqual(
+          expect.objectContaining({
+            conversationId: mockConversationId,
+            status: 'active',
+            type: { $in: ['user', 'agent', 'human'] },
+          }),
+        );
+        expect(projection).toEqual(
+          expect.objectContaining({
+            authorClientUserId: 1,
+            deliveryStatus: 1,
+          }),
+        );
+      });
+    });
+
+    describe('createOperatorMessage', () => {
+      it('inserts a human-typed row with deliveryStatus: pending and the idempotencyKey', async () => {
+        mockModel.create.mockResolvedValueOnce([mockOperatorMessage]);
+        const result = await repository.createOperatorMessage({
+          conversationId: mockConversationId,
+          clientId: mockClientId,
+          channelId: mockChannelId,
+          authorClientUserId:
+            mockOperatorMessage.authorClientUserId as Types.ObjectId,
+          content: 'Operator reply',
+          idempotencyKey: mockOperatorMessage.idempotencyKey,
+        });
+        const [payloadArray] = mockModel.create.mock.calls[0];
+        expect(payloadArray).toHaveLength(1);
+        expect(payloadArray[0]).toEqual(
+          expect.objectContaining({
+            type: 'human',
+            status: 'active',
+            deliveryStatus: 'pending',
+            idempotencyKey: mockOperatorMessage.idempotencyKey,
+          }),
+        );
+        expect(result).toEqual(mockOperatorMessage);
+      });
+
+      it('translates Mongo E11000 to MessageIdempotencyConflictError', async () => {
+        const dupErr: any = new Error('E11000 duplicate key');
+        dupErr.code = 11000;
+        mockModel.create.mockRejectedValueOnce(dupErr);
+
+        await expect(
+          repository.createOperatorMessage({
+            conversationId: mockConversationId,
+            clientId: mockClientId,
+            channelId: mockChannelId,
+            authorClientUserId:
+              mockOperatorMessage.authorClientUserId as Types.ObjectId,
+            content: 'x',
+            idempotencyKey: mockOperatorMessage.idempotencyKey,
+          }),
+        ).rejects.toBeInstanceOf(MessageIdempotencyConflictError);
+      });
+
+      it('rethrows non-duplicate errors as-is', async () => {
+        const otherErr = new Error('boom');
+        mockModel.create.mockRejectedValueOnce(otherErr);
+
+        await expect(
+          repository.createOperatorMessage({
+            conversationId: mockConversationId,
+            clientId: mockClientId,
+            channelId: mockChannelId,
+            authorClientUserId:
+              mockOperatorMessage.authorClientUserId as Types.ObjectId,
+            content: 'x',
+            idempotencyKey: mockOperatorMessage.idempotencyKey,
+          }),
+        ).rejects.toBe(otherErr);
+      });
+    });
+
+    describe('findByIdempotencyKey', () => {
+      it('returns the prior row when one exists', async () => {
+        mockModel.findOne.mockReturnValueOnce({
+          lean: jest.fn().mockReturnValue({
+            exec: jest.fn().mockResolvedValue(mockOperatorMessage),
+          }),
+        });
+
+        const result = await repository.findByIdempotencyKey(
+          mockConversationId,
+          mockOperatorMessage.idempotencyKey,
+        );
+
+        expect(mockModel.findOne).toHaveBeenCalledWith({
+          conversationId: mockConversationId,
+          idempotencyKey: mockOperatorMessage.idempotencyKey,
+        });
+        expect(result).toEqual(mockOperatorMessage);
+      });
+
+      it('returns null when no prior row exists', async () => {
+        mockModel.findOne.mockReturnValueOnce({
+          lean: jest.fn().mockReturnValue({
+            exec: jest.fn().mockResolvedValue(null),
+          }),
+        });
+
+        const result = await repository.findByIdempotencyKey(
+          mockConversationId,
+          'unknown-key',
+        );
+        expect(result).toBeNull();
+      });
+    });
+
+    describe('updateDeliveryStatus', () => {
+      it('updates the row and returns the updated document', async () => {
+        const updated = { ...mockOperatorMessage, deliveryStatus: 'sent' };
+        mockModel.findByIdAndUpdate.mockReturnValueOnce({
+          exec: jest.fn().mockResolvedValue(updated),
+        });
+
+        const messageId = mockOperatorMessage._id as Types.ObjectId;
+        const result = await repository.updateDeliveryStatus(messageId, 'sent');
+
+        expect(mockModel.findByIdAndUpdate).toHaveBeenCalledWith(
+          messageId,
+          { $set: { deliveryStatus: 'sent' } },
+          { new: true },
+        );
+        expect(result).toEqual(updated);
+      });
     });
   });
 
