@@ -120,6 +120,21 @@ describe('INBOX_CONVERSATION_WRITE_PORT boundary', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('Phase 3: InboxConversationMutationService does NOT import INBOX_CONVERSATION_WRITE_PORT', () => {
+    // Locks in the §4.6 / §2.4 contract proof — Phase-3 mutations write
+    // discrete columns (`status`, `assignedOperatorId`, `tags`) directly
+    // through `ConversationRepository`, NOT through the port (which
+    // governs the list-column write surface `lastMessageAt` /
+    // `lastMessagePreview`).
+    const mutationServicePath = path.resolve(
+      SRC_ROOT,
+      'features/inbox/inbox-conversation-mutation.service.ts',
+    );
+    expect(fs.existsSync(mutationServicePath)).toBe(true);
+    const content = fs.readFileSync(mutationServicePath, 'utf8');
+    expect(content).not.toContain('INBOX_CONVERSATION_WRITE_PORT');
+  });
+
   it('exactly one class implements InboxConversationWritePort, and it is the adapter', () => {
     const implementers: string[] = [];
     for (const file of allFiles) {

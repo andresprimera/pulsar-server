@@ -26,6 +26,11 @@ import {
 } from './schemas/conversation.schema';
 import { ConversationRepository } from './repositories/conversation.repository';
 import {
+  ConversationRead,
+  ConversationReadSchema,
+} from './schemas/conversation-read.schema';
+import { ConversationReadRepository } from './repositories/conversation-read.repository';
+import {
   ProcessedEvent,
   ProcessedEventSchema,
 } from './schemas/processed-event.schema';
@@ -89,6 +94,7 @@ const repositories = [
   UserRepository,
   MessageRepository,
   ConversationRepository,
+  ConversationReadRepository,
   ProcessedEventRepository,
   LlmUsageLogRepository,
   AdminUserRepository,
@@ -121,6 +127,7 @@ const repositories = [
       { name: User.name, schema: UserSchema },
       { name: Message.name, schema: MessageSchema },
       { name: Conversation.name, schema: ConversationSchema },
+      { name: ConversationRead.name, schema: ConversationReadSchema },
       { name: ProcessedEvent.name, schema: ProcessedEventSchema },
       { name: LlmUsageLog.name, schema: LlmUsageLogSchema },
       { name: AgentPrice.name, schema: AgentPriceSchema },

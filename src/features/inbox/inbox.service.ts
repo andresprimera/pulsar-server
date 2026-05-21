@@ -1,15 +1,11 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { ClientAgentRepository } from '@persistence/repositories/client-agent.repository';
-import {
-  ConversationRepository,
-  EnrichedInboxRow,
-} from '@persistence/repositories/conversation.repository';
+import { ConversationRepository } from '@persistence/repositories/conversation.repository';
 import { MessageRepository } from '@persistence/repositories/message.repository';
 import { UserRepository } from '@persistence/repositories/user.repository';
 import { Message } from '@persistence/schemas/message.schema';
 import { DEFAULT_CONTROL_MODE, ControlMode } from '@shared/inbox/control-mode';
-import { ConversationSummaryDto } from './dto/conversation-summary.dto';
 import { ListConversationsQueryDto } from './dto/list-conversations-query.dto';
 import { ListConversationsResponseDto } from './dto/list-conversations-response.dto';
 import { ListMessagesQueryDto } from './dto/list-messages-query.dto';
@@ -17,6 +13,7 @@ import { ListMessagesResponseDto } from './dto/list-messages-response.dto';
 import { UpdateControlModeResponseDto } from './dto/update-control-mode-response.dto';
 import { decodeCursor, encodeCursor, PageCursor } from './utils/cursor.util';
 import { toInboxMessageDto } from './utils/inbox-message.mapper';
+import { toConversationSummary } from './utils/conversation-summary.mapper';
 
 const DEFAULT_LIST_LIMIT = 20;
 const DEFAULT_MESSAGES_LIMIT = 50;
@@ -36,6 +33,7 @@ export class InboxService {
   async listConversations(
     clientId: string,
     query: ListConversationsQueryDto,
+    actorClientUserId: string,
   ): Promise<ListConversationsResponseDto> {
     const cursor = decodeCursor(query.cursor);
     const limit = Math.min(query.limit ?? DEFAULT_LIST_LIMIT, MAX_LIMIT);
@@ -65,7 +63,15 @@ export class InboxService {
 
     const page = await this.conversationRepository.findInboxPageEnriched(
       new Types.ObjectId(clientId),
-      { status, cursor, limit, channelId, clientAgentId, qLowered },
+      {
+        status,
+        cursor,
+        limit,
+        channelId,
+        clientAgentId,
+        qLowered,
+        actorClientUserId: new Types.ObjectId(actorClientUserId),
+      },
     );
 
     return {
@@ -163,53 +169,6 @@ export class InboxService {
       updatedAt: updated.updatedAt,
     };
   }
-}
-
-function toConversationSummary(row: EnrichedInboxRow): ConversationSummaryDto {
-  const contactName = row.contact?.name ?? '';
-  const contactEmail =
-    row.contact?.identifier?.type === 'email'
-      ? row.contact.identifier.value
-      : null;
-  const provider = (row.channel?.type ?? '').toLowerCase();
-  const channelHandle = resolveChannelHandle(row);
-  const assistant = row.agent?.name ?? null;
-
-  return {
-    _id: String(row._id),
-    contactId: String(row.contactId),
-    channelId: String(row.channelId),
-    status: row.status,
-    controlMode: (row.controlMode ?? DEFAULT_CONTROL_MODE) as ControlMode,
-    lastMessageAt: row.lastMessageAt,
-    summary: row.summary,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-    contactName,
-    contactEmail,
-    provider,
-    channelHandle,
-    assistant,
-    assignedOperatorName: null,
-    lastMessagePreview: row.lastMessagePreview ?? '',
-    unreadCount: 0,
-    tags: [],
-  };
-}
-
-function resolveChannelHandle(row: EnrichedInboxRow): string {
-  const hireChannels = row.clientAgent?.channels ?? [];
-  const matching = hireChannels.find(
-    (c) => c.channelId && String(c.channelId) === String(row.channelId),
-  );
-  if (!matching) return '';
-  return (
-    matching.phoneNumberId ??
-    matching.instagramAccountId ??
-    matching.tiktokUserId ??
-    matching.telegramBotId ??
-    ''
-  );
 }
 
 /**

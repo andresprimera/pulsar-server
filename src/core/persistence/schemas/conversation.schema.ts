@@ -92,6 +92,37 @@ export class Conversation extends Document {
   @Prop({ type: String, required: false })
   lastMessagePreview?: string;
 
+  /**
+   * Optional reference to the `User` (tenant operator) currently
+   * responsible for this conversation. Written by the Phase-3
+   * `PATCH /inbox/conversations/:id/assignment` endpoint. `undefined`
+   * (or absent) means the conversation is unassigned. The single-field
+   * index supports a future "my assigned conversations" filter.
+   */
+  @Prop({
+    type: Types.ObjectId,
+    ref: 'User',
+    required: false,
+    index: true,
+  })
+  assignedOperatorId?: Types.ObjectId;
+
+  /**
+   * Operator-facing free-form tag list. Server-normalized
+   * (trimmed + lowercased + deduped, max 16 entries) on write by
+   * `InboxConversationMutationService.replaceTags`. Defaults to `[]`
+   * so pre-Phase-3 documents read with an empty array without
+   * backfill. Single-field index forward-compatible with the Phase-5
+   * filter-by-tag work (which will add a `tagsLower` denorm).
+   */
+  @Prop({
+    type: [String],
+    required: true,
+    default: [],
+    index: true,
+  })
+  tags: string[];
+
   createdAt: Date;
   updatedAt: Date;
 }

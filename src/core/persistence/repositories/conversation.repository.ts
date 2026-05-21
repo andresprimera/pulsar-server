@@ -9,6 +9,8 @@ import {
 } from '@persistence/schemas/client-agent.schema';
 import { Contact } from '@persistence/schemas/contact.schema';
 import { Conversation } from '@persistence/schemas/conversation.schema';
+import { ConversationRead } from '@persistence/schemas/conversation-read.schema';
+import { User } from '@persistence/schemas/user.schema';
 import { ControlMode } from '@shared/inbox/control-mode';
 
 export interface InboxListCursor {
@@ -59,6 +61,26 @@ export interface EnrichedInboxRow {
     }>;
   } | null;
   agent: { name?: string } | null;
+  /**
+   * Joined operator name for `Conversation.assignedOperatorId`, filtered
+   * by the same tenant as the conversation so a stale cross-tenant
+   * reference projects as `null`. `null` when the conversation is
+   * unassigned or when the referent has been removed.
+   */
+  assignedOperator: { name?: string } | null;
+  /**
+   * Operator-facing tag list (server-normalized on write). Defaults to
+   * `[]` for documents that pre-date the Phase-3 schema field.
+   */
+  tags: string[];
+  /**
+   * Per-operator unread flag for the caller. Computed from the joined
+   * `conversation_reads` row as
+   * `!readMap.has(rowId) || readMap.get(rowId).lastReadAt < lastMessageAt`.
+   * When the caller is unknown (no `actorClientUserId` supplied), the
+   * field defaults to `false` (backward-compatible).
+   */
+  unread: boolean;
 }
 
 export interface EnrichedInboxPageResult {
@@ -79,6 +101,10 @@ export class ConversationRepository {
     private readonly clientAgentModel: Model<ClientAgent>,
     @InjectModel(Agent.name)
     private readonly agentModel: Model<Agent>,
+    @InjectModel(User.name)
+    private readonly userModel: Model<User>,
+    @InjectModel(ConversationRead.name)
+    private readonly conversationReadModel: Model<ConversationRead>,
   ) {}
 
   async create(
@@ -260,6 +286,16 @@ export class ConversationRepository {
       channelId?: Types.ObjectId;
       clientAgentId?: Types.ObjectId;
       qLowered?: string;
+      /**
+       * When supplied, the page is enriched with the per-operator
+       * `unread` flag (derived from a tenant-filtered `conversation_reads`
+       * `$in` lookup keyed by `(operatorClientUserId, conversationId)`)
+       * and the joined `assignedOperator.name`. When `undefined`, both
+       * joins are skipped, `unread` defaults to `false`, and
+       * `assignedOperator` defaults to `null` — backward-compatible for
+       * any future caller without a principal.
+       */
+      actorClientUserId?: Types.ObjectId;
     },
   ): Promise<EnrichedInboxPageResult> {
     const filter: Record<string, unknown> = {
@@ -301,6 +337,8 @@ export class ConversationRepository {
         summary: 1,
         createdAt: 1,
         updatedAt: 1,
+        assignedOperatorId: 1,
+        tags: 1,
       })
       .sort({ lastMessageAt: -1, _id: -1 })
       .limit(opts.limit + 1)
@@ -319,6 +357,8 @@ export class ConversationRepository {
       summary?: string;
       createdAt: Date;
       updatedAt: Date;
+      assignedOperatorId?: Types.ObjectId;
+      tags?: string[];
     }>;
 
     const hasMore = rows.length > opts.limit;
@@ -335,47 +375,85 @@ export class ConversationRepository {
         .map((r) => r.clientAgentId)
         .filter((id): id is Types.ObjectId => id !== undefined && id !== null),
     );
+    const assignedOperatorIds = uniqueObjectIds(
+      baseRows
+        .map((r) => r.assignedOperatorId)
+        .filter((id): id is Types.ObjectId => id !== undefined && id !== null),
+    );
+    const pageIds = baseRows.map((r) => r._id);
 
-    const [contacts, channels, clientAgents] = await Promise.all([
-      contactIds.length > 0
-        ? (this.contactModel
-            .find(
-              { _id: { $in: contactIds } },
-              { _id: 1, name: 1, identifier: 1 },
-            )
-            .lean()
-            .exec() as unknown as Promise<
-            Array<{
-              _id: Types.ObjectId;
-              name?: string;
-              identifier?: Contact['identifier'];
-            }>
-          >)
-        : Promise.resolve([]),
-      channelIds.length > 0
-        ? (this.channelModel
-            .find({ _id: { $in: channelIds } }, { _id: 1, type: 1 })
-            .lean()
-            .exec() as unknown as Promise<
-            Array<{ _id: Types.ObjectId; type?: string }>
-          >)
-        : Promise.resolve([]),
-      clientAgentIds.length > 0
-        ? (this.clientAgentModel
-            .find(
-              { _id: { $in: clientAgentIds } },
-              { _id: 1, agentId: 1, channels: 1 },
-            )
-            .lean()
-            .exec() as unknown as Promise<
-            Array<{
-              _id: Types.ObjectId;
-              agentId?: string;
-              channels?: HireChannelConfig[];
-            }>
-          >)
-        : Promise.resolve([]),
-    ]);
+    const [contacts, channels, clientAgents, assignedOperators, reads] =
+      await Promise.all([
+        contactIds.length > 0
+          ? (this.contactModel
+              .find(
+                { _id: { $in: contactIds } },
+                { _id: 1, name: 1, identifier: 1 },
+              )
+              .lean()
+              .exec() as unknown as Promise<
+              Array<{
+                _id: Types.ObjectId;
+                name?: string;
+                identifier?: Contact['identifier'];
+              }>
+            >)
+          : Promise.resolve([]),
+        channelIds.length > 0
+          ? (this.channelModel
+              .find({ _id: { $in: channelIds } }, { _id: 1, type: 1 })
+              .lean()
+              .exec() as unknown as Promise<
+              Array<{ _id: Types.ObjectId; type?: string }>
+            >)
+          : Promise.resolve([]),
+        clientAgentIds.length > 0
+          ? (this.clientAgentModel
+              .find(
+                { _id: { $in: clientAgentIds } },
+                { _id: 1, agentId: 1, channels: 1 },
+              )
+              .lean()
+              .exec() as unknown as Promise<
+              Array<{
+                _id: Types.ObjectId;
+                agentId?: string;
+                channels?: HireChannelConfig[];
+              }>
+            >)
+          : Promise.resolve([]),
+        // Tenant-filtered `User` lookup for `assignedOperatorId`s present
+        // on the page. Skipped entirely when the caller is unknown OR no
+        // row carries an assignment.
+        opts.actorClientUserId !== undefined && assignedOperatorIds.length > 0
+          ? (this.userModel
+              .find(
+                { _id: { $in: assignedOperatorIds }, clientId },
+                { _id: 1, name: 1 },
+              )
+              .lean()
+              .exec() as unknown as Promise<
+              Array<{ _id: Types.ObjectId; name?: string }>
+            >)
+          : Promise.resolve([]),
+        // Tenant-filtered `ConversationRead` lookup for the caller. Skipped
+        // entirely when the caller is unknown.
+        opts.actorClientUserId !== undefined && pageIds.length > 0
+          ? (this.conversationReadModel
+              .find(
+                {
+                  operatorClientUserId: opts.actorClientUserId,
+                  conversationId: { $in: pageIds },
+                  clientId,
+                },
+                { conversationId: 1, lastReadAt: 1 },
+              )
+              .lean()
+              .exec() as unknown as Promise<
+              Array<{ conversationId: Types.ObjectId; lastReadAt: Date }>
+            >)
+          : Promise.resolve([]),
+      ]);
 
     const agentIdStrings = uniqueStrings(
       clientAgents
@@ -403,6 +481,10 @@ export class ConversationRepository {
       clientAgents.map((ca) => [String(ca._id), ca]),
     );
     const agentMap = new Map(agents.map((a) => [String(a._id), a]));
+    const assignedOperatorMap = new Map(
+      assignedOperators.map((u) => [String(u._id), u]),
+    );
+    const readMap = new Map(reads.map((r) => [String(r.conversationId), r]));
 
     const items: EnrichedInboxRow[] = baseRows.map((row) => {
       const ca = row.clientAgentId
@@ -410,6 +492,19 @@ export class ConversationRepository {
         : null;
       const agent =
         ca && ca.agentId ? agentMap.get(String(ca.agentId)) ?? null : null;
+      const assignedOperator = row.assignedOperatorId
+        ? assignedOperatorMap.get(String(row.assignedOperatorId)) ?? null
+        : null;
+      // When `actorClientUserId` is undefined, the read-state join is
+      // skipped and every row defaults to `unread: false`. When the
+      // caller IS known, a row is unread when no read record exists OR
+      // the recorded `lastReadAt` is older than the conversation's
+      // `lastMessageAt`.
+      const read = readMap.get(String(row._id));
+      const unread =
+        opts.actorClientUserId === undefined
+          ? false
+          : !read || read.lastReadAt < row.lastMessageAt;
       return {
         _id: row._id,
         clientId: row.clientId,
@@ -427,6 +522,9 @@ export class ConversationRepository {
         channel: channelMap.get(String(row.channelId)) ?? null,
         clientAgent: ca,
         agent,
+        assignedOperator,
+        tags: row.tags ?? [],
+        unread,
       };
     });
 
@@ -478,6 +576,224 @@ export class ConversationRepository {
       )
       .lean()
       .exec() as unknown as Promise<Conversation | null>;
+  }
+
+  /**
+   * Atomic tenant-scoped status update. Mirrors `updateControlMode`:
+   * `runValidators: true` enforces the schema enum on the update path
+   * (Mongoose otherwise skips enum validation on `findOneAndUpdate`).
+   * Returns `null` when the conversation is missing or owned by a
+   * different tenant — caller maps to `NotFoundException`.
+   */
+  async updateStatusForClient(
+    conversationId: Types.ObjectId,
+    clientId: Types.ObjectId,
+    status: 'open' | 'closed' | 'archived',
+  ): Promise<Conversation | null> {
+    return this.model
+      .findOneAndUpdate(
+        { _id: conversationId, clientId },
+        { $set: { status } },
+        { new: true, runValidators: true },
+      )
+      .lean()
+      .exec() as unknown as Promise<Conversation | null>;
+  }
+
+  /**
+   * Atomic tenant-scoped assignment update. `$set` when supplied;
+   * `$unset` when `null` (clear the field entirely so it round-trips as
+   * `undefined` on read). Returns `null` for not-found / cross-tenant.
+   */
+  async updateAssignmentForClient(
+    conversationId: Types.ObjectId,
+    clientId: Types.ObjectId,
+    assignedOperatorId: Types.ObjectId | null,
+  ): Promise<Conversation | null> {
+    const mutation =
+      assignedOperatorId === null
+        ? { $unset: { assignedOperatorId: 1 } }
+        : { $set: { assignedOperatorId } };
+    return this.model
+      .findOneAndUpdate({ _id: conversationId, clientId }, mutation, {
+        new: true,
+        runValidators: true,
+      })
+      .lean()
+      .exec() as unknown as Promise<Conversation | null>;
+  }
+
+  /**
+   * Atomic tenant-scoped tag-list replacement. The service is
+   * responsible for normalization (trim + lowercase + dedupe + length
+   * cap) before calling. Returns `null` for not-found / cross-tenant.
+   */
+  async updateTagsForClient(
+    conversationId: Types.ObjectId,
+    clientId: Types.ObjectId,
+    tags: string[],
+  ): Promise<Conversation | null> {
+    return this.model
+      .findOneAndUpdate(
+        { _id: conversationId, clientId },
+        { $set: { tags } },
+        { new: true, runValidators: true },
+      )
+      .lean()
+      .exec() as unknown as Promise<Conversation | null>;
+  }
+
+  /**
+   * Single-row enriched read used by Phase-3 mutation responses to
+   * project the same `ConversationSummaryDto` shape the list endpoint
+   * produces.
+   *
+   * Status-agnostic: filters by `(_id, clientId)` only — closed and
+   * archived conversations are surfaced. Performs the same six joins
+   * (Contact, Channel, ClientAgent, Agent, User, ConversationRead) as
+   * `findInboxPageEnriched` to keep the wire shape consistent across
+   * the list and mutation responses. Returns `null` for not-found and
+   * cross-tenant.
+   */
+  async findOneForInboxEnriched(
+    conversationId: Types.ObjectId,
+    clientId: Types.ObjectId,
+    actorClientUserId: Types.ObjectId,
+  ): Promise<EnrichedInboxRow | null> {
+    const row = (await this.model
+      .findOne(
+        { _id: conversationId, clientId },
+        {
+          _id: 1,
+          clientId: 1,
+          contactId: 1,
+          channelId: 1,
+          clientAgentId: 1,
+          status: 1,
+          controlMode: 1,
+          lastMessageAt: 1,
+          lastMessagePreview: 1,
+          summary: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          assignedOperatorId: 1,
+          tags: 1,
+        },
+      )
+      .lean()
+      .exec()) as unknown as {
+      _id: Types.ObjectId;
+      clientId: Types.ObjectId;
+      contactId: Types.ObjectId;
+      channelId: Types.ObjectId;
+      clientAgentId?: Types.ObjectId;
+      status: 'open' | 'closed' | 'archived';
+      controlMode?: ControlMode;
+      lastMessageAt: Date;
+      lastMessagePreview?: string;
+      summary?: string;
+      createdAt: Date;
+      updatedAt: Date;
+      assignedOperatorId?: Types.ObjectId;
+      tags?: string[];
+    } | null;
+
+    if (!row) return null;
+
+    const [contact, channel, clientAgent, assignedOperator, read] =
+      await Promise.all([
+        this.contactModel
+          .findOne({ _id: row.contactId }, { _id: 1, name: 1, identifier: 1 })
+          .lean()
+          .exec() as unknown as Promise<{
+          _id: Types.ObjectId;
+          name?: string;
+          identifier?: Contact['identifier'];
+        } | null>,
+        this.channelModel
+          .findOne({ _id: row.channelId }, { _id: 1, type: 1 })
+          .lean()
+          .exec() as unknown as Promise<{
+          _id: Types.ObjectId;
+          type?: string;
+        } | null>,
+        row.clientAgentId
+          ? (this.clientAgentModel
+              .findOne(
+                { _id: row.clientAgentId },
+                { _id: 1, agentId: 1, channels: 1 },
+              )
+              .lean()
+              .exec() as unknown as Promise<{
+              _id: Types.ObjectId;
+              agentId?: string;
+              channels?: HireChannelConfig[];
+            } | null>)
+          : Promise.resolve(null),
+        row.assignedOperatorId
+          ? (this.userModel
+              .findOne(
+                { _id: row.assignedOperatorId, clientId },
+                { _id: 1, name: 1 },
+              )
+              .lean()
+              .exec() as unknown as Promise<{
+              _id: Types.ObjectId;
+              name?: string;
+            } | null>)
+          : Promise.resolve(null),
+        this.conversationReadModel
+          .findOne(
+            {
+              operatorClientUserId: actorClientUserId,
+              conversationId: row._id,
+              clientId,
+            },
+            { conversationId: 1, lastReadAt: 1 },
+          )
+          .lean()
+          .exec() as unknown as Promise<{
+          conversationId: Types.ObjectId;
+          lastReadAt: Date;
+        } | null>,
+      ]);
+
+    let agent: { _id: Types.ObjectId; name?: string } | null = null;
+    if (clientAgent && clientAgent.agentId) {
+      if (Types.ObjectId.isValid(clientAgent.agentId)) {
+        agent = (await this.agentModel
+          .findOne(
+            { _id: new Types.ObjectId(clientAgent.agentId) },
+            { _id: 1, name: 1 },
+          )
+          .lean()
+          .exec()) as unknown as { _id: Types.ObjectId; name?: string } | null;
+      }
+    }
+
+    const unread = !read || read.lastReadAt < row.lastMessageAt;
+
+    return {
+      _id: row._id,
+      clientId: row.clientId,
+      contactId: row.contactId,
+      channelId: row.channelId,
+      clientAgentId: row.clientAgentId,
+      status: row.status,
+      controlMode: row.controlMode,
+      lastMessageAt: row.lastMessageAt,
+      lastMessagePreview: row.lastMessagePreview,
+      summary: row.summary,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      contact,
+      channel,
+      clientAgent,
+      agent,
+      assignedOperator,
+      tags: row.tags ?? [],
+      unread,
+    };
   }
 }
 

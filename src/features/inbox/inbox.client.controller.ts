@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -18,6 +19,7 @@ import { CurrentClientUser } from '@shared/decorators/current-client-user.decora
 import { ClientUserPrincipal } from '@shared/types/express';
 import { InboxService } from './inbox.service';
 import { InboxOperatorMessageService } from './inbox-operator-message.service';
+import { InboxConversationMutationService } from './inbox-conversation-mutation.service';
 import { ListConversationsQueryDto } from './dto/list-conversations-query.dto';
 import { ListConversationsResponseDto } from './dto/list-conversations-response.dto';
 import { ListMessagesQueryDto } from './dto/list-messages-query.dto';
@@ -26,6 +28,11 @@ import { UpdateControlModeDto } from './dto/update-control-mode.dto';
 import { UpdateControlModeResponseDto } from './dto/update-control-mode-response.dto';
 import { SendInboxMessageDto } from './dto/send-inbox-message.dto';
 import { InboxMessageDto } from './dto/inbox-message.dto';
+import { ConversationSummaryDto } from './dto/conversation-summary.dto';
+import { PatchStatusDto } from './dto/patch-status.dto';
+import { PatchAssignmentDto } from './dto/patch-assignment.dto';
+import { PutTagsDto } from './dto/put-tags.dto';
+import { MarkReadResponseDto } from './dto/mark-read-response.dto';
 
 /**
  * UUID v4 canonical form. The 13th nibble is `4`; the 17th nibble is one
@@ -55,6 +62,7 @@ export class InboxController {
   constructor(
     private readonly inboxService: InboxService,
     private readonly inboxOperatorMessageService: InboxOperatorMessageService,
+    private readonly inboxConversationMutationService: InboxConversationMutationService,
   ) {}
 
   @ClientAuth()
@@ -64,8 +72,12 @@ export class InboxController {
     @CurrentClientUser() principal: ClientUserPrincipal | undefined,
     @Query() query: ListConversationsQueryDto,
   ): Promise<ListConversationsResponseDto> {
-    const clientId = requireClientId(principal);
-    return this.inboxService.listConversations(clientId, query);
+    const authenticated = requireAuthenticated(principal);
+    return this.inboxService.listConversations(
+      authenticated.clientId,
+      query,
+      authenticated.userId,
+    );
   }
 
   @ClientAuth()
@@ -137,6 +149,118 @@ export class InboxController {
       authorClientUserId: authenticated.userId,
       text: body.text,
       idempotencyKey: key,
+    });
+  }
+
+  /**
+   * Phase 3 — change the operator-facing conversation status. Idempotent:
+   * re-sending the same status returns the enriched DTO without a DB
+   * write.
+   */
+  @ClientAuth()
+  @ClientRoles('owner', 'operator')
+  @Patch('conversations/:conversationId/status')
+  async changeStatus(
+    @CurrentClientUser() principal: ClientUserPrincipal | undefined,
+    @Param('conversationId') conversationId: string,
+    @Body() body: PatchStatusDto,
+  ): Promise<ConversationSummaryDto> {
+    const authenticated = requireAuthenticated(principal);
+    requireValidObjectId(conversationId);
+    return this.inboxConversationMutationService.changeStatus({
+      clientId: authenticated.clientId,
+      conversationId,
+      status: body.status,
+      actorClientUserId: authenticated.userId,
+    });
+  }
+
+  /**
+   * Phase 3 — change the conversation assignment. Operators may only
+   * target themselves; owners may target any tenant operator. `null`
+   * clears the assignment.
+   */
+  @ClientAuth()
+  @ClientRoles('owner', 'operator')
+  @Patch('conversations/:conversationId/assignment')
+  async changeAssignment(
+    @CurrentClientUser() principal: ClientUserPrincipal | undefined,
+    @Param('conversationId') conversationId: string,
+    @Body() body: PatchAssignmentDto,
+  ): Promise<ConversationSummaryDto> {
+    const authenticated = requireAuthenticated(principal);
+    requireValidObjectId(conversationId);
+    return this.inboxConversationMutationService.changeAssignment({
+      clientId: authenticated.clientId,
+      conversationId,
+      operatorClientUserId: body.operatorClientUserId,
+      actorClientUserId: authenticated.userId,
+      actorClientRole: authenticated.clientRole,
+    });
+  }
+
+  /**
+   * Phase 3 — upsert the caller's per-operator read state for the
+   * conversation. Idempotent.
+   */
+  @ClientAuth()
+  @ClientRoles('owner', 'operator')
+  @Post('conversations/:conversationId/read')
+  @HttpCode(200)
+  async markRead(
+    @CurrentClientUser() principal: ClientUserPrincipal | undefined,
+    @Param('conversationId') conversationId: string,
+  ): Promise<MarkReadResponseDto> {
+    const authenticated = requireAuthenticated(principal);
+    requireValidObjectId(conversationId);
+    return this.inboxConversationMutationService.markRead({
+      clientId: authenticated.clientId,
+      conversationId,
+      actorClientUserId: authenticated.userId,
+    });
+  }
+
+  /**
+   * Phase 3 — delete the caller's per-operator read state for the
+   * conversation (idempotent on missing row).
+   */
+  @ClientAuth()
+  @ClientRoles('owner', 'operator')
+  @Post('conversations/:conversationId/unread')
+  @HttpCode(200)
+  async markUnread(
+    @CurrentClientUser() principal: ClientUserPrincipal | undefined,
+    @Param('conversationId') conversationId: string,
+  ): Promise<MarkReadResponseDto> {
+    const authenticated = requireAuthenticated(principal);
+    requireValidObjectId(conversationId);
+    return this.inboxConversationMutationService.markUnread({
+      clientId: authenticated.clientId,
+      conversationId,
+      actorClientUserId: authenticated.userId,
+    });
+  }
+
+  /**
+   * Phase 3 — replace the operator-facing tag list (full PUT). Server
+   * normalizes (trim + lowercase + dedupe + max 16). Idempotent on equal
+   * input.
+   */
+  @ClientAuth()
+  @ClientRoles('owner', 'operator')
+  @Put('conversations/:conversationId/tags')
+  async replaceTags(
+    @CurrentClientUser() principal: ClientUserPrincipal | undefined,
+    @Param('conversationId') conversationId: string,
+    @Body() body: PutTagsDto,
+  ): Promise<ConversationSummaryDto> {
+    const authenticated = requireAuthenticated(principal);
+    requireValidObjectId(conversationId);
+    return this.inboxConversationMutationService.replaceTags({
+      clientId: authenticated.clientId,
+      conversationId,
+      tags: body.tags,
+      actorClientUserId: authenticated.userId,
     });
   }
 }

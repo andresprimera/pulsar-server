@@ -42,8 +42,13 @@ const buildEnrichedRow = (
   channel: { type: 'whatsapp' },
   clientAgent: null,
   agent: null,
+  assignedOperator: null,
+  tags: [],
+  unread: false,
   ...overrides,
 });
+
+const ACTOR = new Types.ObjectId().toHexString();
 
 const buildMessageRow = (overrides: Partial<MessageRow> = {}): MessageRow => ({
   _id: new Types.ObjectId(),
@@ -116,6 +121,7 @@ describe('InboxService', () => {
       const result = await service.listConversations(
         clientId.toHexString(),
         {},
+        ACTOR,
       );
 
       expect(conversationRepository.findInboxPageEnriched).toHaveBeenCalledWith(
@@ -127,6 +133,7 @@ describe('InboxService', () => {
           channelId: undefined,
           clientAgentId: undefined,
           qLowered: undefined,
+          actorClientUserId: expect.any(Types.ObjectId),
         },
       );
       expect(result.nextCursor).toBeNull();
@@ -143,7 +150,7 @@ describe('InboxService', () => {
       });
 
       const clientId = new Types.ObjectId().toHexString();
-      const result = await service.listConversations(clientId, {});
+      const result = await service.listConversations(clientId, {}, ACTOR);
 
       expect(result.nextCursor).toEqual(expect.any(String));
       expect(
@@ -158,7 +165,7 @@ describe('InboxService', () => {
       });
 
       const clientId = new Types.ObjectId().toHexString();
-      await service.listConversations(clientId, { limit: 500 });
+      await service.listConversations(clientId, { limit: 500 }, ACTOR);
 
       expect(conversationRepository.findInboxPageEnriched).toHaveBeenCalledWith(
         expect.any(Types.ObjectId),
@@ -176,6 +183,7 @@ describe('InboxService', () => {
       const result = await service.listConversations(
         new Types.ObjectId().toHexString(),
         {},
+        ACTOR,
       );
       expect(result.items[0].controlMode).toBe('bot');
     });
@@ -186,9 +194,11 @@ describe('InboxService', () => {
         nextCursor: null,
       });
 
-      await service.listConversations(new Types.ObjectId().toHexString(), {
-        status: 'closed',
-      });
+      await service.listConversations(
+        new Types.ObjectId().toHexString(),
+        { status: 'closed' },
+        ACTOR,
+      );
       expect(conversationRepository.findInboxPageEnriched).toHaveBeenCalledWith(
         expect.any(Types.ObjectId),
         expect.objectContaining({ status: 'closed' }),
@@ -202,9 +212,11 @@ describe('InboxService', () => {
       });
 
       const channelId = new Types.ObjectId().toHexString();
-      await service.listConversations(new Types.ObjectId().toHexString(), {
-        channelId,
-      });
+      await service.listConversations(
+        new Types.ObjectId().toHexString(),
+        { channelId },
+        ACTOR,
+      );
 
       const call = conversationRepository.findInboxPageEnriched.mock.calls[0];
       expect(call[1].channelId).toBeInstanceOf(Types.ObjectId);
@@ -223,9 +235,11 @@ describe('InboxService', () => {
         nextCursor: null,
       });
 
-      await service.listConversations(clientId.toHexString(), {
-        agentId: agentId.toHexString(),
-      });
+      await service.listConversations(
+        clientId.toHexString(),
+        { agentId: agentId.toHexString() },
+        ACTOR,
+      );
 
       expect(clientAgentRepository.findByClientAndAgent).toHaveBeenCalledWith(
         clientId.toHexString(),
@@ -241,6 +255,7 @@ describe('InboxService', () => {
       const result = await service.listConversations(
         new Types.ObjectId().toHexString(),
         { agentId: new Types.ObjectId().toHexString() },
+        ACTOR,
       );
 
       expect(result).toEqual({ items: [], nextCursor: null });
@@ -255,9 +270,11 @@ describe('InboxService', () => {
         nextCursor: null,
       });
 
-      await service.listConversations(new Types.ObjectId().toHexString(), {
-        q: '  Foo.Bar*+  ',
-      });
+      await service.listConversations(
+        new Types.ObjectId().toHexString(),
+        { q: '  Foo.Bar*+  ' },
+        ACTOR,
+      );
 
       const call = conversationRepository.findInboxPageEnriched.mock.calls[0];
       // class-validator's @Transform runs in the controller pipe in real use;
@@ -265,21 +282,53 @@ describe('InboxService', () => {
       expect(call[1].qLowered).toBe('foo\\.bar\\*\\+');
     });
 
-    it('maps DTO defaults for assignedOperatorName / unreadCount / tags', async () => {
-      const row = buildEnrichedRow();
+    it('maps real values for assignedOperatorName / unreadCount / tags (Phase 3)', async () => {
+      const assignedRow = buildEnrichedRow({
+        assignedOperator: { name: 'Ana' },
+        tags: ['vip'],
+        unread: true,
+      });
+      const unassignedRow = buildEnrichedRow({
+        assignedOperator: null,
+        tags: [],
+        unread: false,
+      });
       conversationRepository.findInboxPageEnriched.mockResolvedValue({
-        items: [row],
+        items: [assignedRow, unassignedRow],
         nextCursor: null,
       });
 
       const result = await service.listConversations(
         new Types.ObjectId().toHexString(),
         {},
+        ACTOR,
       );
 
-      expect(result.items[0].assignedOperatorName).toBeNull();
-      expect(result.items[0].unreadCount).toBe(0);
-      expect(result.items[0].tags).toEqual([]);
+      expect(result.items[0].assignedOperatorName).toBe('Ana');
+      expect(result.items[0].unreadCount).toBe(1);
+      expect(result.items[0].tags).toEqual(['vip']);
+
+      expect(result.items[1].assignedOperatorName).toBeNull();
+      expect(result.items[1].unreadCount).toBe(0);
+      expect(result.items[1].tags).toEqual([]);
+    });
+
+    it('forwards actorClientUserId to the repository as a Types.ObjectId', async () => {
+      conversationRepository.findInboxPageEnriched.mockResolvedValue({
+        items: [],
+        nextCursor: null,
+      });
+
+      const actorHex = new Types.ObjectId().toHexString();
+      await service.listConversations(
+        new Types.ObjectId().toHexString(),
+        {},
+        actorHex,
+      );
+
+      const call = conversationRepository.findInboxPageEnriched.mock.calls[0];
+      expect(call[1].actorClientUserId).toBeInstanceOf(Types.ObjectId);
+      expect(String(call[1].actorClientUserId)).toBe(actorHex);
     });
 
     it('projects contactEmail from email identifier and null otherwise', async () => {
@@ -297,6 +346,7 @@ describe('InboxService', () => {
       const result = await service.listConversations(
         new Types.ObjectId().toHexString(),
         {},
+        ACTOR,
       );
 
       expect(result.items[0].contactEmail).toBe('a@b.c');
@@ -313,6 +363,7 @@ describe('InboxService', () => {
       const result = await service.listConversations(
         new Types.ObjectId().toHexString(),
         {},
+        ACTOR,
       );
 
       expect(result.items[0].provider).toBe('whatsapp');
@@ -370,6 +421,7 @@ describe('InboxService', () => {
       const result = await service.listConversations(
         new Types.ObjectId().toHexString(),
         {},
+        ACTOR,
       );
 
       expect(result.items[0].channelHandle).toBe('+1');
@@ -388,6 +440,7 @@ describe('InboxService', () => {
       const result = await service.listConversations(
         new Types.ObjectId().toHexString(),
         {},
+        ACTOR,
       );
       expect(result.items[0].lastMessagePreview).toBe('');
     });
