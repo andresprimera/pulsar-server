@@ -32,6 +32,15 @@ export class ListConversationsQueryDto {
   @IsMongoId()
   channelId?: string;
 
+  /**
+   * The underlying `Agent._id` (the assistant kind), NOT the
+   * `ClientAgent._id` (the per-tenant hire). The service resolves it to
+   * `clientAgentId` via `findByClientAndAgent(clientId, agentId)` and
+   * returns an empty page when the tenant has no hire for that agent —
+   * mismatches do not surface as 4xx. Pass the value the FE filter
+   * dropdown exposes from `GET /client-agents/me` (`row.agent.id`), not
+   * the hire row's `id`.
+   */
   @IsOptional()
   @IsString()
   @IsMongoId()
