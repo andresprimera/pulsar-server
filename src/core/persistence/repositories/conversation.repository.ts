@@ -795,6 +795,40 @@ export class ConversationRepository {
       unread,
     };
   }
+
+  /**
+   * Phase 5 — tenant-scoped aggregation that counts conversations per
+   * contact for the inbox `/contacts` endpoint.
+   *
+   * `$match { clientId, contactId: { $in: ids } }` (covered by the
+   * existing compound `(clientId, contactId, channelId, status)` index
+   * prefix), then `$group { _id: '$contactId', n: { $sum: 1 } }`.
+   *
+   * Counts ALL statuses (open + closed + archived) — the FE expectation
+   * is "lifetime activity per contact", not "open conversations". The
+   * service treats missing entries as `0`. Returns an empty `Map` when
+   * the input id list is empty (no DB roundtrip).
+   */
+  async countConversationsByContacts(
+    clientId: Types.ObjectId,
+    contactIds: Types.ObjectId[],
+  ): Promise<Map<string, number>> {
+    if (contactIds.length === 0) {
+      return new Map();
+    }
+    const rows = (await this.model
+      .aggregate<{ _id: Types.ObjectId; n: number }>([
+        { $match: { clientId, contactId: { $in: contactIds } } },
+        { $group: { _id: '$contactId', n: { $sum: 1 } } },
+      ])
+      .exec()) as Array<{ _id: Types.ObjectId; n: number }>;
+
+    const out = new Map<string, number>();
+    for (const row of rows) {
+      out.set(String(row._id), row.n);
+    }
+    return out;
+  }
 }
 
 function uniqueObjectIds(ids: Types.ObjectId[]): Types.ObjectId[] {

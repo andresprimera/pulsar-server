@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
+import { Types } from 'mongoose';
 import { ClientAgentRepository } from './client-agent.repository';
 import {
   CLIENT_AGENT_CLIENT_LIST_PROJECTION,
@@ -478,6 +479,125 @@ describe('ClientAgentRepository telegram webhook methods', () => {
         'createdAt',
         'status',
       ]);
+    });
+  });
+
+  describe('findHiredChannelsForClient', () => {
+    function setupFindChain(rows: unknown) {
+      const exec = jest.fn().mockResolvedValue(rows);
+      const lean = jest.fn().mockReturnValue({ exec });
+      mockModel.find.mockReturnValue({ lean });
+      return { exec, lean };
+    }
+
+    it('filters by clientId with a safe projection string (no secrets)', async () => {
+      setupFindChain([]);
+
+      await repository.findHiredChannelsForClient('client-1');
+
+      const [filter, projection] = mockModel.find.mock.calls[0];
+      expect(filter).toEqual({ clientId: 'client-1' });
+      expect(typeof projection).toBe('string');
+      expect(projection).not.toContain('credentials');
+      expect(projection).not.toContain('telegramWebhookSecretHex');
+      expect(projection).not.toContain('webhookRegistration');
+      expect(projection).not.toContain('promptSupplement');
+      expect(projection).toContain('channels.channelId');
+      expect(projection).toContain('channels.provider');
+      expect(projection).toContain('channels.status');
+    });
+
+    it('flattens each hire to one row per binding', async () => {
+      const clientAgentA = new Types.ObjectId();
+      const clientAgentB = new Types.ObjectId();
+      const channel1 = new Types.ObjectId();
+      const channel2 = new Types.ObjectId();
+      const channel3 = new Types.ObjectId();
+      setupFindChain([
+        {
+          _id: clientAgentA,
+          channels: [
+            { channelId: channel1, provider: 'meta', status: 'active' },
+            { channelId: channel2, provider: 'telegram', status: 'inactive' },
+          ],
+        },
+        {
+          _id: clientAgentB,
+          channels: [
+            { channelId: channel3, provider: 'tiktok', status: 'active' },
+          ],
+        },
+      ]);
+
+      const out = await repository.findHiredChannelsForClient('client-1');
+
+      expect(out).toHaveLength(3);
+      expect(out).toEqual(
+        expect.arrayContaining([
+          {
+            clientAgentId: clientAgentA,
+            channelId: channel1,
+            provider: 'meta',
+            status: 'active',
+          },
+          {
+            clientAgentId: clientAgentA,
+            channelId: channel2,
+            provider: 'telegram',
+            status: 'inactive',
+          },
+          {
+            clientAgentId: clientAgentB,
+            channelId: channel3,
+            provider: 'tiktok',
+            status: 'active',
+          },
+        ]),
+      );
+    });
+
+    it('returns an empty array when the tenant has no hires', async () => {
+      setupFindChain([]);
+      const out = await repository.findHiredChannelsForClient('client-empty');
+      expect(out).toEqual([]);
+    });
+
+    it('skips hires whose channels[] is missing or empty', async () => {
+      setupFindChain([
+        { _id: new Types.ObjectId() }, // channels undefined
+        { _id: new Types.ObjectId(), channels: [] },
+      ]);
+
+      const out = await repository.findHiredChannelsForClient('client-1');
+      expect(out).toEqual([]);
+    });
+
+    it('skips channel bindings missing channelId/provider/status', async () => {
+      const clientAgent = new Types.ObjectId();
+      const goodChannel = new Types.ObjectId();
+      setupFindChain([
+        {
+          _id: clientAgent,
+          channels: [
+            // missing channelId
+            { provider: 'meta', status: 'active' },
+            // missing provider
+            { channelId: new Types.ObjectId(), status: 'active' },
+            // missing status
+            { channelId: new Types.ObjectId(), provider: 'meta' },
+            // good
+            {
+              channelId: goodChannel,
+              provider: 'meta',
+              status: 'active',
+            },
+          ],
+        },
+      ]);
+
+      const out = await repository.findHiredChannelsForClient('client-1');
+      expect(out).toHaveLength(1);
+      expect(out[0].channelId).toEqual(goodChannel);
     });
   });
 });

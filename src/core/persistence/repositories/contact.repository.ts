@@ -4,6 +4,36 @@ import { ClientSession, Model, Types } from 'mongoose';
 import { Contact } from '@persistence/schemas/contact.schema';
 import { ContactIdentifierType } from '@persistence/schemas/contact.schema';
 
+/**
+ * Phase 5 — cursor shape for `findInboxContactsPage`. Same `(t, i)`
+ * encoding the Phase 1 cursor codec produces; the timestamp is
+ * `Contact.updatedAt` (the sort key) and `i` is `Contact._id` for
+ * stable same-millisecond tiebreaking.
+ */
+export interface InboxContactsCursor {
+  t: Date;
+  i: Types.ObjectId;
+}
+
+/**
+ * Phase 5 — slim contact row returned by `findInboxContactsPage`. The
+ * projection carries only the fields the inbox `/contacts` endpoint
+ * needs to build `InboxContactDto` (with side joins on `Channel.type`
+ * and `Conversation` aggregation). Everything else stays on disk.
+ */
+export interface InboxContactRow {
+  _id: Types.ObjectId;
+  name: string;
+  identifier?: { type: ContactIdentifierType; value: string };
+  channelId: Types.ObjectId;
+  updatedAt: Date;
+}
+
+export interface InboxContactsPageResult {
+  items: InboxContactRow[];
+  nextCursor: InboxContactsCursor | null;
+}
+
 @Injectable()
 export class ContactRepository {
   private readonly logger = new Logger(ContactRepository.name);
@@ -100,5 +130,57 @@ export class ContactRepository {
       error !== null &&
       (error as any).code === 11000
     );
+  }
+
+  /**
+   * Phase 5 — tenant-scoped paginated read of contacts for the inbox
+   * `/contacts` endpoint.
+   *
+   * Filter: `{ clientId }` (+ cursor predicate when supplied). Sort:
+   * `{ updatedAt: -1, _id: -1 }` (DESC; same-millisecond ties broken by
+   * `_id`). Projection limited to `(_id, name, identifier, channelId,
+   * updatedAt)`. Uses the standard "limit + 1 → hasMore" pattern so the
+   * caller can decide `nextCursor` without a second query.
+   *
+   * Filter is covered by the existing single-field index on `clientId`;
+   * the sort tiebreaker on `_id` is not index-covered (page size is
+   * bounded, so an in-memory tiebreaker pass is acceptable for Phase 5
+   * — see plan §4 index-coverage proof).
+   */
+  async findInboxContactsPage(
+    clientId: Types.ObjectId,
+    opts: { cursor: InboxContactsCursor | null; limit: number },
+  ): Promise<InboxContactsPageResult> {
+    const filter: Record<string, unknown> = { clientId };
+    if (opts.cursor) {
+      filter.$or = [
+        { updatedAt: { $lt: opts.cursor.t } },
+        { updatedAt: opts.cursor.t, _id: { $lt: opts.cursor.i } },
+      ];
+    }
+
+    const rows = (await this.model
+      .find(filter, {
+        _id: 1,
+        name: 1,
+        identifier: 1,
+        channelId: 1,
+        updatedAt: 1,
+      })
+      .sort({ updatedAt: -1, _id: -1 })
+      .limit(opts.limit + 1)
+      .lean()
+      .exec()) as unknown as InboxContactRow[];
+
+    if (rows.length <= opts.limit) {
+      return { items: rows, nextCursor: null };
+    }
+
+    const items = rows.slice(0, opts.limit);
+    const last = items[items.length - 1];
+    return {
+      items,
+      nextCursor: { t: last.updatedAt, i: last._id },
+    };
   }
 }

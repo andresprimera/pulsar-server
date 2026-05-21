@@ -52,4 +52,24 @@ export class ChannelRepository {
     }
     return doc;
   }
+
+  /**
+   * Phase 5 — batched `_id` lookup used by the inbox `/channels` and
+   * `/contacts` endpoints to project a `Channel`'s human-readable
+   * `name` and canonical `type` (the wire `provider`). Returns only the
+   * safe projection `(_id, name, type)`; covered by the default
+   * `_id_` index. Missing references are handled by the caller (omit
+   * from the rendered list).
+   */
+  async findByIds(
+    ids: Types.ObjectId[],
+  ): Promise<Pick<Channel, '_id' | 'name' | 'type'>[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+    return (await this.model
+      .find({ _id: { $in: ids } }, { _id: 1, name: 1, type: 1 })
+      .lean()
+      .exec()) as unknown as Pick<Channel, '_id' | 'name' | 'type'>[];
+  }
 }

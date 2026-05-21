@@ -1,7 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { ClientSession, FilterQuery, Model, UpdateQuery } from 'mongoose';
+import {
+  ClientSession,
+  FilterQuery,
+  Model,
+  Types,
+  UpdateQuery,
+} from 'mongoose';
 import { ClientAgent } from '@persistence/schemas/client-agent.schema';
+import { type ChannelProviderValue } from '@shared/channel-provider.constants';
 import {
   CLIENT_AGENT_CLIENT_LIST_PROJECTION_STRING,
   CLIENT_AGENT_LIST_PROJECTION_STRING,
@@ -9,6 +16,40 @@ import {
   type ClientAgentListProjectedField,
 } from './client-agent.repository.constants';
 import { normalizeToE164 } from '@shared/e164.util';
+
+/**
+ * Phase 5 — projection returned by `findHiredChannelsForClient`. One
+ * entry per hire-channel binding for the tenant. The shape carries only
+ * the safe scalars the inbox `/channels` endpoint needs to dedupe and
+ * project the wire row. Secret-bearing fields
+ * (`credentials`, `telegramWebhookSecretHex`, `webhookRegistration`)
+ * and prompt grounding (`promptSupplement`) are excluded by the
+ * server-side projection so they never reach the inbox layer.
+ */
+export type HireChannelProvider = ChannelProviderValue;
+export interface HireChannelConfigProjection {
+  clientAgentId: Types.ObjectId;
+  channelId: Types.ObjectId;
+  provider: HireChannelProvider;
+  status: 'active' | 'inactive';
+}
+
+/**
+ * Safe projection string for `findHiredChannelsForClient` — explicit
+ * allowlist mirroring the redaction shape of
+ * `CLIENT_AGENT_LIST_PROJECTION_STRING`. Excludes encrypted credentials
+ * (`channels.credentials`), telegram webhook secret
+ * (`channels.telegramWebhookSecretHex`), webhook registration state
+ * (`channels.webhookRegistration`) and any prompt grounding
+ * (`promptSupplement`). Top-level `_id` is included for the
+ * `clientAgentId` projection key.
+ */
+const HIRED_CHANNELS_PROJECTION_STRING = [
+  '_id',
+  'channels.channelId',
+  'channels.provider',
+  'channels.status',
+].join(' ');
 
 const LAST_ERROR_MAX_LENGTH = 500;
 
@@ -101,6 +142,57 @@ export class ClientAgentRepository {
     agentId: string,
   ): Promise<ClientAgent | null> {
     return this.model.findOne({ clientId, agentId }).exec();
+  }
+
+  /**
+   * Phase 5 — tenant-scoped read of hire-channel bindings for the inbox
+   * `/channels` endpoint. Returns one row per `(clientAgent, channel)`
+   * binding (flattened from each hire's `channels[]` sub-array). The
+   * server-side projection ({@link HIRED_CHANNELS_PROJECTION_STRING})
+   * excludes secret-bearing fields and the prompt supplement; the
+   * inbox layer never sees `credentials`, `telegramWebhookSecretHex`,
+   * `webhookRegistration`, or `promptSupplement`.
+   *
+   * The result is the flat list of projections; the caller (service) is
+   * responsible for deduplicating by `channelId` and merging `status`.
+   * Filter `{ clientId }` is index-covered by the existing single-field
+   * index on `clientId`.
+   */
+  async findHiredChannelsForClient(
+    clientId: string,
+  ): Promise<HireChannelConfigProjection[]> {
+    const docs = (await this.model
+      .find({ clientId }, HIRED_CHANNELS_PROJECTION_STRING)
+      .lean()
+      .exec()) as unknown as Array<{
+      _id: Types.ObjectId;
+      channels?: Array<{
+        channelId?: Types.ObjectId;
+        provider?: HireChannelProvider;
+        status?: 'active' | 'inactive';
+      }>;
+    }>;
+
+    const out: HireChannelConfigProjection[] = [];
+    for (const doc of docs) {
+      if (!Array.isArray(doc.channels)) continue;
+      for (const ch of doc.channels) {
+        if (
+          ch.channelId === undefined ||
+          ch.provider === undefined ||
+          ch.status === undefined
+        ) {
+          continue;
+        }
+        out.push({
+          clientAgentId: doc._id,
+          channelId: ch.channelId,
+          provider: ch.provider,
+          status: ch.status,
+        });
+      }
+    }
+    return out;
   }
 
   async findByClientAndStatus(

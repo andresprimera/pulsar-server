@@ -22,6 +22,9 @@ import { InboxOperatorMessageService } from './inbox-operator-message.service';
 import { InboxConversationMutationService } from './inbox-conversation-mutation.service';
 import { ListConversationsQueryDto } from './dto/list-conversations-query.dto';
 import { ListConversationsResponseDto } from './dto/list-conversations-response.dto';
+import { ListInboxChannelsResponseDto } from './dto/list-inbox-channels-response.dto';
+import { ListInboxContactsQueryDto } from './dto/list-inbox-contacts-query.dto';
+import { ListInboxContactsResponseDto } from './dto/list-inbox-contacts-response.dto';
 import { ListMessagesQueryDto } from './dto/list-messages-query.dto';
 import { ListMessagesResponseDto } from './dto/list-messages-response.dto';
 import { UpdateControlModeDto } from './dto/update-control-mode.dto';
@@ -78,6 +81,39 @@ export class InboxController {
       query,
       authenticated.userId,
     );
+  }
+
+  /**
+   * Phase 5 — read the set of channels currently hired by the caller's
+   * tenant. Read-only; no pagination. The deduped wire row carries
+   * `(id, provider, label, status)`; missing `Channel` joins are
+   * silently skipped (graceful degradation).
+   */
+  @ClientAuth()
+  @ClientRoles('owner', 'operator')
+  @Get('channels')
+  async listChannels(
+    @CurrentClientUser() principal: ClientUserPrincipal | undefined,
+  ): Promise<ListInboxChannelsResponseDto> {
+    const clientId = requireClientId(principal);
+    return this.inboxService.listChannels(clientId);
+  }
+
+  /**
+   * Phase 5 — cursor-paginated list of tenant contacts for the operator
+   * inbox UI. Cursor encodes `(updatedAt, _id)` via the Phase-1 codec;
+   * `limit` is bounded `[1, 100]` (default 50). No `q` filter (deferred
+   * to Phase 6+).
+   */
+  @ClientAuth()
+  @ClientRoles('owner', 'operator')
+  @Get('contacts')
+  async listContacts(
+    @CurrentClientUser() principal: ClientUserPrincipal | undefined,
+    @Query() query: ListInboxContactsQueryDto,
+  ): Promise<ListInboxContactsResponseDto> {
+    const clientId = requireClientId(principal);
+    return this.inboxService.listContacts(clientId, query);
   }
 
   @ClientAuth()

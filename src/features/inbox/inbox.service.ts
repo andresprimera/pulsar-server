@@ -1,6 +1,8 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Types } from 'mongoose';
+import { ChannelRepository } from '@persistence/repositories/channel.repository';
 import { ClientAgentRepository } from '@persistence/repositories/client-agent.repository';
+import { ContactRepository } from '@persistence/repositories/contact.repository';
 import { ConversationRepository } from '@persistence/repositories/conversation.repository';
 import { MessageRepository } from '@persistence/repositories/message.repository';
 import { UserRepository } from '@persistence/repositories/user.repository';
@@ -8,6 +10,9 @@ import { Message } from '@persistence/schemas/message.schema';
 import { DEFAULT_CONTROL_MODE, ControlMode } from '@shared/inbox/control-mode';
 import { ListConversationsQueryDto } from './dto/list-conversations-query.dto';
 import { ListConversationsResponseDto } from './dto/list-conversations-response.dto';
+import { ListInboxChannelsResponseDto } from './dto/list-inbox-channels-response.dto';
+import { ListInboxContactsQueryDto } from './dto/list-inbox-contacts-query.dto';
+import { ListInboxContactsResponseDto } from './dto/list-inbox-contacts-response.dto';
 import { ListMessagesQueryDto } from './dto/list-messages-query.dto';
 import { ListMessagesResponseDto } from './dto/list-messages-response.dto';
 import { UpdateControlModeResponseDto } from './dto/update-control-mode-response.dto';
@@ -17,6 +22,13 @@ import { toConversationSummary } from './utils/conversation-summary.mapper';
 
 const DEFAULT_LIST_LIMIT = 20;
 const DEFAULT_MESSAGES_LIMIT = 50;
+/**
+ * Phase 5 — default page size for `GET /inbox/contacts`. The
+ * architect-locked contract is 1 ≤ limit ≤ 100, default 50. Lives
+ * adjacent to the other list-limit constants so future tuning is
+ * mechanically discoverable.
+ */
+const DEFAULT_CONTACTS_LIMIT = 50;
 const MAX_LIMIT = 100;
 
 @Injectable()
@@ -28,6 +40,8 @@ export class InboxService {
     private readonly messageRepository: MessageRepository,
     private readonly clientAgentRepository: ClientAgentRepository,
     private readonly userRepository: UserRepository,
+    private readonly channelRepository: ChannelRepository,
+    private readonly contactRepository: ContactRepository,
   ) {}
 
   async listConversations(
@@ -140,6 +154,151 @@ export class InboxService {
     return out;
   }
 
+  /**
+   * Phase 5 — `GET /inbox/channels`.
+   *
+   * Returns the deduped set of channels currently hired by the caller's
+   * tenant. Source = `ClientAgent.channels[]` flattened to one row per
+   * `(clientAgent, channel)` binding, then deduped by `channelId`. The
+   * deduped status is `'active'` when ANY binding on that channel is
+   * `'active'`, otherwise `'inactive'` (Decision 6). The `Channel`
+   * collection is joined (batched `findByIds`) for the human-readable
+   * `label` and the canonical `provider` (= `Channel.type`).
+   *
+   * Stale references (a hire pointing at a deleted `Channel`) are
+   * silently skipped per graceful-degradation (do not throw). No
+   * pagination.
+   */
+  async listChannels(clientId: string): Promise<ListInboxChannelsResponseDto> {
+    const hires = await this.clientAgentRepository.findHiredChannelsForClient(
+      clientId,
+    );
+
+    if (hires.length === 0) {
+      return { items: [] };
+    }
+
+    // Dedupe by `channelId`. The deduped status is the OR over all
+    // bindings: `'active'` if any binding is active, else `'inactive'`.
+    const dedupedByChannel = new Map<
+      string,
+      { channelId: Types.ObjectId; status: 'active' | 'inactive' }
+    >();
+    for (const hire of hires) {
+      const key = String(hire.channelId);
+      const existing = dedupedByChannel.get(key);
+      if (existing === undefined) {
+        dedupedByChannel.set(key, {
+          channelId: hire.channelId,
+          status: hire.status,
+        });
+        continue;
+      }
+      if (existing.status === 'inactive' && hire.status === 'active') {
+        existing.status = 'active';
+      }
+    }
+
+    const channelIds = Array.from(dedupedByChannel.values()).map(
+      (v) => v.channelId,
+    );
+    const channels = await this.channelRepository.findByIds(channelIds);
+    const channelMap = new Map(channels.map((c) => [String(c._id), c]));
+
+    const items = [];
+    for (const deduped of dedupedByChannel.values()) {
+      const channel = channelMap.get(String(deduped.channelId));
+      // Graceful degradation: a hire referencing a deleted `Channel`
+      // simply drops out of the listing. The join direction is
+      // `hire → channel`, so a `Channel` returned by `findByIds` with
+      // no surviving hire is impossible by construction (this loop
+      // iterates over deduped hires, never over `channels`).
+      if (channel === undefined) continue;
+      items.push({
+        id: String(deduped.channelId),
+        provider: channel.type,
+        label: channel.name,
+        status: deduped.status,
+      });
+    }
+
+    return { items };
+  }
+
+  /**
+   * Phase 5 — `GET /inbox/contacts`.
+   *
+   * Tenant-scoped, cursor-paginated list of contacts projected to the
+   * shape the operator inbox UI needs. The cursor encodes
+   * `(Contact.updatedAt, Contact._id)` (Phase 1 codec). `limit` is
+   * clamped to `[1, 100]` and defaults to {@link DEFAULT_CONTACTS_LIMIT}
+   * = 50 per the architect-locked Phase 5 contract.
+   *
+   * Each row joins:
+   *  - `Channel.type` (batched `findByIds`) → wire `provider`. Missing
+   *    join → `'unknown'` (the wire forbids `null` on `provider`).
+   *  - `Conversation` aggregation (batched
+   *    `countConversationsByContacts`) → wire `conversationCount`.
+   *    Missing entries → `0`.
+   *
+   * `email` is `Contact.identifier.value` when
+   * `identifier.type === 'email'`, otherwise `null`. `lastSeen` is
+   * `Contact.updatedAt`. No `q` filter (deferred to Phase 6+ per
+   * Decision 5).
+   */
+  async listContacts(
+    clientId: string,
+    query: ListInboxContactsQueryDto,
+  ): Promise<ListInboxContactsResponseDto> {
+    const cursor = decodeCursor(query.cursor);
+    const limit = Math.min(
+      Math.max(query.limit ?? DEFAULT_CONTACTS_LIMIT, 1),
+      MAX_LIMIT,
+    );
+
+    const page = await this.contactRepository.findInboxContactsPage(
+      new Types.ObjectId(clientId),
+      { cursor, limit },
+    );
+
+    if (page.items.length === 0) {
+      return { items: [], nextCursor: null };
+    }
+
+    const channelIds = uniqueObjectIds(page.items.map((c) => c.channelId));
+    const contactIds = page.items.map((c) => c._id);
+
+    const [channels, countMap] = await Promise.all([
+      this.channelRepository.findByIds(channelIds),
+      this.conversationRepository.countConversationsByContacts(
+        new Types.ObjectId(clientId),
+        contactIds,
+      ),
+    ]);
+
+    const channelMap = new Map(channels.map((c) => [String(c._id), c]));
+
+    const items = page.items.map((contact) => {
+      const joinedChannel = channelMap.get(String(contact.channelId));
+      const provider = joinedChannel?.type ?? 'unknown';
+      const email =
+        contact.identifier?.type === 'email' ? contact.identifier.value : null;
+      return {
+        id: String(contact._id),
+        name: contact.name,
+        email,
+        provider,
+        conversationCount: countMap.get(String(contact._id)) ?? 0,
+        lastSeen: contact.updatedAt,
+      };
+    });
+
+    return {
+      items,
+      nextCursor: page.nextCursor ? encodeCursor(page.nextCursor) : null,
+    };
+  }
+
   async updateControlMode(
     clientId: string,
     conversationId: string,
@@ -179,6 +338,22 @@ export class InboxService {
  */
 function escapeRegex(value: string): string {
   return value.replace(/[\\^$.|?*+()[\]{}]/g, '\\$&');
+}
+
+/**
+ * Stable in-order dedupe of an `ObjectId[]` keyed by hex string. Used
+ * to build batched `$in` projections without sending duplicate keys.
+ */
+function uniqueObjectIds(ids: Types.ObjectId[]): Types.ObjectId[] {
+  const seen = new Set<string>();
+  const out: Types.ObjectId[] = [];
+  for (const id of ids) {
+    const key = String(id);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(id);
+  }
+  return out;
 }
 
 // `PageCursor` is re-exported for spec files that need to construct cursors

@@ -944,6 +944,104 @@ describe('ConversationRepository.findOneForInboxEnriched', () => {
   });
 });
 
+describe('ConversationRepository.countConversationsByContacts', () => {
+  function buildAggregateModel(rows: unknown) {
+    const exec = jest.fn().mockResolvedValue(rows);
+    const aggregate = jest.fn().mockReturnValue({ exec });
+    return { aggregate, exec };
+  }
+
+  it('returns an empty Map when contactIds is empty (no DB roundtrip)', async () => {
+    const chain = buildAggregateModel([]);
+    const repo = buildRepo(
+      { aggregate: chain.aggregate } as any,
+      buildLookupModel([]),
+      buildLookupModel([]),
+      buildLookupModel([]),
+      buildLookupModel([]),
+    );
+
+    const out = await repo.countConversationsByContacts(
+      new Types.ObjectId(),
+      [],
+    );
+
+    expect(out.size).toBe(0);
+    expect(chain.aggregate).not.toHaveBeenCalled();
+  });
+
+  it('builds the $match + $group pipeline and projects a Map<idHex, n>', async () => {
+    const c1 = new Types.ObjectId();
+    const c2 = new Types.ObjectId();
+    const rows = [
+      { _id: c1, n: 3 },
+      { _id: c2, n: 7 },
+    ];
+    const chain = buildAggregateModel(rows);
+    const repo = buildRepo(
+      { aggregate: chain.aggregate } as any,
+      buildLookupModel([]),
+      buildLookupModel([]),
+      buildLookupModel([]),
+      buildLookupModel([]),
+    );
+
+    const clientId = new Types.ObjectId();
+    const out = await repo.countConversationsByContacts(clientId, [c1, c2]);
+
+    expect(chain.aggregate).toHaveBeenCalledTimes(1);
+    expect(chain.aggregate.mock.calls[0][0]).toEqual([
+      { $match: { clientId, contactId: { $in: [c1, c2] } } },
+      { $group: { _id: '$contactId', n: { $sum: 1 } } },
+    ]);
+    expect(out.get(String(c1))).toBe(3);
+    expect(out.get(String(c2))).toBe(7);
+  });
+
+  it('returns a Map with entries only for contacts that have conversations (missing → caller treats as 0)', async () => {
+    const c1 = new Types.ObjectId();
+    const c2 = new Types.ObjectId();
+    const c3 = new Types.ObjectId();
+    const rows = [{ _id: c1, n: 1 }]; // c2 and c3 absent
+    const chain = buildAggregateModel(rows);
+    const repo = buildRepo(
+      { aggregate: chain.aggregate } as any,
+      buildLookupModel([]),
+      buildLookupModel([]),
+      buildLookupModel([]),
+      buildLookupModel([]),
+    );
+
+    const out = await repo.countConversationsByContacts(new Types.ObjectId(), [
+      c1,
+      c2,
+      c3,
+    ]);
+
+    expect(out.size).toBe(1);
+    expect(out.get(String(c1))).toBe(1);
+    expect(out.get(String(c2))).toBeUndefined();
+    expect(out.get(String(c3))).toBeUndefined();
+  });
+
+  it('tenant-scopes the aggregation (clientId in $match)', async () => {
+    const chain = buildAggregateModel([]);
+    const repo = buildRepo(
+      { aggregate: chain.aggregate } as any,
+      buildLookupModel([]),
+      buildLookupModel([]),
+      buildLookupModel([]),
+      buildLookupModel([]),
+    );
+
+    const clientId = new Types.ObjectId();
+    await repo.countConversationsByContacts(clientId, [new Types.ObjectId()]);
+
+    const pipeline = chain.aggregate.mock.calls[0][0];
+    expect(pipeline[0].$match.clientId).toEqual(clientId);
+  });
+});
+
 describe('ConversationRepository.setEnrichmentFields', () => {
   it('applies only supplied fields via $set', async () => {
     const updateOne = jest.fn().mockReturnValue({

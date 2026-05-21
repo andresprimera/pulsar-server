@@ -148,6 +148,130 @@ describe('ContactRepository', () => {
     expect(resultA._id.toString()).not.toBe(resultB._id.toString());
   });
 
+  describe('findInboxContactsPage', () => {
+    function buildPaginatedModel(rows: unknown) {
+      const exec = jest.fn().mockResolvedValue(rows);
+      const lean = jest.fn().mockReturnValue({ exec });
+      const limit = jest.fn().mockReturnValue({ lean });
+      const sort = jest.fn().mockReturnValue({ limit });
+      const find = jest.fn().mockReturnValue({ sort });
+      return { find, sort, limit, lean, exec };
+    }
+
+    it('filters by clientId, sorts (updatedAt DESC, _id DESC), uses limit + 1', async () => {
+      const chain = buildPaginatedModel([]);
+      const repository = new ContactRepository({ find: chain.find } as any);
+
+      const clientId = new Types.ObjectId();
+      await repository.findInboxContactsPage(clientId, {
+        cursor: null,
+        limit: 25,
+      });
+
+      const [filter, projection] = chain.find.mock.calls[0];
+      expect(filter).toEqual({ clientId });
+      expect(projection).toEqual({
+        _id: 1,
+        name: 1,
+        identifier: 1,
+        channelId: 1,
+        updatedAt: 1,
+      });
+      expect(chain.sort).toHaveBeenCalledWith({ updatedAt: -1, _id: -1 });
+      expect(chain.limit).toHaveBeenCalledWith(26);
+    });
+
+    it('applies the cursor predicate on (updatedAt, _id) for same-millisecond tiebreaking', async () => {
+      const chain = buildPaginatedModel([]);
+      const repository = new ContactRepository({ find: chain.find } as any);
+
+      const clientId = new Types.ObjectId();
+      const cursorTs = new Date('2026-05-19T10:00:00Z');
+      const cursorId = new Types.ObjectId();
+      await repository.findInboxContactsPage(clientId, {
+        cursor: { t: cursorTs, i: cursorId },
+        limit: 10,
+      });
+
+      const [filter] = chain.find.mock.calls[0];
+      expect(filter).toEqual({
+        clientId,
+        $or: [
+          { updatedAt: { $lt: cursorTs } },
+          { updatedAt: cursorTs, _id: { $lt: cursorId } },
+        ],
+      });
+    });
+
+    it('returns nextCursor=null when fewer than limit+1 rows are read', async () => {
+      const rows = [
+        {
+          _id: new Types.ObjectId(),
+          name: 'A',
+          channelId: new Types.ObjectId(),
+          updatedAt: new Date(),
+        },
+      ];
+      const chain = buildPaginatedModel(rows);
+      const repository = new ContactRepository({ find: chain.find } as any);
+
+      const page = await repository.findInboxContactsPage(
+        new Types.ObjectId(),
+        {
+          cursor: null,
+          limit: 10,
+        },
+      );
+
+      expect(page.items).toEqual(rows);
+      expect(page.nextCursor).toBeNull();
+    });
+
+    it('returns nextCursor from the last surfaced row when more than limit rows are read', async () => {
+      const ts1 = new Date('2026-05-19T10:00:02Z');
+      const ts2 = new Date('2026-05-19T10:00:01Z');
+      const ts3 = new Date('2026-05-19T10:00:00Z');
+      const ids = [
+        new Types.ObjectId(),
+        new Types.ObjectId(),
+        new Types.ObjectId(),
+      ];
+      const rows = [
+        {
+          _id: ids[0],
+          name: 'A',
+          channelId: new Types.ObjectId(),
+          updatedAt: ts1,
+        },
+        {
+          _id: ids[1],
+          name: 'B',
+          channelId: new Types.ObjectId(),
+          updatedAt: ts2,
+        },
+        {
+          _id: ids[2],
+          name: 'C',
+          channelId: new Types.ObjectId(),
+          updatedAt: ts3,
+        },
+      ];
+      const chain = buildPaginatedModel(rows);
+      const repository = new ContactRepository({ find: chain.find } as any);
+
+      const page = await repository.findInboxContactsPage(
+        new Types.ObjectId(),
+        {
+          cursor: null,
+          limit: 2,
+        },
+      );
+
+      expect(page.items).toHaveLength(2);
+      expect(page.nextCursor).toEqual({ t: ts2, i: ids[1] });
+    });
+  });
+
   it('retries by reading existing contact when duplicate key error occurs', async () => {
     const duplicateError = Object.assign(
       new Error('E11000 duplicate key error'),
