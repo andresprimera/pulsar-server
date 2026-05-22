@@ -6,6 +6,8 @@ import { ClientAuthController } from './client-auth.controller';
 import { ClientAuthService } from './client-auth.service';
 import { ClientSessionsService } from './client-sessions.service';
 import { CLIENT_SESSION_COOKIE_NAME } from './client-session-cookie-options';
+import { IS_CLIENT_AUTH_KEY } from '@shared/decorators/client-auth.decorator';
+import { CLIENT_ROLES_METADATA_KEY } from '@shared/decorators/client-roles.decorator';
 import type { User } from '@persistence/schemas/user.schema';
 import type { ClientUserPrincipal } from '@shared/types/express';
 
@@ -204,6 +206,52 @@ describe('ClientAuthController', () => {
       expect(result.principal.status).toBe('active');
       expect(result.principal.clientRole).toBe('owner');
       expect(result.principal.displayName).toBe(user.name);
+    });
+
+    it('returns the operator principal verbatim when the fresh user has clientRole operator', async () => {
+      const user = buildUser({ clientRole: 'operator' });
+      clientAuthService.getMe.mockResolvedValue(user);
+
+      const result = await controller.me({
+        userId: user.id,
+        clientId: user.clientId.toString(),
+        sessionId: 's',
+        email: user.email,
+        status: 'active',
+        clientRole: 'operator',
+      });
+
+      expect(result.principal.clientRole).toBe('operator');
+      expect(result.principal.kind).toBe('clientUser');
+    });
+  });
+
+  describe('decorator metadata', () => {
+    it('me is marked @ClientAuth() and allows owner + operator', () => {
+      expect(
+        Reflect.getMetadata(IS_CLIENT_AUTH_KEY, ClientAuthController.prototype.me),
+      ).toBe(true);
+      expect(
+        Reflect.getMetadata(
+          CLIENT_ROLES_METADATA_KEY,
+          ClientAuthController.prototype.me,
+        ),
+      ).toEqual(['owner', 'operator']);
+    });
+
+    it('logout is marked @ClientAuth() and allows owner + operator', () => {
+      expect(
+        Reflect.getMetadata(
+          IS_CLIENT_AUTH_KEY,
+          ClientAuthController.prototype.logout,
+        ),
+      ).toBe(true);
+      expect(
+        Reflect.getMetadata(
+          CLIENT_ROLES_METADATA_KEY,
+          ClientAuthController.prototype.logout,
+        ),
+      ).toEqual(['owner', 'operator']);
     });
   });
 });

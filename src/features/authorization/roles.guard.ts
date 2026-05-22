@@ -24,6 +24,14 @@ import type { ClientRole } from '@shared/auth/client-roles';
  * - admin route with no `@Roles(...)` → `['super_admin']`
  * - client route with no `@ClientRoles(...)` → `['owner']`
  *
+ * The default-deny is intentional (fail-closed), but for client-tier
+ * controllers where the implicit owner-only default would lock out
+ * operators silently, the controller is paired with an architecture spec
+ * that fails CI if any `@ClientAuth()` handler omits `@ClientRoles(...)`.
+ * See `test/architecture/client-auth-handlers-declare-client-roles.spec.ts`
+ * — scoped to `ClientAuthController` today; broader sweep is a tracked
+ * follow-up.
+ *
  * Public routes (`@Public()`) short-circuit — neither tier nor role checks
  * apply. Authentication has already run in `AdminAuthGuard` /
  * `ClientAuthGuard` (registered earlier in `APP_GUARD` order); this guard

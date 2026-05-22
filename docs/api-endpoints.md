@@ -29,8 +29,8 @@ and are not exposed in response bodies.
 | POST   | `/admin-auth/logout`  | Admin session | No body. 204 No Content. Clears `pulsar_admin_session`. |
 | GET    | `/admin-auth/me`      | Admin session | Returns the [Auth response envelope](#auth-response-envelope) with `kind: "admin"`. 401 if unauthenticated. |
 | POST   | `/client-auth/login`  | Public        | `email`, `password`. Returns the [Auth response envelope](#auth-response-envelope) with `kind: "clientUser"`. Sets `pulsar_client_session`. |
-| POST   | `/client-auth/logout` | Client session| No body. 204 No Content. Clears `pulsar_client_session`. |
-| GET    | `/client-auth/me`     | Client session| Returns the [Auth response envelope](#auth-response-envelope) with `kind: "clientUser"`. 401 if unauthenticated or status not `active`. |
+| POST   | `/client-auth/logout` | Client session (owner or operator) | No body. 204 No Content. Clears `pulsar_client_session`. |
+| GET    | `/client-auth/me`     | Client session (owner or operator) | Returns the [Auth response envelope](#auth-response-envelope) with `kind: "clientUser"`. 401 if unauthenticated or status not `active`. |
 
 Controllers: `AdminAuthController`, `ClientAuthController`.
 

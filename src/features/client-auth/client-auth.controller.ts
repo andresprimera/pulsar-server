@@ -15,6 +15,7 @@ import { ClientSessionsService } from './client-sessions.service';
 import { LoginDto } from './dto/login.dto';
 import { Public } from '@shared/decorators/public.decorator';
 import { ClientAuth } from '@shared/decorators/client-auth.decorator';
+import { ClientRoles } from '@shared/decorators/client-roles.decorator';
 import { CurrentClientUser } from '@shared/decorators/current-client-user.decorator';
 import { ClientUserPrincipal } from '@shared/types/express';
 import {
@@ -58,6 +59,7 @@ export class ClientAuthController {
   }
 
   @ClientAuth()
+  @ClientRoles('owner', 'operator')
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
   async logout(
@@ -71,6 +73,7 @@ export class ClientAuthController {
   }
 
   @ClientAuth()
+  @ClientRoles('owner', 'operator')
   @Get('me')
   async me(
     @CurrentClientUser() principal: ClientUserPrincipal | undefined,
