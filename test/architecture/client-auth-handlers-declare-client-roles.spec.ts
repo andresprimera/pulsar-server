@@ -1,7 +1,10 @@
 import 'reflect-metadata';
 import { IS_CLIENT_AUTH_KEY } from '../../src/shared/decorators/client-auth.decorator';
 import { CLIENT_ROLES_METADATA_KEY } from '../../src/shared/decorators/client-roles.decorator';
-import { CLIENT_ROLES, type ClientRole } from '../../src/shared/auth/client-roles';
+import {
+  CLIENT_ROLES,
+  type ClientRole,
+} from '../../src/shared/auth/client-roles';
 import { ClientAuthController } from '../../src/features/client-auth/client-auth.controller';
 
 /**
@@ -63,7 +66,11 @@ describe('Architecture: ClientAuthController handlers declare @ClientRoles', () 
 
     if (offenders.length > 0) {
       throw new Error(
-        `Architecture violation: ${offenders.length} ClientAuthController handler(s) lack explicit @ClientRoles(...):\n  ${offenders.join('\n  ')}`,
+        `Architecture violation: ${
+          offenders.length
+        } ClientAuthController handler(s) lack explicit @ClientRoles(...):\n  ${offenders.join(
+          '\n  ',
+        )}`,
       );
     }
   });
@@ -97,7 +104,11 @@ describe('Architecture: ClientAuthController handlers declare @ClientRoles', () 
 
     if (offenders.length > 0) {
       throw new Error(
-        `Architecture violation: ${offenders.length} ClientAuthController handler(s) declare unknown roles:\n  ${offenders.join('\n  ')}`,
+        `Architecture violation: ${
+          offenders.length
+        } ClientAuthController handler(s) declare unknown roles:\n  ${offenders.join(
+          '\n  ',
+        )}`,
       );
     }
   });

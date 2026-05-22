@@ -57,16 +57,12 @@ describe('Client-auth /me + /logout (e2e)', () => {
 
   const cleanup = async (): Promise<void> => {
     if (!connection) return;
-    await connection
-      .collection('client_user_sessions')
-      .deleteMany({
-        userId: { $in: [ownerObj, operatorObj, inactiveOperatorObj] },
-      });
-    await connection
-      .collection('users')
-      .deleteMany({
-        _id: { $in: [ownerObj, operatorObj, inactiveOperatorObj] },
-      });
+    await connection.collection('client_user_sessions').deleteMany({
+      userId: { $in: [ownerObj, operatorObj, inactiveOperatorObj] },
+    });
+    await connection.collection('users').deleteMany({
+      _id: { $in: [ownerObj, operatorObj, inactiveOperatorObj] },
+    });
     await connection.collection('clients').deleteMany({ _id: clientObj });
   };
 

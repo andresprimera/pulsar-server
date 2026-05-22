@@ -229,7 +229,10 @@ describe('ClientAuthController', () => {
   describe('decorator metadata', () => {
     it('me is marked @ClientAuth() and allows owner + operator', () => {
       expect(
-        Reflect.getMetadata(IS_CLIENT_AUTH_KEY, ClientAuthController.prototype.me),
+        Reflect.getMetadata(
+          IS_CLIENT_AUTH_KEY,
+          ClientAuthController.prototype.me,
+        ),
       ).toBe(true);
       expect(
         Reflect.getMetadata(
