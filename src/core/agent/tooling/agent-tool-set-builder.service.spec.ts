@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AgentToolSetBuilderService } from './agent-tool-set-builder.service';
+import { LeadBootstrapService } from '@agent/lead-qualifier/lead-bootstrap.service';
 
 describe('AgentToolSetBuilderService', () => {
   let service: AgentToolSetBuilderService;
@@ -11,11 +12,20 @@ describe('AgentToolSetBuilderService', () => {
     channelId: 'ch1',
     contactId: 'ct1',
     toolingProfileId: 'standard' as const,
+    agentKind: 'customer_service' as const,
+  };
+
+  const leadBootstrapMock = {
+    upsertStub: jest.fn(),
+    applyUpdate: jest.fn(),
   };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [AgentToolSetBuilderService],
+      providers: [
+        AgentToolSetBuilderService,
+        { provide: LeadBootstrapService, useValue: leadBootstrapMock },
+      ],
     }).compile();
     service = module.get(AgentToolSetBuilderService);
   });
@@ -39,5 +49,14 @@ describe('AgentToolSetBuilderService', () => {
       toolingProfileId: 'sales-catalog',
     });
     expect(Object.keys(tools)).toHaveLength(0);
+  });
+
+  it('lead-qualifier profile exposes record_lead_qualification', () => {
+    const tools = service.buildToolSet('lead-qualifier', {
+      ...correlation,
+      toolingProfileId: 'lead-qualifier',
+      agentKind: 'lead_qualifier',
+    });
+    expect(Object.keys(tools)).toEqual(['record_lead_qualification']);
   });
 });

@@ -30,6 +30,7 @@ describe('ConversationSummaryService', () => {
 
   const mockContext = {
     agentId: mockAgentId.toString(),
+    agentKind: 'customer_service' as const,
     clientId: mockClientId.toString(),
     channelId: mockChannelId.toString(),
     systemPrompt: 'You are a helpful assistant',

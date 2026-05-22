@@ -21,6 +21,7 @@ import type {
 import { AgentToolSetBuilderService } from './tooling/agent-tool-set-builder.service';
 import { extractLlmUsageFromGenerateTextResult } from './tooling/extract-llm-usage-from-generate-text-result';
 import type { AgentToolRunCorrelation } from './tooling/agent-tool-run-correlation';
+import { LeadBootstrapService } from './lead-qualifier/lead-bootstrap.service';
 
 @Injectable()
 export class AgentService {
@@ -35,6 +36,7 @@ export class AgentService {
     private readonly clientContextSuggestionExecutor: ClientContextSuggestionExecutor,
     private readonly clientCatalogImportExecutor: ClientCatalogImportExecutor,
     private readonly agentToolSetBuilderService: AgentToolSetBuilderService,
+    private readonly leadBootstrapService: LeadBootstrapService,
   ) {}
 
   async run(input: AgentInput, context: AgentContext): Promise<AgentOutput> {
@@ -52,6 +54,27 @@ export class AgentService {
       };
       const contactId = new Types.ObjectId(input.contactId);
       const conversationId = new Types.ObjectId(input.conversationId);
+
+      // Lead-qualifier pre-flight: ensure a Lead stub exists for this
+      // conversation BEFORE the LLM runs so the `record_lead_qualification`
+      // tool always has a row to update. Idempotent ($setOnInsert only) —
+      // safe to call on every turn. Errors are logged and swallowed so a
+      // transient lead bootstrap failure cannot break the chat reply.
+      if (context.agentKind === 'lead_qualifier') {
+        try {
+          await this.leadBootstrapService.upsertStub({
+            clientId: context.clientId,
+            conversationId: input.conversationId,
+            contactId: input.contactId,
+            agentId: context.agentId,
+          });
+        } catch (err) {
+          this.logger.error(
+            `Lead bootstrap upsertStub failed for client=${context.clientId} conversation=${input.conversationId}: ` +
+              (err instanceof Error ? err.message : String(err)),
+          );
+        }
+      }
 
       const conversationHistory =
         await this.messagePersistenceService.getConversationContextByConversationId(
@@ -110,6 +133,7 @@ export class AgentService {
         channelId: context.channelId,
         contactId: input.contactId,
         toolingProfileId: context.toolingProfileId,
+        agentKind: context.agentKind,
       };
 
       const tools = this.agentToolSetBuilderService.buildToolSet(

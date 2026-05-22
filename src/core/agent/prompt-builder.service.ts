@@ -7,7 +7,12 @@ const SECTION_SEP = '\n\n';
  * Centralized prompt construction. Builds the final system prompt in deterministic
  * section order:
  * [Agent Instructions] → [Organization Context] → [Personality] → [Personality Examples] →
- * [Personality Guardrails] → [Task Context] → [Client Context] → [Contact Context] → [Safety Rules].
+ * [Personality Guardrails] → [Lead Qualification Goal] (only when
+ * `context.agentKind === 'lead_qualifier'`) → [Task Context] →
+ * [Client Context] → [Contact Context] → [Safety Rules].
+ *
+ * The `[Lead Qualification Goal]` slot is the ONLY kind-gated section.
+ * Every other section is kind-agnostic.
  */
 @Injectable()
 export class PromptBuilderService {
@@ -55,6 +60,13 @@ export class PromptBuilderService {
     if (context.personality?.guardrails?.trim()) {
       sections.push(
         `[Personality Guardrails]\n${context.personality.guardrails.trim()}`,
+      );
+    }
+
+    // [Lead Qualification Goal] — kind-gated; only emitted for lead_qualifier agents.
+    if (context.agentKind === 'lead_qualifier') {
+      sections.push(
+        `[Lead Qualification Goal]\nYou are qualifying this contact as a sales lead. Capture the contact's BUDGET, INTENT, and TIMELINE. Ask one qualification question per turn. Use the record_lead_qualification tool to commit any field you learn with high confidence; do not speculate. When all three are captured, summarize and close politely.`,
       );
     }
 

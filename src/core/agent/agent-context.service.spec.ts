@@ -21,6 +21,7 @@ describe('AgentContextService', () => {
 
   const baseContext: AgentContext = {
     agentId: 'agent-1',
+    agentKind: 'customer_service',
     clientId: 'client-1',
     channelId: 'channel-1',
     systemPrompt: 'You are a helpful assistant.',
@@ -240,6 +241,7 @@ describe('AgentContextService', () => {
       _id: 'agent-1',
       name: 'Support Agent',
       systemPrompt: 'You are helpful.',
+      kind: 'customer_service',
     } as any;
     const mockPersonality = {
       _id: new Types.ObjectId(),
@@ -501,6 +503,147 @@ describe('AgentContextService', () => {
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('Invalid toolingProfileId'),
       );
+    });
+
+    it('populates agentKind on context for each catalog kind', async () => {
+      const clientWithLlm = {
+        _id: 'client-1',
+        name: 'Acme',
+        type: 'organization',
+        status: 'active',
+        llmConfig: {
+          provider: LlmProvider.OpenAI,
+          apiKey: 'k',
+          model: 'gpt-4o',
+        },
+      } as any;
+      clientRepository.findByIdWithLlmCredentials.mockResolvedValue(
+        clientWithLlm,
+      );
+      const agentRepo = moduleRef.get(
+        AgentRepository,
+      ) as jest.Mocked<AgentRepository>;
+
+      for (const kind of ['customer_service', 'sales', 'lead_qualifier']) {
+        agentRepo.findActiveById.mockResolvedValue({
+          ...mockAgent,
+          kind,
+        } as any);
+        const { context } = await service.buildContextFromRoute(
+          mockClientAgent,
+          mockChannelConfig,
+        );
+        expect(unwrapContext(context).agentKind).toBe(kind);
+      }
+    });
+
+    it('forces lead-qualifier toolingProfileId for lead_qualifier kind and warns on mismatch', async () => {
+      const clientWithLlm = {
+        _id: 'client-1',
+        name: 'Acme',
+        type: 'organization',
+        status: 'active',
+        llmConfig: {
+          provider: LlmProvider.OpenAI,
+          apiKey: 'k',
+          model: 'gpt-4o',
+        },
+      } as any;
+      clientRepository.findByIdWithLlmCredentials.mockResolvedValue(
+        clientWithLlm,
+      );
+      const agentRepo = moduleRef.get(
+        AgentRepository,
+      ) as jest.Mocked<AgentRepository>;
+      agentRepo.findActiveById.mockResolvedValue({
+        ...mockAgent,
+        kind: 'lead_qualifier',
+        toolingProfileId: 'standard',
+      } as any);
+
+      const { context } = await service.buildContextFromRoute(
+        { ...mockClientAgent, toolingProfileId: 'internal-debug' },
+        mockChannelConfig,
+      );
+
+      expect(unwrapContext(context).toolingProfileId).toBe('lead-qualifier');
+      expect(unwrapContext(context).agentKind).toBe('lead_qualifier');
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'lead_qualifier kind overriding toolingProfileId',
+        ),
+      );
+    });
+
+    it('does not warn for lead_qualifier when hire/catalog already align', async () => {
+      const clientWithLlm = {
+        _id: 'client-1',
+        name: 'Acme',
+        type: 'organization',
+        status: 'active',
+        llmConfig: {
+          provider: LlmProvider.OpenAI,
+          apiKey: 'k',
+          model: 'gpt-4o',
+        },
+      } as any;
+      clientRepository.findByIdWithLlmCredentials.mockResolvedValue(
+        clientWithLlm,
+      );
+      const agentRepo = moduleRef.get(
+        AgentRepository,
+      ) as jest.Mocked<AgentRepository>;
+      agentRepo.findActiveById.mockResolvedValue({
+        ...mockAgent,
+        kind: 'lead_qualifier',
+        toolingProfileId: 'lead-qualifier',
+      } as any);
+
+      const { context } = await service.buildContextFromRoute(
+        { ...mockClientAgent, toolingProfileId: 'lead-qualifier' },
+        mockChannelConfig,
+      );
+
+      expect(unwrapContext(context).toolingProfileId).toBe('lead-qualifier');
+      expect(warnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('lead_qualifier kind overriding'),
+      );
+    });
+
+    it('preserves agentKind and toolingProfileId through enrichContext', async () => {
+      const clientWithLlm = {
+        _id: 'client-1',
+        name: 'Acme',
+        type: 'organization',
+        status: 'active',
+        llmConfig: {
+          provider: LlmProvider.OpenAI,
+          apiKey: 'k',
+          model: 'gpt-4o',
+        },
+      } as any;
+      clientRepository.findByIdWithLlmCredentials.mockResolvedValue(
+        clientWithLlm,
+      );
+      const agentRepo = moduleRef.get(
+        AgentRepository,
+      ) as jest.Mocked<AgentRepository>;
+      agentRepo.findActiveById.mockResolvedValue({
+        ...mockAgent,
+        kind: 'lead_qualifier',
+      } as any);
+
+      const { context, client } = await service.buildContextFromRoute(
+        mockClientAgent,
+        mockChannelConfig,
+      );
+      const enriched = await service.enrichContext(
+        unwrapContext(context),
+        client,
+      );
+
+      expect(enriched.agentKind).toBe('lead_qualifier');
+      expect(enriched.toolingProfileId).toBe('lead-qualifier');
     });
   });
 });

@@ -6,7 +6,11 @@
  * Forward-only per `docs/rules/data-modeling.md` §"Forward-only enum
  * evolution" — values may be added but never removed.
  */
-export const AGENT_KINDS = ['customer_service', 'sales'] as const;
+export const AGENT_KINDS = [
+  'customer_service',
+  'sales',
+  'lead_qualifier',
+] as const;
 
 export type AgentKind = (typeof AGENT_KINDS)[number];
 

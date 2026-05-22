@@ -8,6 +8,7 @@ describe('PromptBuilderService', () => {
 
   const baseContext: AgentContext = {
     agentId: 'agent-1',
+    agentKind: 'customer_service',
     clientId: 'client-1',
     channelId: 'channel-1',
     systemPrompt: 'You are a helpful assistant.',
@@ -249,6 +250,54 @@ describe('PromptBuilderService', () => {
     const orgIdx = result.indexOf('[Organization Context]');
     const personalityIdx = result.indexOf('[Personality]');
     expect(orgIdx).toBeLessThan(personalityIdx);
+  });
+
+  describe('[Lead Qualification Goal] (kind-gated)', () => {
+    it('includes the section only when context.agentKind === "lead_qualifier"', () => {
+      const csResult = service.build(
+        { ...baseContext, agentKind: 'customer_service' },
+        {},
+        undefined,
+      );
+      const salesResult = service.build(
+        { ...baseContext, agentKind: 'sales' },
+        {},
+        undefined,
+      );
+      const leadResult = service.build(
+        { ...baseContext, agentKind: 'lead_qualifier' },
+        {},
+        undefined,
+      );
+
+      expect(csResult).not.toContain('[Lead Qualification Goal]');
+      expect(salesResult).not.toContain('[Lead Qualification Goal]');
+      expect(leadResult).toContain('[Lead Qualification Goal]');
+      expect(leadResult).toContain('BUDGET');
+      expect(leadResult).toContain('INTENT');
+      expect(leadResult).toContain('TIMELINE');
+      expect(leadResult).toContain('record_lead_qualification');
+    });
+
+    it('places [Lead Qualification Goal] AFTER [Personality Guardrails] and BEFORE [Task Context]', () => {
+      const context: AgentContext = {
+        ...baseContext,
+        agentKind: 'lead_qualifier',
+        promptSupplement: 'Per-hire notes.',
+        personality: {
+          id: 'p-1',
+          name: 'P',
+          promptTemplate: 'Be brief.',
+          guardrails: 'Stay safe.',
+        },
+      };
+      const result = service.build(context, {}, undefined);
+      const guardrailsIdx = result.indexOf('[Personality Guardrails]');
+      const leadIdx = result.indexOf('[Lead Qualification Goal]');
+      const taskIdx = result.indexOf('[Task Context]');
+      expect(guardrailsIdx).toBeLessThan(leadIdx);
+      expect(leadIdx).toBeLessThan(taskIdx);
+    });
   });
 
   it('should place Task Context after Personality Guardrails when both exist', () => {

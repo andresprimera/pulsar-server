@@ -4,10 +4,13 @@
  */
 export const SALES_CATALOG_TOOLING_PROFILE_ID = 'sales-catalog' as const;
 
+export const LEAD_QUALIFIER_TOOLING_PROFILE_ID = 'lead-qualifier' as const;
+
 export const AGENT_TOOLING_PROFILE_IDS = [
   'standard',
   'internal-debug',
   SALES_CATALOG_TOOLING_PROFILE_ID,
+  LEAD_QUALIFIER_TOOLING_PROFILE_ID,
 ] as const;
 
 export type AgentToolingProfileId = (typeof AGENT_TOOLING_PROFILE_IDS)[number];
@@ -25,6 +28,12 @@ export function isSalesCatalogToolingProfileId(
   id: string | undefined,
 ): id is typeof SALES_CATALOG_TOOLING_PROFILE_ID {
   return id === SALES_CATALOG_TOOLING_PROFILE_ID;
+}
+
+export function isLeadQualifierToolingProfileId(
+  id: string | undefined,
+): id is typeof LEAD_QUALIFIER_TOOLING_PROFILE_ID {
+  return id === LEAD_QUALIFIER_TOOLING_PROFILE_ID;
 }
 
 /**

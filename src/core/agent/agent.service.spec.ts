@@ -12,6 +12,7 @@ import { ClientContextSuggestionExecutor } from './client-context-suggestion.exe
 import { ClientCatalogImportExecutor } from './client-catalog-import.executor';
 import type { CatalogImportLlmBatchInput } from './contracts/catalog-import-llm.input';
 import { AgentToolSetBuilderService } from './tooling/agent-tool-set-builder.service';
+import { LeadBootstrapService } from './lead-qualifier/lead-bootstrap.service';
 import * as llmFactory from './llm/llm.factory';
 import * as ai from 'ai';
 import { Logger } from '@nestjs/common';
@@ -49,6 +50,7 @@ describe('AgentService', () => {
 
   const mockContext: AgentContext = {
     agentId: '507f1f77bcf86cd799439013',
+    agentKind: 'customer_service',
     clientId: '507f1f77bcf86cd799439011',
     channelId: '507f1f77bcf86cd799439014',
     systemPrompt: 'You are a helpful assistant.',
@@ -97,6 +99,13 @@ describe('AgentService', () => {
           useValue: { extractBatch: jest.fn() },
         },
         AgentToolSetBuilderService,
+        {
+          provide: LeadBootstrapService,
+          useValue: {
+            upsertStub: jest.fn().mockResolvedValue({ leadId: 'lead-id-mock' }),
+            applyUpdate: jest.fn(),
+          },
+        },
         {
           provide: PromptBuilderService,
           useValue: {
@@ -482,6 +491,80 @@ describe('AgentService', () => {
       expect(generateTextCall.messages).toEqual([
         { role: 'user', content: mockInput.message.text },
       ]);
+    });
+
+    it('invokes leadBootstrapService.upsertStub exactly once for lead_qualifier kind', async () => {
+      const mockModel = {};
+      (llmFactory.createLLMModel as jest.Mock).mockReturnValue(mockModel);
+      (ai.generateText as jest.Mock).mockResolvedValue({ text: 'ok' });
+      messagePersistenceService.createUserMessage.mockResolvedValue();
+      messagePersistenceService.getConversationContextByConversationId.mockResolvedValue(
+        [],
+      );
+      messagePersistenceService.handleOutgoingMessage.mockResolvedValue();
+
+      const leadBootstrap = testingModule.get(LeadBootstrapService) as any;
+
+      await service.run(mockInput, {
+        ...mockContext,
+        agentKind: 'lead_qualifier',
+        toolingProfileId: 'lead-qualifier',
+      });
+
+      expect(leadBootstrap.upsertStub).toHaveBeenCalledTimes(1);
+      expect(leadBootstrap.upsertStub).toHaveBeenCalledWith({
+        clientId: mockContext.clientId,
+        conversationId: mockInput.conversationId,
+        contactId: mockInput.contactId,
+        agentId: mockContext.agentId,
+      });
+    });
+
+    it('does NOT invoke leadBootstrapService.upsertStub for non-lead_qualifier kinds', async () => {
+      const mockModel = {};
+      (llmFactory.createLLMModel as jest.Mock).mockReturnValue(mockModel);
+      (ai.generateText as jest.Mock).mockResolvedValue({ text: 'ok' });
+      messagePersistenceService.createUserMessage.mockResolvedValue();
+      messagePersistenceService.getConversationContextByConversationId.mockResolvedValue(
+        [],
+      );
+      messagePersistenceService.handleOutgoingMessage.mockResolvedValue();
+
+      const leadBootstrap = testingModule.get(LeadBootstrapService) as any;
+
+      await service.run(mockInput, mockContext);
+      await service.run(mockInput, { ...mockContext, agentKind: 'sales' });
+
+      expect(leadBootstrap.upsertStub).not.toHaveBeenCalled();
+    });
+
+    it('still returns reply when leadBootstrapService.upsertStub throws (error swallowed)', async () => {
+      const mockModel = {};
+      (llmFactory.createLLMModel as jest.Mock).mockReturnValue(mockModel);
+      (ai.generateText as jest.Mock).mockResolvedValue({
+        text: 'AI response',
+      });
+      messagePersistenceService.createUserMessage.mockResolvedValue();
+      messagePersistenceService.getConversationContextByConversationId.mockResolvedValue(
+        [],
+      );
+      messagePersistenceService.handleOutgoingMessage.mockResolvedValue();
+
+      const leadBootstrap = testingModule.get(LeadBootstrapService) as any;
+      leadBootstrap.upsertStub.mockRejectedValue(new Error('mongo down'));
+
+      const result = await service.run(mockInput, {
+        ...mockContext,
+        agentKind: 'lead_qualifier',
+        toolingProfileId: 'lead-qualifier',
+      });
+
+      expect(result).toEqual({
+        reply: { type: 'text', text: 'AI response' },
+      });
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Lead bootstrap upsertStub failed'),
+      );
     });
 
     it('passes tools and stopWhen for internal-debug tooling profile', async () => {

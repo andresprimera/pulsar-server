@@ -211,6 +211,7 @@ describe('IncomingMessageOrchestrator', () => {
       const mockContext = {
         agentId: 'agent-1',
         agentName: 'Support Bot',
+        agentKind: 'customer_service' as const,
         clientId: mockClientAgent.clientId,
         channelId: mockClientAgent.channels[0].channelId,
         systemPrompt: mockAgent.systemPrompt,
@@ -283,6 +284,7 @@ describe('IncomingMessageOrchestrator', () => {
       const mockContext = {
         agentId: 'agent-1',
         agentName: 'Support Bot',
+        agentKind: 'customer_service' as const,
         clientId: mockClientAgent.clientId,
         channelId: mockClientAgent.channels[0].channelId,
         systemPrompt: mockAgent.systemPrompt,
@@ -328,6 +330,7 @@ describe('IncomingMessageOrchestrator', () => {
       const mockContext = {
         agentId: 'agent-1',
         agentName: 'Support Bot',
+        agentKind: 'customer_service' as const,
         clientId: mockClientAgent.clientId,
         channelId: mockClientAgent.channels[0].channelId,
         systemPrompt: mockAgent.systemPrompt,
@@ -372,6 +375,7 @@ describe('IncomingMessageOrchestrator', () => {
       const mockContext = {
         agentId: 'agent-1',
         agentName: 'Support Bot',
+        agentKind: 'customer_service' as const,
         clientId: mockClientAgent.clientId,
         channelId: mockClientAgent.channels[0].channelId,
         systemPrompt: mockAgent.systemPrompt,
@@ -416,6 +420,7 @@ describe('IncomingMessageOrchestrator', () => {
       const mockContext = {
         agentId: 'agent-1',
         agentName: 'Support Bot',
+        agentKind: 'customer_service' as const,
         clientId: mockClientAgent.clientId,
         channelId: mockClientAgent.channels[0].channelId,
         systemPrompt: mockAgent.systemPrompt,

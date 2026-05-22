@@ -56,6 +56,8 @@ import {
   ClientCatalogItemSchema,
 } from './schemas/client-catalog-item.schema';
 import { ClientCatalogItemRepository } from './repositories/client-catalog-item.repository';
+import { Lead, LeadSchema } from './schemas/lead.schema';
+import { LeadRepository } from './repositories/lead.repository';
 import { EventIdempotencyService } from './event-idempotency.service';
 import { OnboardingModule } from '@onboarding/onboarding.module';
 import { AdminAuthModule } from '@admin-auth/admin-auth.module';
@@ -100,6 +102,7 @@ const repositories = [
   AdminUserRepository,
   AdminSessionRepository,
   ClientUserSessionRepository,
+  LeadRepository,
 ];
 
 @Global()
@@ -136,6 +139,7 @@ const repositories = [
       { name: AdminUser.name, schema: AdminUserSchema },
       { name: AdminSession.name, schema: AdminSessionSchema },
       { name: ClientUserSession.name, schema: ClientUserSessionSchema },
+      { name: Lead.name, schema: LeadSchema },
     ]),
     forwardRef(() => OnboardingModule),
     forwardRef(() => AdminAuthModule),

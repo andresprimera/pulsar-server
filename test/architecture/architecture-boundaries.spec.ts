@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import madge = require('madge');
+import { PromptBuilderService } from '@agent/prompt-builder.service';
 
 const SRC_ROOT = path.resolve(__dirname, '../../src');
 const TS_CONFIG_PATH = path.resolve(__dirname, '../../tsconfig.json');
@@ -289,6 +290,139 @@ describe('Architecture Boundaries', () => {
         }
       }
       expect(offenders).toEqual([]);
+    });
+  });
+
+  describe('lead-qualifier feature boundaries', () => {
+    const DOMAIN_LEADS = path.resolve(SRC_ROOT, 'core/domain/leads');
+    const LEAD_SCHEMA = path.resolve(
+      SRC_ROOT,
+      'core/persistence/schemas/lead.schema.ts',
+    );
+    const LEAD_REPO = path.resolve(
+      SRC_ROOT,
+      'core/persistence/repositories/lead.repository.ts',
+    );
+    const PROMPT_BUILDER = path.resolve(
+      SRC_ROOT,
+      'core/agent/prompt-builder.service.ts',
+    );
+    const FEATURES_LEADS_DTO = path.resolve(SRC_ROOT, 'features/leads/dto');
+
+    it('domain/leads/* has no outward layer imports (only @nestjs/common + @shared/*)', () => {
+      const domainLeadsFiles = fs.existsSync(DOMAIN_LEADS)
+        ? getAllFiles(DOMAIN_LEADS)
+        : [];
+      expect(domainLeadsFiles.length).toBeGreaterThan(0);
+
+      const FORBIDDEN_GROUPS = [
+        '@channels/',
+        '@orchestrator/',
+        '@agent/',
+        '@persistence/',
+      ];
+      for (const file of domainLeadsFiles) {
+        const content = fs.readFileSync(file, 'utf8');
+        for (const prefix of FORBIDDEN_GROUPS) {
+          expect(content).not.toContain(`from '${prefix}`);
+          expect(content).not.toContain(`from "${prefix}`);
+        }
+      }
+    });
+
+    it('lead.schema.ts and lead.repository.ts import nothing from @agent/* or @domain/*', () => {
+      expect(fs.existsSync(LEAD_SCHEMA)).toBe(true);
+      expect(fs.existsSync(LEAD_REPO)).toBe(true);
+      for (const file of [LEAD_SCHEMA, LEAD_REPO]) {
+        const content = fs.readFileSync(file, 'utf8');
+        expect(content).not.toMatch(/from\s+['"]@agent\//);
+        expect(content).not.toMatch(/from\s+['"]@domain\//);
+      }
+    });
+
+    it('prompt-builder.service.ts does not import any lead-qualifier files', () => {
+      expect(fs.existsSync(PROMPT_BUILDER)).toBe(true);
+      const content = fs.readFileSync(PROMPT_BUILDER, 'utf8');
+      expect(content).not.toMatch(/lead-qualifier/);
+      expect(content).not.toMatch(/lead-bootstrap/);
+      expect(content).not.toMatch(/record-lead-qualification/);
+      expect(content).not.toMatch(/from\s+['"]@domain\/leads\//);
+      expect(content).not.toMatch(
+        /from\s+['"]@persistence\/repositories\/lead/,
+      );
+    });
+
+    it('features/leads/dto/* imports only from @shared/*, class-validator, class-transformer, or sibling files', () => {
+      const dtoFiles = fs.existsSync(FEATURES_LEADS_DTO)
+        ? getAllFiles(FEATURES_LEADS_DTO)
+        : [];
+      expect(dtoFiles.length).toBeGreaterThan(0);
+
+      const ALLOWED_PREFIXES = [
+        '@shared/',
+        'class-validator',
+        'class-transformer',
+      ];
+      const offenders: string[] = [];
+      for (const file of dtoFiles) {
+        const content = fs.readFileSync(file, 'utf8');
+        const regex = /from\s+['"]([^'"]+)['"]/g;
+        let match: RegExpExecArray | null;
+        while ((match = regex.exec(content)) !== null) {
+          const src = match[1];
+          // Sibling/relative-same-folder imports (e.g. './lead-summary.dto') are allowed.
+          if (src.startsWith('./')) {
+            continue;
+          }
+          const allowed = ALLOWED_PREFIXES.some(
+            (p) => src === p || src.startsWith(p),
+          );
+          if (!allowed) {
+            offenders.push(`${toPosixPath(file)} → ${src}`);
+          }
+        }
+      }
+      expect(offenders).toEqual([]);
+    });
+
+    it('prompt-builder renders [Lead Qualification Goal] ONLY for agentKind === "lead_qualifier"', () => {
+      // Behavioral architecture test: instantiate the real prompt builder
+      // through the same alias resolver as the production code path and
+      // confirm the lead-qualifier section is gated by `agentKind`.
+      const service = new PromptBuilderService();
+
+      const TOKENS = ['lead', 'qualif', 'budget', 'intent', 'timeline'];
+
+      const baseContext: any = {
+        agentId: 'a1',
+        clientId: 'c1',
+        channelId: 'ch1',
+        systemPrompt: 'You are helpful.',
+        toolingProfileId: 'standard',
+        llmConfig: { provider: 'openai', apiKey: 'k', model: 'gpt-4o' },
+      };
+
+      const customerServiceOut: string = service.build(
+        { ...baseContext, agentKind: 'customer_service' },
+        {},
+        undefined,
+      );
+      const salesOut: string = service.build(
+        { ...baseContext, agentKind: 'sales' },
+        {},
+        undefined,
+      );
+      const leadOut: string = service.build(
+        { ...baseContext, agentKind: 'lead_qualifier' },
+        {},
+        undefined,
+      );
+
+      for (const token of TOKENS) {
+        expect(customerServiceOut.toLowerCase()).not.toContain(token);
+        expect(salesOut.toLowerCase()).not.toContain(token);
+        expect(leadOut.toLowerCase()).toContain(token);
+      }
     });
   });
 

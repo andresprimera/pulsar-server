@@ -597,6 +597,9 @@ describe('SeederService', () => {
       );
       const salesAgentId = new Types.ObjectId('cccccccccccccccccccccccc');
       const orderSalesAgentId = new Types.ObjectId('dddddddddddddddddddddddd');
+      const leadQualifierAgentId = new Types.ObjectId(
+        'eeeeeeeeeeeeeeeeeeeeeeee',
+      );
 
       mockUserRepository.findByEmail.mockResolvedValue(null);
       mockAgentModel.findOne
@@ -616,6 +619,12 @@ describe('SeederService', () => {
           exec: jest.fn().mockResolvedValue({
             _id: orderSalesAgentId,
             name: SEED_DATA.agents[2].name,
+          }),
+        })
+        .mockReturnValueOnce({
+          exec: jest.fn().mockResolvedValue({
+            _id: leadQualifierAgentId,
+            name: SEED_DATA.agents[3].name,
           }),
         });
 

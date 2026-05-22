@@ -12,9 +12,11 @@ import {
 import { decrypt, decryptRecord } from '@shared/crypto.util';
 import {
   CHAT_STANDARD_TOOLING_PROFILE_ID,
+  LEAD_QUALIFIER_TOOLING_PROFILE_ID,
   isAgentToolingProfileId,
   type AgentToolingProfileId,
 } from '@shared/agent-tooling-profile.constants';
+import type { AgentKind } from '@shared/agent-kind.constants';
 import { RouteCandidate } from '@domain/routing/agent-routing.service';
 import { LlmProvider } from '@domain/llm/provider.enum';
 import type { LLMConfig } from '@domain/llm/llm.factory';
@@ -83,7 +85,32 @@ export class AgentContextService {
   private resolveToolingProfileId(
     hireRaw: string | undefined,
     catalogRaw: string | undefined,
+    agentKind: AgentKind,
   ): AgentToolingProfileId {
+    // Lead-qualifier agents force the lead-qualifier profile so the
+    // `record_lead_qualification` tool is always present, regardless of
+    // what hire/catalog metadata happens to carry.
+    if (agentKind === 'lead_qualifier') {
+      const hireMismatch =
+        hireRaw != null &&
+        hireRaw !== '' &&
+        hireRaw !== LEAD_QUALIFIER_TOOLING_PROFILE_ID;
+      const catalogMismatch =
+        catalogRaw != null &&
+        catalogRaw !== '' &&
+        catalogRaw !== LEAD_QUALIFIER_TOOLING_PROFILE_ID;
+      if (hireMismatch || catalogMismatch) {
+        this.logger.warn(
+          `lead_qualifier kind overriding toolingProfileId; hire="${
+            hireRaw ?? ''
+          }" catalog="${
+            catalogRaw ?? ''
+          }" → ${LEAD_QUALIFIER_TOOLING_PROFILE_ID}`,
+        );
+      }
+      return LEAD_QUALIFIER_TOOLING_PROFILE_ID;
+    }
+
     const raw =
       hireRaw != null && hireRaw !== ''
         ? hireRaw
@@ -159,11 +186,13 @@ export class AgentContextService {
     const toolingProfileId = this.resolveToolingProfileId(
       clientAgent.toolingProfileId,
       agent.toolingProfileId,
+      agent.kind,
     );
 
     const rawContext: AgentContext = {
       agentId: clientAgent.agentId,
       agentName: agent.name,
+      agentKind: agent.kind,
       clientId: clientAgent.clientId,
       channelId: channelConfig.channelId.toString(),
       systemPrompt: agent.systemPrompt,
